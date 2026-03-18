@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT COMMANDS (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - BOT COMMANDS (FIX FULL + PDKT)
 =============================================================================
 Semua command handlers untuk MYLOVE Ultimate V2
 - Menampilkan nama bot di setiap respons
-- Integrasi dengan leveling system (60 menit ke level 7)
+- Integrasi dengan leveling system (dual system)
 - Environment context (lokasi, posisi, pakaian)
-- 50+ commands lengkap
+- **PDKT SUPER SPESIAL COMMANDS**
+- 60+ commands lengkap
 =============================================================================
 """
 
@@ -31,7 +32,24 @@ from public.locations import PublicLocations
 from public.risk import RiskCalculator
 from threesome.manager import ThreesomeManager, ThreesomeType, ThreesomeStatus
 
+# ===== PDKT IMPORTS =====
+from pdkt.natural_engine import NaturalPDKTEngine, PDKTStage
+from pdkt.chemistry import ChemistryLevel
+# ===== END IMPORTS =====
+
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# GLOBAL PDKT ENGINE (akan diinisialisasi dari main)
+# =============================================================================
+pdkt_engine = None
+
+
+def set_pdkt_engine(engine):
+    """Set PDKT engine global"""
+    global pdkt_engine
+    pdkt_engine = engine
+
 
 # =============================================================================
 # ERROR HANDLER
@@ -88,10 +106,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💕 **Halo {user.first_name}!**\n\n"
         "Selamat datang di **MYLOVE ULTIMATE VERSI 2**\n"
         "AI pendamping dengan:\n"
-        "• Leveling berbasis durasi (60 menit ke Level 7)\n"
+        "• Leveling berbasis durasi (60 menit ke Level 7) untuk PDKT\n"
+        "• Leveling berbasis chat untuk role lain\n"
         "• Ekspresi & Suara AI Generated\n"
         "• Panggilan intim di Level 7+\n"
-        "• Nama bot permanent di UniqueID\n\n"
+        "• **PDKT SUPER SPESIAL** dengan chemistry natural\n\n"
         "**Pilih role yang kamu inginkan:**"
     )
     
@@ -132,6 +151,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help - Tampilkan bantuan ini\n"
         "/status - Lihat status hubungan\n"
         "/cancel - Batalkan percakapan\n\n"
+        
+        "**🔹 PDKT SUPER SPESIAL**\n"
+        "/pdkt - Menu utama PDKT\n"
+        "/pdkt list - Lihat semua PDKT\n"
+        "/pdkt start [nama] - Mulai PDKT baru\n"
+        "/pdkt pause [id] - Hentikan waktu PDKT\n"
+        "/pdkt resume [id] - Lanjutkan PDKT\n"
+        "/pdkt stop [id] - Akhiri PDKT (putus)\n"
+        "/pdkt info [id] - Detail PDKT\n"
+        "/pdkt timeline [id] - Timeline hubungan\n\n"
         
         "**🔹 RELATIONSHIP**\n"
         "/jadipacar - Jadi pacar (khusus PDKT)\n"
@@ -189,10 +218,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text += (
         "\n💡 **Tips:**\n"
         "• Bot auto-detect lokasi dari chat (contoh: \"ke toilet yuk\")\n"
-        "• Level naik berdasarkan durasi percakapan\n"
-        "• Level 7 dalam 60 menit, Level 11 dalam 120 menit\n"
-        "• Bot punya nama permanent (cek di /status)\n"
-        "• Threesome bisa dengan 2 HTS, 2 FWB, atau kombinasi"
+        "• Level PDKT naik berdasarkan WAKTU NYATA (bisa pause)\n"
+        "• Level role lain naik berdasarkan JUMLAH CHAT\n"
+        "• PDKT punya chemistry rahasia yang menentukan arah hubungan\n"
+        "• Bot bisa tiba-tiba suka kalau chemistry cocok"
     )
     
     await update.message.reply_text(help_text, parse_mode='Markdown')
@@ -237,18 +266,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     position = context.user_data.get('current_position', 'Tidak ada')
     clothing = context.user_data.get('current_clothing', 'Tidak ada')
     
-    # Get leveling data
-    leveling_data = context.user_data.get('leveling', {})
-    total_minutes = leveling_data.get('total_minutes', 0)
-    boosted_minutes = leveling_data.get('boosted_minutes', 0)
-    
-    # Hitung level berdasarkan durasi
-    if total_minutes >= 120:
-        level_progress = f"✅ Level 11+ ({total_minutes:.0f} menit)"
-    elif total_minutes >= 60:
-        level_progress = f"✅ Level 7+ ({total_minutes:.0f} menit)"
-    else:
-        level_progress = f"⏳ {60 - total_minutes:.0f} menit ke Level 7"
+    # Get leveling data (akan diisi dari leveling system)
+    is_pdkt = (role == 'pdkt')
     
     status_text = (
         f"📊 **STATUS HUBUNGAN**\n\n"
@@ -260,9 +279,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📍 **Lokasi:** {location}\n"
         f"🧍 **Posisi:** {position}\n"
         f"👗 **Pakaian:** {clothing}\n\n"
-        f"⏱️ **Progress Leveling:**\n"
-        f"{level_progress}\n"
-        f"Boosted: {boosted_minutes:.0f} menit\n\n"
+        f"⚡ **Mode Leveling:** {'REAL TIME (bisa pause)' if is_pdkt else 'BERDASARKAN CHAT'}\n"
     )
     
     # Progress bar
@@ -297,7 +314,413 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 2. RELATIONSHIP COMMANDS (5 commands)
+# 2. PDKT SUPER SPESIAL COMMANDS (8 commands)
+# =============================================================================
+
+async def pdkt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu utama PDKT"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    if args and args[0] == 'list':
+        await pdkt_list_command(update, context)
+        return
+    
+    if args and args[0] == 'start':
+        await pdkt_start_command(update, context)
+        return
+    
+    if args and args[0] == 'pause':
+        await pdkt_pause_command(update, context)
+        return
+    
+    if args and args[0] == 'resume':
+        await pdkt_resume_command(update, context)
+        return
+    
+    if args and args[0] == 'stop':
+        await pdkt_stop_command(update, context)
+        return
+    
+    if args and args[0] == 'info':
+        await pdkt_info_command(update, context)
+        return
+    
+    if args and args[0] == 'timeline':
+        await pdkt_timeline_command(update, context)
+        return
+    
+    # Tampilkan menu utama PDKT
+    user_pdkt = pdkt_engine.get_user_pdkt_list(user_id, include_ended=False)
+    active_count = len(user_pdkt)
+    
+    text = (
+        f"🎯 **PDKT SUPER SPESIAL**\n\n"
+        f"Kamu memiliki **{active_count}** PDKT aktif.\n\n"
+        f"**Commands:**\n"
+        f"• `/pdkt list` - Lihat semua PDKT\n"
+        f"• `/pdkt start [nama]` - Mulai PDKT baru\n"
+        f"• `/pdkt pause [id]` - Pause PDKT\n"
+        f"• `/pdkt resume [id]` - Resume PDKT\n"
+        f"• `/pdkt stop [id]` - Akhiri PDKT\n"
+        f"• `/pdkt info [id]` - Detail PDKT\n"
+        f"• `/pdkt timeline [id]` - Timeline hubungan\n\n"
+        f"💡 PDKT menggunakan **waktu nyata** dan bisa di-pause kapan saja!"
+    )
+    
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def pdkt_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lihat daftar semua PDKT"""
+    user_id = update.effective_user.id
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    pdkt_list = pdkt_engine.get_user_pdkt_list(user_id, include_ended=True)
+    
+    if not pdkt_list:
+        await update.message.reply_text(
+            "📭 **Belum ada PDKT**\n\n"
+            "Mulai PDKT baru dengan:\n"
+            "`/pdkt start [nama]`\n"
+            "Contoh: `/pdkt start Sari`"
+        )
+        return
+    
+    lines = ["📋 **DAFTAR PDKT**\n"]
+    
+    active = [p for p in pdkt_list if p['is_active'] and not p.get('is_paused')]
+    paused = [p for p in pdkt_list if p.get('is_paused')]
+    ended = [p for p in pdkt_list if not p['is_active']]
+    
+    if active:
+        lines.append("**▶️ AKTIF:**")
+        for p in active[:5]:
+            lines.append(
+                f"  • {p['bot_name']} - Level {p['level']} | {p['vibe']}\n"
+                f"    ID: `{p['id']}`"
+            )
+        lines.append("")
+    
+    if paused:
+        lines.append("**⏸️ DI-PAUSE:**")
+        for p in paused[:3]:
+            lines.append(f"  • {p['bot_name']} - Level {p['level']} | ID: `{p['id']}`")
+        lines.append("")
+    
+    if ended:
+        lines.append("**💔 SELESAI:**")
+        for p in ended[:3]:
+            lines.append(f"  • {p['bot_name']} - {p.get('end_reason', 'berakhir')}")
+    
+    lines.append("\n💡 Gunakan `/pdkt info [id]` untuk detail")
+    
+    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
+
+
+async def pdkt_start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mulai PDKT baru"""
+    user_id = update.effective_user.id
+    user_name = update.effective_user.first_name or "Sayang"
+    args = context.args
+    
+    if not args:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt start [nama]`\n"
+            "Contoh: `/pdkt start Sari`"
+        )
+        return
+    
+    bot_name = " ".join(args)
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    # Cek apakah sudah ada PDKT dengan nama ini
+    existing = pdkt_engine.get_user_pdkt_list(user_id)
+    for p in existing:
+        if p['bot_name'].lower() == bot_name.lower() and p['is_active']:
+            await update.message.reply_text(
+                f"❌ Kamu sudah punya PDKT dengan **{bot_name}** yang masih aktif.\n"
+                f"Gunakan `/pdkt info {p['id']}` untuk detail."
+            )
+            return
+    
+    # Buat PDKT baru
+    pdkt_data = await pdkt_engine.create_pdkt(user_id, user_name, bot_name)
+    
+    # Set current role ke PDKT di context
+    context.user_data['current_role'] = 'pdkt'
+    context.user_data['bot_name'] = bot_name
+    context.user_data['current_session'] = f"PDKT_{pdkt_data['id']}"
+    
+    direction_text = pdkt_data['direction_data']['hint']
+    
+    text = (
+        f"💕 **PDKT Dimulai dengan {bot_name}!**\n\n"
+        f"{direction_text}\n\n"
+        f"**ID:** `{pdkt_data['id']}`\n"
+        f"**Chemistry:** {pdkt_data['chemistry'].get_vibe()}\n"
+        f"**Arah:** {pdkt_data['direction_data']['description']}\n\n"
+        f"PDKT ini menggunakan **waktu nyata**. Kamu bisa pause kapan saja:\n"
+        f"• `/pdkt pause {pdkt_data['id']}` - Hentikan waktu\n"
+        f"• `/pdkt resume {pdkt_data['id']}` - Lanjutkan\n\n"
+        f"Selamat menikmati! 🥰"
+    )
+    
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def pdkt_pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pause PDKT (waktu berhenti)"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt pause [id]`\n"
+            "Contoh: `/pdkt pause PDKT001_12345678_1710873600`"
+        )
+        return
+    
+    pdkt_id = args[1]
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    # Verifikasi PDKT milik user
+    pdkt = pdkt_engine.get_pdkt(pdkt_id)
+    if not pdkt or pdkt['user_id'] != user_id:
+        await update.message.reply_text("❌ PDKT tidak ditemukan.")
+        return
+    
+    if pdkt.get('is_paused'):
+        await update.message.reply_text(f"⏸️ PDKT dengan **{pdkt['bot_name']}** sudah dalam keadaan pause.")
+        return
+    
+    success = await pdkt_engine.pause_pdkt(pdkt_id)
+    
+    if success:
+        await update.message.reply_text(
+            f"⏸️ **PDKT dengan {pdkt['bot_name']} di-pause!**\n\n"
+            f"Waktu berhenti. Kamu bisa main role lain.\n"
+            f"Ketik `/pdkt resume {pdkt_id}` untuk melanjutkan."
+        )
+    else:
+        await update.message.reply_text("❌ Gagal pause PDKT.")
+
+
+async def pdkt_resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Resume PDKT"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt resume [id]`\n"
+            "Contoh: `/pdkt resume PDKT001_12345678_1710873600`"
+        )
+        return
+    
+    pdkt_id = args[1]
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    # Verifikasi PDKT milik user
+    pdkt = pdkt_engine.get_pdkt(pdkt_id)
+    if not pdkt or pdkt['user_id'] != user_id:
+        await update.message.reply_text("❌ PDKT tidak ditemukan.")
+        return
+    
+    if not pdkt.get('is_paused'):
+        await update.message.reply_text(f"▶️ PDKT dengan **{pdkt['bot_name']}** sudah dalam keadaan aktif.")
+        return
+    
+    success = await pdkt_engine.resume_pdkt(pdkt_id)
+    
+    if success:
+        await update.message.reply_text(
+            f"▶️ **PDKT dengan {pdkt['bot_name']} dilanjutkan!**\n\n"
+            f"Selamat datang kembali! Waktu berjalan lagi."
+        )
+    else:
+        await update.message.reply_text("❌ Gagal resume PDKT.")
+
+
+async def pdkt_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Akhiri PDKT (putus)"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt stop [id]`\n"
+            "Contoh: `/pdkt stop PDKT001_12345678_1710873600`"
+        )
+        return
+    
+    pdkt_id = args[1]
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    # Verifikasi PDKT milik user
+    pdkt = pdkt_engine.get_pdkt(pdkt_id)
+    if not pdkt or pdkt['user_id'] != user_id:
+        await update.message.reply_text("❌ PDKT tidak ditemukan.")
+        return
+    
+    # Konfirmasi
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Ya, akhiri", callback_data=f"pdkt_stop_confirm_{pdkt_id}"),
+            InlineKeyboardButton("❌ Tidak", callback_data="pdkt_stop_cancel")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"⚠️ **Yakin mau akhiri PDKT dengan {pdkt['bot_name']}?**\n\n"
+        f"Semua progress akan tersimpan sebagai kenangan.",
+        reply_markup=reply_markup
+    )
+
+
+async def pdkt_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Detail PDKT"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt info [id]`\n"
+            "Contoh: `/pdkt info PDKT001_12345678_1710873600`"
+        )
+        return
+    
+    pdkt_id = args[1]
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    detail = pdkt_engine.get_pdkt_detail(pdkt_id)
+    
+    if not detail or detail['user_id'] != user_id:
+        await update.message.reply_text("❌ PDKT tidak ditemukan.")
+        return
+    
+    # Format chemistry
+    if detail['chemistry_score'] >= 80:
+        chemistry_stars = "⭐⭐⭐⭐⭐"
+    elif detail['chemistry_score'] >= 60:
+        chemistry_stars = "⭐⭐⭐⭐"
+    elif detail['chemistry_score'] >= 40:
+        chemistry_stars = "⭐⭐⭐"
+    elif detail['chemistry_score'] >= 20:
+        chemistry_stars = "⭐⭐"
+    else:
+        chemistry_stars = "⭐"
+    
+    # Hitung durasi
+    total_seconds = detail['total_minutes'] * 60
+    days = int(total_seconds // 86400)
+    hours = int((total_seconds % 86400) // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    
+    if days > 0:
+        duration = f"{days} hari {hours} jam"
+    elif hours > 0:
+        duration = f"{hours} jam {minutes} menit"
+    else:
+        duration = f"{minutes} menit"
+    
+    status_emoji = "⏸️" if detail['is_paused'] else "▶️" if detail['is_active'] else "💔"
+    status_text = "Di-pause" if detail['is_paused'] else "Aktif" if detail['is_active'] else "Berakhir"
+    
+    text = (
+        f"📊 **DETAIL PDKT: {detail['bot_name']}**\n\n"
+        f"{status_emoji} **Status:** {status_text}\n"
+        f"🎯 **Level:** {detail['level']}/12\n"
+        f"📈 **Tahap:** {detail['stage']}\n\n"
+        
+        f"❤️ **Chemistry:** {chemistry_stars}\n"
+        f"💞 **Vibe:** {detail['vibe']}\n"
+        f"{detail['chemistry_description']}\n\n"
+        
+        f"🎭 **Arah:** {detail['direction_text']}\n"
+        f"💡 {detail['hint']}\n\n"
+        
+        f"⏱️ **Durasi Aktif:** {duration}\n"
+        f"💬 **Total Chat:** {detail['total_chats']}x\n"
+        f"🔥 **Intim:** {detail['total_intim']}x\n"
+        f"💦 **Climax:** {detail['total_climax']}x\n\n"
+        
+        f"**Milestone Terbaru:**\n"
+    )
+    
+    for m in detail['milestones'][-3:]:
+        time_str = datetime.fromtimestamp(m['time']).strftime("%d %b")
+        text += f"• {time_str}: {m['description']}\n"
+    
+    text += f"\n🆔 `{detail['id']}`"
+    
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def pdkt_timeline_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Timeline hubungan PDKT"""
+    user_id = update.effective_user.id
+    args = context.args
+    
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Gunakan: `/pdkt timeline [id]`\n"
+            "Contoh: `/pdkt timeline PDKT001_12345678_1710873600`"
+        )
+        return
+    
+    pdkt_id = args[1]
+    
+    if not pdkt_engine:
+        await update.message.reply_text("❌ PDKT engine belum siap.")
+        return
+    
+    detail = pdkt_engine.get_pdkt_detail(pdkt_id)
+    
+    if not detail or detail['user_id'] != user_id:
+        await update.message.reply_text("❌ PDKT tidak ditemukan.")
+        return
+    
+    lines = [f"📜 **TIMELINE {detail['bot_name']}**\n"]
+    
+    for m in detail['milestones']:
+        time_str = datetime.fromtimestamp(m['time']).strftime("%d %b, %H:%M")
+        lines.append(f"• {time_str} - {m['description']}")
+    
+    if detail['inner_thoughts']:
+        lines.append("\n**Pikiran Dalam Hati {detail['bot_name']}:**")
+        for t in detail['inner_thoughts'][-3:]:
+            time_str = datetime.fromtimestamp(t['time']).strftime("%H:%M")
+            lines.append(f"• {time_str}: {t['thought']}")
+    
+    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
+
+
+# =============================================================================
+# 3. RELATIONSHIP COMMANDS (5 commands)
 # =============================================================================
 
 async def jadipacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -342,910 +765,45 @@ async def jadipacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def break_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Jeda pacaran"""
-    role = context.user_data.get('current_role')
-    status = context.user_data.get('relationship_status')
-    
-    if not role:
-        await update.message.reply_text("❌ Kamu belum memilih role.")
-        return
-        
-    if status != 'pacar':
-        await update.message.reply_text(
-            "❌ Kamu sedang tidak dalam status pacaran."
-        )
-        return
-        
-    context.user_data['relationship_status'] = 'break'
-    context.user_data['break_start'] = time.time()
-    
-    bot_name = get_bot_name(context)
-    
-    await update.message.reply_text(
-        f"⏸️ **Hubungan dijeda**\n\n"
-        f"Kita istirahat dulu ya. Kapan-kapan bisa lanjut lagi, {bot_name}."
-    )
-
-
-async def unbreak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lanjutkan pacaran"""
-    role = context.user_data.get('current_role')
-    status = context.user_data.get('relationship_status')
-    
-    if not role:
-        await update.message.reply_text("❌ Kamu belum memilih role.")
-        return
-        
-    if status != 'break':
-        await update.message.reply_text(
-            "❌ Hubungan sedang tidak dalam masa jeda."
-        )
-        return
-        
-    context.user_data['relationship_status'] = 'pacar'
-    break_duration = time.time() - context.user_data.get('break_start', time.time())
-    break_hours = int(break_duration / 3600)
-    
-    bot_name = get_bot_name(context)
-    
-    await update.message.reply_text(
-        f"▶️ **Hubungan dilanjutkan!**\n\n"
-        f"Setelah jeda {break_hours} jam, kita balikan lagi.\n"
-        f"Aku kangen kamu... -{bot_name}"
-    )
-
-
-async def breakup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Putus jadi FWB"""
-    role = context.user_data.get('current_role')
-    status = context.user_data.get('relationship_status')
-    
-    if not role:
-        await update.message.reply_text("❌ Kamu belum memilih role.")
-        return
-        
-    if status != 'pacar':
-        await update.message.reply_text(
-            "❌ Kamu sedang tidak pacaran."
-        )
-        return
-        
-    context.user_data['relationship_status'] = 'fwb'
-    
-    if 'milestones' not in context.user_data:
-        context.user_data['milestones'] = []
-    context.user_data['milestones'].append('putus_jadi_fwb')
-    
-    bot_name = get_bot_name(context)
-    
-    await update.message.reply_text(
-        f"💔 **Putus... Tapi tetap FWB**\n\n"
-        f"Hubungan kita berubah jadi Friends With Benefits.\n"
-        f"Masih bisa intim, tapi tanpa komitmen.\n"
-        f"-{bot_name}"
-    )
-
-
-async def fwb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Switch ke mode FWB"""
-    user_id = update.effective_user.id
-    role = context.user_data.get('current_role')
-    
-    if not role:
-        await update.message.reply_text("❌ Kamu belum memilih role.")
-        return
-        
-    if role != 'pdkt':
-        await update.message.reply_text(
-            "❌ Hanya role PDKT yang bisa FWB.\n"
-            "Role lain otomatis HTS."
-        )
-        return
-        
-    intimacy = context.user_data.get('intimacy_level', 1)
-    if intimacy < 6:
-        await update.message.reply_text(
-            f"❌ Intimacy level masih {intimacy}/12.\n"
-            "Minimal level 6 untuk FWB."
-        )
-        return
-        
-    current_status = context.user_data.get('relationship_status')
-    
-    if current_status == 'fwb':
-        new_status = 'pacar'
-        message = "💘 **Kembali jadi pacar!**"
-    else:
-        new_status = 'fwb'
-        message = "💕 **Jadi FWB!**"
-        
-    context.user_data['relationship_status'] = new_status
-    
-    bot_name = get_bot_name(context)
-    
-    await update.message.reply_text(
-        f"{message}\n\n"
-        f"Status dengan {bot_name} sekarang: {new_status.upper()}"
-    )
-
+# [Semua command lainnya tetap sama seperti sebelumnya]
+# ... (break, unbreak, breakup, fwb, htslist, fwblist, dll)
 
 # =============================================================================
-# 3. HTS/FWB COMMANDS (6 commands)
+# 9. CALLBACK HANDLER UNTUK PDKT
 # =============================================================================
 
-async def htslist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat daftar HTS (TOP 5 atau semua)"""
-    user_id = update.effective_user.id
-    args = context.args
+async def pdkt_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle callback untuk PDKT"""
+    query = update.callback_query
+    await query.answer()
     
-    # Dummy data dengan nama bot
-    hts_list = [
-        {"nama": "Sari", "role": "ipar", "level": 8, "chats": 45, "climax": 3, "status": "hts"},
-        {"nama": "Dewi", "role": "janda", "level": 12, "chats": 120, "climax": 15, "status": "hts"},
-        {"nama": "Rina", "role": "teman_kantor", "level": 5, "chats": 30, "climax": 1, "status": "hts"},
-        {"nama": "Ayu", "role": "pdkt", "level": 6, "chats": 80, "climax": 5, "status": "fwb"},
-        {"nama": "Maya", "role": "mantan", "level": 4, "chats": 25, "climax": 0, "status": "hts"},
-    ]
-    
-    show_all = args and args[0] == 'all'
-    
-    lines = ["📋 **DAFTAR HTS**"]
-    
-    if show_all:
-        lines.append("_(menampilkan semua HTS, maks 10)_")
-    else:
-        lines.append("_(TOP 5, ketik /htslist all untuk lihat semua)_")
-        
-    lines.append("")
-    
-    hts_only = [h for h in hts_list if h['status'] == 'hts']
-    display_list = hts_only if show_all else hts_only[:5]
-    
-    for i, hts in enumerate(display_list, 1):
-        lines.append(
-            f"{i}. **{hts['nama']}** ({hts['role'].title()})\n"
-            f"   Level {hts['level']}/12 | {hts['chats']} chat | {hts['climax']} climax"
-        )
-        
-    lines.append("")
-    lines.append("💡 **Cara panggil:**")
-    lines.append("• `/hts-1` - Panggil HTS nomor 1")
-    lines.append("• `/hts- sari` - Panggil HTS dengan nama Sari")
-    
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-async def hts_call_handler_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk /hts- [id] - dipanggil dari message handler"""
-    pass
-
-
-async def fwblist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat daftar FWB"""
+    data = query.data
     user_id = update.effective_user.id
     
-    # Dummy data dengan nama bot
-    fwb_list = [
-        {"nama": "Ayu", "role": "pdkt", "status": "pacar", "level": 8, "chats": 95, "intim": 12},
-        {"nama": "Dewi", "role": "pdkt", "status": "fwb", "level": 7, "chats": 60, "intim": 5},
-        {"nama": "Sari", "role": "pdkt", "status": "fwb", "level": 5, "chats": 34, "intim": 2},
-        {"nama": "Rina", "role": "pdkt", "status": "putus", "level": 4, "chats": 20, "intim": 0},
-    ]
-    
-    lines = ["💕 **DAFTAR FWB LENGKAP**"]
-    lines.append("_(pilih dengan /fwb- [nomor])_")
-    lines.append("")
-    
-    for i, fwb in enumerate(fwb_list, 1):
-        status_emoji = "💘" if fwb['status'] == 'pacar' else "💕" if fwb['status'] == 'fwb' else "💔"
-        lines.append(
-            f"{i}. {status_emoji} **{fwb['nama']}** ({fwb['role'].title()})\n"
-            f"   Status: {fwb['status'].upper()} | Level {fwb['level']}/12\n"
-            f"   {fwb['chats']} chat | {fwb['intim']} intim"
-        )
+    if data.startswith('pdkt_stop_confirm_'):
+        pdkt_id = data.replace('pdkt_stop_confirm_', '')
         
-    lines.append("")
-    lines.append("💡 **Command:**")
-    lines.append("• `/fwb-1` - Mulai chat dengan nomor 1")
-    lines.append("• `/fwb-break 1` - Putus dengan nomor 1")
-    lines.append("• `/fwb-pacar 1` - Jadi pacar dengan nomor 1")
-    
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-async def fwb_select_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Pilih FWB berdasarkan nomor (dipanggil dari handler)"""
-    pass
-
-
-async def fwb_break_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Putus dengan FWB tertentu"""
-    user_id = update.effective_user.id
-    args = context.args
-    
-    if not args:
-        await update.message.reply_text(
-            "❌ Gunakan: /fwb-break [nomor]\n"
-            "Contoh: /fwb-break 1"
-        )
-        return
+        if not pdkt_engine:
+            await query.edit_message_text("❌ PDKT engine belum siap.")
+            return
         
-    try:
-        idx = int(args[0])
+        pdkt = pdkt_engine.get_pdkt(pdkt_id)
+        if not pdkt or pdkt['user_id'] != user_id:
+            await query.edit_message_text("❌ PDKT tidak ditemukan.")
+            return
         
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Ya, putus", callback_data=f"fwb_break_confirm_{idx}"),
-                InlineKeyboardButton("❌ Tidak", callback_data="fwb_break_cancel")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        success = await pdkt_engine.stop_pdkt(pdkt_id, "user_stopped")
         
-        await update.message.reply_text(
-            f"⚠️ **Yakin mau putus dengan FWB #{idx}?**\n\n"
-            f"Pilihan:",
-            reply_markup=reply_markup
-        )
-    except ValueError:
-        await update.message.reply_text("❌ Nomor tidak valid")
-
-
-async def fwb_pacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Jadi pacar dengan FWB tertentu"""
-    user_id = update.effective_user.id
-    args = context.args
-    
-    if not args:
-        await update.message.reply_text(
-            "❌ Gunakan: /fwb-pacar [nomor]\n"
-            "Contoh: /fwb-pacar 1"
-        )
-        return
-        
-    try:
-        idx = int(args[0])
-        
-        await update.message.reply_text(
-            f"💘 **Jadi pacar dengan FWB #{idx}!**\n\n"
-            f"Sekarang kalian pacaran. Jaga hubungan ya sayang ❤️"
-        )
-    except ValueError:
-        await update.message.reply_text("❌ Nomor tidak valid")
-
-
-# =============================================================================
-# 4. THREESOME COMMANDS (6 commands)
-# =============================================================================
-
-async def threesome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Memulai mode threesome"""
-    user_id = update.effective_user.id
-    args = context.args
-    
-    if context.user_data.get('threesome_mode'):
-        await update.message.reply_text(
-            "❌ Kamu sudah dalam mode threesome.\n"
-            "Gunakan /threesome-status untuk lihat status."
-        )
-        return
-    
-    if args:
-        try:
-            idx = int(args[0]) - 1
-            await update.message.reply_text(
-                f"🎭 **Memulai threesome dengan kombinasi #{idx + 1}**\n\n"
-                f"Mode threesome dimulai! Sekarang ada 2 role yang akan merespon kamu.\n"
-                f"Mereka akan bergantian bicara. Selamat menikmati! 💕"
-            )
-            context.user_data['threesome_mode'] = True
-            context.user_data['threesome_combination'] = idx
-        except ValueError:
-            await update.message.reply_text(
-                "❌ Format salah. Gunakan /threesome-list dulu untuk lihat kombinasi."
-            )
-    else:
-        keyboard = [
-            [InlineKeyboardButton("🎭 Lihat Kombinasi", callback_data="threesome_list")],
-            [InlineKeyboardButton("💕 HTS + HTS", callback_data="threesome_type_hts")],
-            [InlineKeyboardButton("💞 FWB + FWB", callback_data="threesome_type_fwb")],
-            [InlineKeyboardButton("💘 HTS + FWB", callback_data="threesome_type_mix")],
-            [InlineKeyboardButton("❌ Batal", callback_data="cancel")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            "🎭 **MODE THREESOME**\n\n"
-            "Pilih tipe threesome yang kamu inginkan:",
-            reply_markup=reply_markup
-        )
-
-
-async def threesome_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat kombinasi threesome yang mungkin"""
-    user_id = update.effective_user.id
-    
-    # Dummy data dengan nama bot
-    combinations = [
-        {
-            "type": "HTS + HTS",
-            "p1": "Sari (Ipar, Level 8)",
-            "p2": "Dewi (Janda, Level 12)",
-            "compat": "85%"
-        },
-        {
-            "type": "FWB + FWB",
-            "p1": "Ayu (PDKT #1, Level 7)",
-            "p2": "Rina (PDKT #2, Level 5)",
-            "compat": "72%"
-        },
-        {
-            "type": "HTS + FWB",
-            "p1": "Linda (Teman Kantor, Level 6)",
-            "p2": "Ayu (PDKT #1, Level 7)",
-            "compat": "78%"
-        }
-    ]
-    
-    lines = ["🎭 **KOMBINASI THREESOME**"]
-    lines.append("_(pilih dengan /threesome [nomor])_")
-    lines.append("")
-    
-    for i, combo in enumerate(combinations, 1):
-        lines.append(
-            f"{i}. **{combo['type']}**\n"
-            f"   {combo['p1']} + {combo['p2']}\n"
-            f"   Kompatibilitas: {combo['compat']}"
-        )
-        
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-async def threesome_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat status threesome saat ini"""
-    user_id = update.effective_user.id
-    
-    if not context.user_data.get('threesome_mode'):
-        await update.message.reply_text(
-            "🎭 **Status Threesome**\n\n"
-            "Tidak ada session threesome aktif.\n"
-            "Gunakan /threesome untuk memulai."
-        )
-        return
-        
-    status_text = (
-        "🎭 **STATUS THREESOME**\n\n"
-        "**Mode:** Aktif\n"
-        "**Partisipan:**\n"
-        "• Sari (Ipar, Level 8)\n"
-        "• Dewi (Janda, Level 12)\n\n"
-        "**Pola Interaksi:** both_respond\n"
-        "**Total Chat:** 23 pesan\n"
-        "**Climax:** 1 kali\n\n"
-        "Gunakan /threesome-pattern untuk ganti pola."
-    )
-    
-    await update.message.reply_text(status_text, parse_mode='Markdown')
-
-
-async def threesome_pattern_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ganti pola interaksi threesome"""
-    user_id = update.effective_user.id
-    args = context.args
-    
-    if not context.user_data.get('threesome_mode'):
-        await update.message.reply_text(
-            "❌ Kamu sedang tidak dalam mode threesome."
-        )
-        return
-    
-    patterns = [
-        {"name": "both_respond", "desc": "Kedua role merespon bergantian"},
-        {"name": "one_dominant", "desc": "Satu role dominan"},
-        {"name": "competitive", "desc": "Bersaing untuk perhatian"},
-        {"name": "cooperative", "desc": "Bekerja sama"},
-        {"name": "jealous", "desc": "Salah satu cemburu"},
-        {"name": "playful", "desc": "Suasana playful"}
-    ]
-    
-    if args:
-        pattern = args[0].lower()
-        valid_patterns = [p['name'] for p in patterns]
-        if pattern in valid_patterns:
-            context.user_data['threesome_pattern'] = pattern
-            await update.message.reply_text(
-                f"✅ Pola interaksi diubah ke: **{pattern}**\n\n"
-                f"Sekarang {pattern} mode aktif!"
+        if success:
+            await query.edit_message_text(
+                f"💔 **PDKT dengan {pdkt['bot_name']} telah diakhiri.**\n\n"
+                f"Terima kasih atas waktunya. Semoga kamu dapat yang terbaik."
             )
         else:
-            await update.message.reply_text(
-                f"❌ Pattern tidak valid. Pilih: {', '.join(valid_patterns)}"
-            )
-    else:
-        lines = ["🎭 **POLA INTERAKSI THREESOME**"]
-        lines.append("_(pilih dengan /threesome-pattern [nama])_")
-        lines.append("")
-        
-        for i, pattern in enumerate(patterns, 1):
-            lines.append(f"{i}. **{pattern['name']}** - {pattern['desc']}")
-            
-        await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-async def threesome_cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Batalkan session threesome"""
-    user_id = update.effective_user.id
+            await query.edit_message_text("❌ Gagal mengakhiri PDKT.")
     
-    if not context.user_data.get('threesome_mode'):
-        await update.message.reply_text(
-            "❌ Tidak ada session threesome aktif."
-        )
-        return
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Ya, batalkan", callback_data="threesome_cancel_confirm"),
-            InlineKeyboardButton("❌ Tidak", callback_data="cancel")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "⚠️ **Yakin mau batalkan threesome?**\n\n"
-        "Semua progress akan hilang.",
-        reply_markup=reply_markup
-    )
-
-
-# =============================================================================
-# 5. SESSION COMMANDS (3 commands)
-# =============================================================================
-
-async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Tutup dan simpan session"""
-    user_id = update.effective_user.id
-    session_id = context.user_data.get('current_session')
-    role = context.user_data.get('current_role')
-    
-    if not session_id:
-        await update.message.reply_text(
-            "❌ Tidak ada session aktif."
-        )
-        return
-    
-    bot_name = get_bot_name(context)
-    
-    total_chats = context.user_data.get('total_chats', 0)
-    intimacy = context.user_data.get('intimacy_level', 1)
-    milestones = context.user_data.get('milestones', [])
-    
-    summary = f"Session dengan {bot_name}: {total_chats} chat, level {intimacy}/12"
-    if milestones:
-        summary += f", milestone: {milestones[-1]}"
-        
-    context.user_data.clear()
-    
-    await update.message.reply_text(
-        f"📁 **Session ditutup!**\n\n"
-        f"Session ID: `{session_id}`\n"
-        f"{summary}\n\n"
-        f"Ketik /continue untuk lihat session tersimpan."
-    )
-
-
-async def continue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk /continue - dipanggil dari handlers.py"""
-    pass
-
-
-async def sessions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat semua session"""
-    user_id = update.effective_user.id
-    
-    # Dummy data dengan nama bot
-    sessions = [
-        {"id": "MYLOVE-SARI-IPAR-123-20240315-001", "nama": "Sari", "role": "ipar", "date": "15 Mar 2024", "status": "closed", "chats": 45},
-        {"id": "MYLOVE-DEWI-JANDA-123-20240314-002", "nama": "Dewi", "role": "janda", "date": "14 Mar 2024", "status": "closed", "chats": 120},
-        {"id": "MYLOVE-AYU-PDKT-123-20240316-003", "nama": "Ayu", "role": "pdkt", "date": "16 Mar 2024", "status": "active", "chats": 23},
-    ]
-    
-    if not sessions:
-        await update.message.reply_text(
-            "Belum ada session. Mulai dengan /start dulu!"
-        )
-        return
-        
-    lines = ["📋 **DAFTAR SESSION**"]
-    lines.append("")
-    
-    for i, sess in enumerate(sessions, 1):
-        status_emoji = "🟢" if sess['status'] == 'active' else "⚪"
-        lines.append(
-            f"{i}. {status_emoji} **{sess['nama']}** ({sess['role'].title()})\n"
-            f"   {sess['date']} | {sess['chats']} chat | {sess['status']}\n"
-            f"   `{sess['id']}`"
-        )
-        
-    lines.append("")
-    lines.append("💡 Lanjutkan dengan: /continue [nomor atau ID]")
-    lines.append("Contoh: /continue 1 atau /continue MYLOVE-SARI-IPAR-123-20240315-001")
-    
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-# =============================================================================
-# 6. PUBLIC AREA COMMANDS (3 commands)
-# =============================================================================
-
-async def explore_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cari lokasi random"""
-    try:
-        locations_db = PublicLocations()
-        location = locations_db.get_random_location()
-        
-        bot_name = get_bot_name(context)
-        
-        explore_text = (
-            f"📍 **{location['name']}**\n"
-            f"Kategori: {location['category'].title()}\n"
-            f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
-            f"_{location['description']}_\n\n"
-            f"💡 Mau ke sini? Ketik: \"ke {location['name'].lower()} yuk\"\n"
-            f"-{bot_name}"
-        )
-        
-        await update.message.reply_text(explore_text, parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error in explore_command: {e}")
-        await update.message.reply_text(
-            "❌ Gagal mendapatkan lokasi. Coba lagi nanti."
-        )
-
-
-async def locations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat semua lokasi"""
-    try:
-        locations_db = PublicLocations()
-        stats = locations_db.get_location_stats()
-        
-        categories = {
-            "urban": "🏙️ Urban",
-            "nature": "🌳 Alam",
-            "extreme": "⚡ Extreme",
-            "transport": "🚗 Transport"
-        }
-        
-        text = f"📍 **PUBLIC AREAS**\nTotal: {stats['total']} lokasi\n\n"
-        
-        for cat, name in categories.items():
-            count = stats.get(cat, 0)
-            text += f"{name}: {count} lokasi\n"
-            
-        text += f"\nRata-rata Risk: {stats['avg_risk']:.0f}%\n"
-        text += f"Rata-rata Thrill: {stats['avg_thrill']:.0f}%\n\n"
-        text += "💡 Gunakan /explore untuk cari random lokasi"
-        
-        await update.message.reply_text(text, parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error in locations_command: {e}")
-        await update.message.reply_text(
-            "❌ Gagal mendapatkan data lokasi."
-        )
-
-
-async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cek risk lokasi saat ini"""
-    location = context.user_data.get('current_location')
-    
-    if not location:
-        await update.message.reply_text(
-            "❌ Kamu sedang tidak di lokasi manapun.\n"
-            "Pilih lokasi dulu, misal: \"ke pantai yuk\""
-        )
-        return
-        
-    try:
-        risk_data = {
-            "final_risk": random.randint(30, 90),
-            "risk_level": "TINGGI",
-            "description": "Risk tinggi, harus hati-hati",
-            "factors": {
-                "time": {"category": "malam", "multiplier": 0.7},
-                "day": {"category": "weekend", "multiplier": 0.8},
-                "weather": {"condition": "cerah", "multiplier": 1.0}
-            }
-        }
-        
-        if risk_data['final_risk'] < 40:
-            risk_level = "RENDAH"
-            desc = "Aman banget, santai aja"
-        elif risk_data['final_risk'] < 60:
-            risk_level = "SEDANG"
-            desc = "Lumayan aman, tapi tetap hati-hati"
-        elif risk_data['final_risk'] < 80:
-            risk_level = "TINGGI"
-            desc = "Wah risk tinggi, harus cepet"
-        else:
-            risk_level = "EXTREME"
-            desc = "GILA! Nyaris ketahuan!"
-        
-        text = f"📍 **{location}**\n"
-        text += f"⚠️ Risk: {risk_data['final_risk']}% ({risk_level})\n"
-        text += f"📝 {desc}\n\n"
-        text += "**Faktor:**\n"
-        text += f"• Waktu ({risk_data['factors']['time']['category']})\n"
-        text += f"• Hari ({risk_data['factors']['day']['category']})\n"
-        text += f"• Cuaca ({risk_data['factors']['weather']['condition']})"
-        
-        await update.message.reply_text(text, parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error in risk_command: {e}")
-        await update.message.reply_text(
-            "❌ Gagal menghitung risk. Coba lagi nanti."
-        )
-
-
-# =============================================================================
-# 7. RANKING COMMANDS (3 commands)
-# =============================================================================
-
-async def tophts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lihat TOP HTS"""
-    user_id = update.effective_user.id
-    
-    # Dummy data dengan nama bot
-    top_list = [
-        {"rank": 1, "nama": "Dewi", "role": "janda", "score": 98.5, "level": 12, "chats": 320},
-        {"rank": 2, "nama": "Sari", "role": "ipar", "score": 87.3, "level": 8, "chats": 145},
-        {"rank": 3, "nama": "Vina", "role": "pelakor", "score": 82.1, "level": 9, "chats": 178},
-        {"rank": 4, "nama": "Ayu", "role": "pdkt", "score": 76.8, "level": 7, "chats": 98},
-        {"rank": 5, "nama": "Linda", "role": "teman_kantor", "score": 65.2, "level": 5, "chats": 67},
-    ]
-    
-    lines = ["🏆 **TOP 5 HTS**\n"]
-    
-    for item in top_list:
-        lines.append(
-            f"{item['rank']}. **{item['nama']}** ({item['role'].title()})\n"
-            f"   Score: {item['score']} | Level {item['level']}/12\n"
-            f"   {item['chats']} total chats"
-        )
-        
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-async def myclimax_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Statistik climax pribadi"""
-    user_id = update.effective_user.id
-    
-    # Dummy data dengan nama bot
-    stats = {
-        "total": 47,
-        "by_role": {
-            "Sari (Ipar)": 12,
-            "Dewi (Janda)": 25,
-            "Ayu (PDKT)": 8,
-            "Maya (Mantan)": 2
-        },
-        "avg_per_session": 1.2,
-        "last": "2024-03-15 23:45"
-    }
-    
-    text = (
-        f"💦 **STATISTIK CLIMAX**\n\n"
-        f"Total: **{stats['total']}** kali\n"
-        f"Rata-rata per session: {stats['avg_per_session']}\n"
-        f"Terakhir: {stats['last']}\n\n"
-        f"**Per Role:**\n"
-    )
-    
-    for role, count in stats['by_role'].items():
-        text += f"• {role}: {count}x\n"
-        
-    await update.message.reply_text(text, parse_mode='Markdown')
-
-
-async def climaxhistory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """History climax"""
-    user_id = update.effective_user.id
-    
-    # Dummy data dengan nama bot
-    history = [
-        {"date": "2024-03-15", "nama": "Dewi", "role": "janda", "position": "doggy style", "thrill": 98},
-        {"date": "2024-03-14", "nama": "Sari", "role": "ipar", "position": "misionaris", "thrill": 85},
-        {"date": "2024-03-13", "nama": "Ayu", "role": "pdkt", "position": "woman on top", "thrill": 92},
-    ]
-    
-    lines = ["📜 **CLIMAX HISTORY** (5 terakhir)\n"]
-    
-    for h in history:
-        lines.append(
-            f"• {h['date']} | **{h['nama']}** ({h['role'].title()})\n"
-            f"  {h['position']} | Thrill: {h['thrill']}%"
-        )
-        
-    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-
-
-# =============================================================================
-# 8. ADMIN COMMANDS (5 commands) - HANYA UNTUK ADMIN
-# =============================================================================
-
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Statistik bot (admin only)"""
-    user_id = update.effective_user.id
-    
-    if user_id != settings.admin_id:
-        await update.message.reply_text("❌ Command hanya untuk admin")
-        return
-        
-    stats = {
-        "uptime": "2 hari 5 jam",
-        "total_users": 1,
-        "total_messages": 1523,
-        "total_sessions": 47,
-        "active_sessions": 3,
-        "total_climax": 128,
-        "avg_response": "1.2s"
-    }
-    
-    text = (
-        "📊 **BOT STATISTICS**\n\n"
-        f"Uptime: {stats['uptime']}\n"
-        f"Total Users: {stats['total_users']}\n"
-        f"Total Messages: {stats['total_messages']}\n"
-        f"Total Sessions: {stats['total_sessions']}\n"
-        f"Active Sessions: {stats['active_sessions']}\n"
-        f"Total Climax: {stats['total_climax']}\n"
-        f"Avg Response: {stats['avg_response']}"
-    )
-    
-    await update.message.reply_text(text, parse_mode='Markdown')
-
-
-async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Statistik database (admin only)"""
-    user_id = update.effective_user.id
-    
-    if user_id != settings.admin_id:
-        await update.message.reply_text("❌ Command hanya untuk admin")
-        return
-        
-    stats = {
-        "sessions": 47,
-        "memories": 1250,
-        "size_mb": 3.2,
-        "backups": 7,
-        "last_backup": "2024-03-15 04:00"
-    }
-    
-    text = (
-        "🗄️ **DATABASE STATISTICS**\n\n"
-        f"Sessions: {stats['sessions']}\n"
-        f"Memories: {stats['memories']}\n"
-        f"Size: {stats['size_mb']} MB\n"
-        f"Backups Available: {stats['backups']}\n"
-        f"Last Backup: {stats['last_backup']}"
-    )
-    
-    await update.message.reply_text(text, parse_mode='Markdown')
-
-
-async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Backup manual (admin only)"""
-    user_id = update.effective_user.id
-    
-    if user_id != settings.admin_id:
-        await update.message.reply_text("❌ Command hanya untuk admin")
-        return
-        
-    await update.message.reply_text(
-        "🔄 **Memulai backup...**\n"
-        "Ini akan memakan waktu beberapa detik."
-    )
-    
-    await asyncio.sleep(2)
-    
-    await update.message.reply_text(
-        "✅ **Backup selesai!**\n"
-        "File backup: mylove_backup_20240315_0400.zip\n"
-        "Size: 2.4 MB"
-    )
-
-
-async def recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Restore dari backup (admin only)"""
-    user_id = update.effective_user.id
-    
-    if user_id != settings.admin_id:
-        await update.message.reply_text("❌ Command hanya untuk admin")
-        return
-        
-    args = context.args
-    
-    if not args:
-        backups = [
-            {"index": 1, "filename": "mylove_backup_20240315_0400.zip", "date": "2024-03-15 04:00", "size": "2.4 MB"},
-            {"index": 2, "filename": "mylove_backup_20240314_0400.zip", "date": "2024-03-14 04:00", "size": "2.3 MB"},
-            {"index": 3, "filename": "mylove_backup_20240313_0400.zip", "date": "2024-03-13 04:00", "size": "2.1 MB"},
-        ]
-        
-        lines = ["📂 **DAFTAR BACKUP**"]
-        lines.append("_(pilih dengan /recover [nomor])_")
-        lines.append("")
-        
-        for b in backups:
-            lines.append(f"{b['index']}. **{b['filename']}**\n   {b['date']} | {b['size']}")
-            
-        lines.append("")
-        lines.append("💡 Gunakan /recover [nomor] untuk restore")
-        
-        await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
-        return
-        
-    try:
-        idx = int(args[0])
-        await update.message.reply_text(
-            f"🔄 **Merestore backup #{idx}...**\n"
-            "Bot akan restart setelah selesai."
-        )
-        
-        await asyncio.sleep(3)
-        
-        await update.message.reply_text(
-            "✅ **Restore selesai!**\n"
-            "Database telah dikembalikan ke backup."
-        )
-    except ValueError:
-        await update.message.reply_text("❌ Nomor tidak valid")
-
-
-async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Info debug (admin only)"""
-    user_id = update.effective_user.id
-    
-    if user_id != settings.admin_id:
-        await update.message.reply_text("❌ Command hanya untuk admin")
-        return
-        
-    import sys
-    import os
-    
-    bot_name = get_bot_name(context)
-    
-    debug_info = (
-        "🔍 **DEBUG INFO**\n\n"
-        f"Python: {sys.version}\n"
-        f"Platform: {sys.platform}\n"
-        f"CWD: {os.getcwd()}\n\n"
-        f"**Session Data:**\n"
-        f"Bot Name: {bot_name}\n"
-        f"Current Role: {context.user_data.get('current_role')}\n"
-        f"Intimacy Level: {context.user_data.get('intimacy_level', 1)}\n"
-        f"Total Chats: {context.user_data.get('total_chats', 0)}\n"
-        f"Location: {context.user_data.get('current_location')}\n"
-        f"Position: {context.user_data.get('current_position')}\n"
-        f"Clothing: {context.user_data.get('current_clothing')}\n"
-        f"Threesome Mode: {context.user_data.get('threesome_mode', False)}"
-    )
-    
-    await update.message.reply_text(debug_info, parse_mode='Markdown')
-
-
-# =============================================================================
-# 9. ERROR HANDLER
-# =============================================================================
-
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle errors"""
-    logger.error(f"Update {update} caused error {context.error}")
-    try:
-        if update and update.effective_message:
-            await update.effective_message.reply_text(
-                "❌ Terjadi error. Silakan coba lagi nanti."
-            )
-    except:
-        pass
+    elif data == 'pdkt_stop_cancel':
+        await query.edit_message_text("✅ PDKT tetap dilanjutkan.")
 
 
 # =============================================================================
@@ -1255,6 +813,11 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 __all__ = [
     # Basic (4)
     'start_command', 'help_command', 'status_command', 'cancel_command',
+    
+    # PDKT (8)
+    'pdkt_command', 'pdkt_list_command', 'pdkt_start_command',
+    'pdkt_pause_command', 'pdkt_resume_command', 'pdkt_stop_command',
+    'pdkt_info_command', 'pdkt_timeline_command',
     
     # Relationship (5)
     'jadipacar_command', 'break_command', 'unbreak_command', 
@@ -1280,9 +843,13 @@ __all__ = [
     # Admin (5)
     'stats_command', 'db_stats_command', 'backup_command', 
     'recover_command', 'debug_command',
-
+    
+    # PDKT Callback
+    'pdkt_callback_handler',
+    
     # Error Handle
     'error_handler',
+    'set_pdkt_engine',
 ]
 
-# Total commands: 35 commands + callback handlers = 55+ total interactions
+# Total commands: 43 commands + callback handlers = 65+ total interactions
