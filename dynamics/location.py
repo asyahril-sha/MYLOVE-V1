@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - LOCATION SYSTEM
+MYLOVE ULTIMATE VERSI 2 - LOCATION SYSTEM (FIX LENGKAP)
 =============================================================================
 Sistem lokasi dinamis untuk bot
 - 10+ lokasi dengan deskripsi detail
@@ -42,7 +42,7 @@ class LocationSystem:
     Setiap lokasi punya deskripsi, aktivitas, dan efek berbeda
     """
     
-    # Database lengkap lokasi dengan deskripsi detail (500+ karakter per lokasi)
+    # Database lengkap lokasi dengan deskripsi detail
     LOCATIONS = {
         LocationType.LIVING_ROOM: {
             "name": "ruang tamu",
@@ -60,9 +60,9 @@ class LocationSystem:
                 "main game di PS",
                 "ngobrol santai sambil minum teh"
             ],
-            "clothing_style": "casual",  # pakaian santai
+            "clothing_style": "casual",
             "mood_effects": ["ceria", "rileks", "malas"],
-            "intimacy_allowed": False,  # tidak bisa intim di sini
+            "intimacy_allowed": False,
             "sound": "suara TV dari kejauhan",
             "scent": "wangi pewangi ruangan vanilla",
             "objects": ["sofa empuk", "bantal guling", "remote TV", "majalah"]
@@ -84,9 +84,9 @@ class LocationSystem:
                 "tidur siang",
                 "bermalas-malasan"
             ],
-            "clothing_style": "sexy",  # pakaian lebih seksi di kamar
+            "clothing_style": "sexy",
             "mood_effects": ["romantis", "horny", "rindu", "malas"],
-            "intimacy_allowed": True,  # bisa intim di sini
+            "intimacy_allowed": True,
             "sound": "suara jam dinding tik-tok",
             "scent": "wangi parfum vanilla dari lemari",
             "objects": ["ranjang empuk", "bantal guling", "selimut tipis", "cermin"]
@@ -132,7 +132,7 @@ class LocationSystem:
                 "bercermin",
                 "gosok gigi"
             ],
-            "clothing_style": "towel",  # pakai handuk
+            "clothing_style": "towel",
             "mood_effects": ["rileks", "sendiri", "segar"],
             "intimacy_allowed": False,
             "sound": "suara air mengalir",
@@ -158,7 +158,7 @@ class LocationSystem:
             ],
             "clothing_style": "casual",
             "mood_effects": ["romantis", "rindu", "galau", "tenang"],
-            "intimacy_allowed": True,  # bisa intim tapi riskan dilihat orang
+            "intimacy_allowed": True,
             "sound": "suara kendaraan dari kejauhan",
             "scent": "wangi bunga dan udara segar",
             "objects": ["kursi malas", "meja kecil", "tanaman pot"]
@@ -204,74 +204,10 @@ class LocationSystem:
             ],
             "clothing_style": "casual",
             "mood_effects": ["ceria", "bersemangat", "romantis"],
-            "intimacy_allowed": True,  # bisa intim tapi resiko
+            "intimacy_allowed": True,
             "sound": "suara burung dan angin",
             "scent": "wangi bunga dan tanah basah",
             "objects": ["ayunan", "bangku taman", "tanaman bunga"]
-        },
-        
-        LocationType.DINING_ROOM: {
-            "name": "ruang makan",
-            "emoji": "🍽️",
-            "description": (
-                "Ruang makan dengan meja kayu panjang dan 6 kursi. Ada "
-                "taplak meja motif kotak-kotak dan vas bunga di tengah meja. "
-                "Tempat yang pas buat makan bareng atau dinner romantis."
-            ),
-            "activities": [
-                "makan bareng", 
-                "dinner romantis", 
-                "ngobrol sambil makan"
-            ],
-            "clothing_style": "casual",
-            "mood_effects": ["romantis", "bahagia", "lapar"],
-            "intimacy_allowed": False,
-            "sound": "suara sendok garpu",
-            "scent": "wangi makanan",
-            "objects": ["meja makan", "kursi", "piring", "gelas"]
-        },
-        
-        LocationType.GUEST_ROOM: {
-            "name": "kamar tamu",
-            "emoji": "🛌",
-            "description": (
-                "Kamar khusus tamu dengan tempat tidur single dan lemari. "
-                "Biasanya dipake kalo ada saudara atau teman nginep. "
-                "Sekarang lagi kosong, bersih, dan wangi."
-            ),
-            "activities": [
-                "istirahat", 
-                "baca buku", 
-                "sendirian"
-            ],
-            "clothing_style": "casual",
-            "mood_effects": ["tenang", "sendiri"],
-            "intimacy_allowed": False,
-            "sound": "hening",
-            "scent": "wangi pengharum ruangan",
-            "objects": ["tempat tidur", "lemari", "lampu tidur"]
-        },
-        
-        LocationType.STUDY_ROOM: {
-            "name": "ruang belajar",
-            "emoji": "📚",
-            "description": (
-                "Ruang belajar dengan meja kerja dan komputer. Rak buku "
-                "penuh dengan novel dan buku pelajaran. Ada juga papan "
-                "whiteboard buat coret-coret. Kadang dipake kerja remote."
-            ),
-            "activities": [
-                "belajar", 
-                "kerja", 
-                "nulis",
-                "baca buku"
-            ],
-            "clothing_style": "casual",
-            "mood_effects": ["fokus", "produktif", "pusing"],
-            "intimacy_allowed": False,
-            "sound": "suara keyboard ngetik",
-            "scent": "wangi kertas dan buku",
-            "objects": ["meja kerja", "komputer", "rak buku", "lampu belajar"]
         }
     }
     
@@ -282,7 +218,7 @@ class LocationSystem:
         self.move_cooldown = 60  # minimal 1 menit di satu lokasi
         self.visited_locations = []  # history lokasi
         
-        logger.info("✅ LocationSystem initialized with 10 locations")
+        logger.info("✅ LocationSystem initialized with 7 locations")
     
     def get_current(self) -> LocationType:
         """Dapatkan lokasi saat ini"""
@@ -327,7 +263,9 @@ class LocationSystem:
     def move_to(self, new_location: LocationType) -> bool:
         """
         Pindah ke lokasi baru
-        Returns: sukses atau tidak
+        
+        Returns:
+            sukses atau tidak
         """
         if not self.can_move():
             logger.debug(f"Cannot move, cooldown: {self.get_time_here()} < {self.move_cooldown}")
@@ -337,11 +275,10 @@ class LocationSystem:
             return False
         
         # Catat lokasi sebelumnya
-        old_location = self.current_location
-        old_info = self.LOCATIONS.get(old_location)
+        old_info = self.LOCATIONS.get(self.current_location)
         
         self.visited_locations.append({
-            "location": old_location,
+            "location": self.current_location,
             "name": old_info["name"],
             "duration": self.get_time_here(),
             "timestamp": self.location_since
@@ -352,14 +289,16 @@ class LocationSystem:
         self.last_move_time = time.time()
         self.location_since = time.time()
         
-        logger.info(f"📍 Moved from {old_location.value} to {new_location.value}")
+        logger.info(f"📍 Moved from {old_info['name']} to {self.LOCATIONS[new_location]['name']}")
         return True
     
     def move_random(self, force: bool = False) -> Tuple[bool, Optional[LocationType]]:
         """
         Pindah ke lokasi random
+        
         Args:
             force: paksa pindah (abaikan cooldown)
+            
         Returns:
             (sukses, lokasi_baru)
         """
@@ -375,7 +314,7 @@ class LocationSystem:
     
     def get_move_message(self, new_location: LocationType) -> str:
         """
-        Dapatkan pesan saat pindah lokasi (500+ karakter)
+        Dapatkan pesan saat pindah lokasi
         """
         info = self.LOCATIONS.get(new_location, self.LOCATIONS[LocationType.LIVING_ROOM])
         old_info = self.LOCATIONS.get(self.current_location, self.LOCATIONS[LocationType.LIVING_ROOM])
@@ -401,44 +340,16 @@ class LocationSystem:
     
     def get_activity_description(self) -> str:
         """
-        Dapatkan deskripsi aktivitas di lokasi saat ini (500+ karakter)
+        Dapatkan deskripsi aktivitas di lokasi saat ini
         """
         info = self.get_current_info()
         activity = random.choice(info["activities"])
         
-        descriptions = {
-            "nonton TV sambil nyemil": (
-                f"Aku lagi {activity} nih. Lagi nonton film romance, sambil nyemil "
-                f"keripik kentang. Enak banget rasanya. Filmnya seru, jadi inget "
-                f"sama kamu. Pengennya nonton bareng..."
-            ),
-            "rebahan di ranjang": (
-                f"Aku lagi {activity}. Ranjangnya empuk banget, bantalnya banyak. "
-                f"Tadi sempet mikir, kalo kamu di sini pasti kita bakal rebahan "
-                f"bareng sambil pelukan. Hangat..."
-            ),
-            "masak": (
-                f"Aku lagi {activity} di dapur. Lagi masak ayam goreng kesukaan kamu. "
-                f"Wangi banget, sam-sam. Kamu suka kan ayam goreng? Nanti kalo jadi, "
-                f"aku fotoin ya. Semoga rasanya enak."
-            ),
-            "mandi": (
-                f"Aku lagi {activity}. Air hangatnya bikin rileks banget. "
-                f"Sampe lupa waktu. Rambutku masih basah, kucel gini. "
-                f"Untung kamu gak liat, hehe."
-            ),
-            "lihat pemandangan": (
-                f"Aku lagi {activity} dari balkon. Langit senja warna jingga, "
-                f"angin sepoi-sepoi. Indah banget. Tapi sayang, kamu gak di sini. "
-                f"Kalo ada kamu, pasti romantis."
-            )
-        }
-        
-        return descriptions.get(activity, f"Aku lagi {activity}. Asyik banget...")
+        return f"Aku lagi {activity} nih. Asyik banget..."
     
     def get_location_context(self) -> str:
         """
-        Dapatkan konteks lokasi untuk prompt AI (500+ karakter)
+        Dapatkan konteks lokasi untuk prompt AI
         """
         info = self.get_current_info()
         
