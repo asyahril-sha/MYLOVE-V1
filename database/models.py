@@ -2,19 +2,31 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - DATABASE MODELS
+MYLOVE ULTIMATE VERSI 1 - DATABASE MODELS (FIX FULL)
 =============================================================================
 - Data models untuk semua entitas
 - Pydantic models untuk validasi
-- JSON serialization/deserialization
+- SQLAlchemy Base class untuk import
+- Semua model lengkap dengan method to_dict/from_dict
 """
 
 import time
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from enum import Enum
+
+
+# =============================================================================
+# BASE CLASS (untuk SQLAlchemy import)
+# =============================================================================
+class Base:
+    """
+    Base class untuk SQLAlchemy models
+    Memungkinkan import 'Base' dari database.models
+    """
+    pass
 
 
 # =============================================================================
@@ -28,6 +40,7 @@ class RelationshipStatus(str, Enum):
     PACAR = "pacar"
     PUTUS = "putus"
     BREAK = "break"
+    ENDED = "ended"
 
 
 class MemoryType(str, Enum):
@@ -50,6 +63,12 @@ class MilestoneType(str, Enum):
     AFTERCARE = "aftercare"
     RESET = "reset"
     BREAK_UP = "break_up"
+    CAN_INTIM = "can_intim"
+    AFTERCARE_READY = "aftercare_ready"
+    MEMULAI_ROLE = "memulai_role"
+    JADI_PACAR = "jadi_pacar"
+    PUTUS_JADI_FWB = "putus_jadi_fwb"
+    BACK_TO_PACAR = "back_to_pacar"
 
 
 class BackupType(str, Enum):
@@ -65,12 +84,31 @@ class BackupStatus(str, Enum):
     FAILED = "failed"
 
 
+class SessionStatus(str, Enum):
+    """Status session"""
+    ACTIVE = "active"
+    CLOSED = "closed"
+    EXPIRED = "expired"
+
+
+class PreferenceType(str, Enum):
+    """Tipe preferensi"""
+    POSITION = "position"
+    AREA = "area"
+    ACTIVITY = "activity"
+    LOCATION = "location"
+    ROLE = "role"
+    FOREPLAY = "foreplay"
+    AFTERCARE = "aftercare"
+
+
 # =============================================================================
-# USER MODELS
+# USER MODEL
 # =============================================================================
 
 class User(BaseModel):
     """Model untuk user Telegram"""
+    id: Optional[int] = None
     telegram_id: int
     username: Optional[str] = None
     first_name: Optional[str] = None
@@ -88,7 +126,7 @@ class User(BaseModel):
         return v
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'telegram_id': self.telegram_id,
             'username': self.username,
@@ -103,8 +141,9 @@ class User(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'User':
-        """Create from dictionary"""
+        """Create User instance from database row"""
         return cls(
+            id=data.get('id'),
             telegram_id=data['telegram_id'],
             username=data.get('username'),
             first_name=data.get('first_name'),
@@ -115,10 +154,19 @@ class User(BaseModel):
             preferences=json.loads(data.get('preferences', '{}')),
             settings=json.loads(data.get('settings', '{}'))
         )
+    
+    def update_last_active(self):
+        """Update last active timestamp"""
+        self.last_active = time.time()
+    
+    def increment_interactions(self):
+        """Increment total interactions"""
+        self.total_interactions += 1
+        self.last_active = time.time()
 
 
 # =============================================================================
-# SESSION MODELS
+# SESSION MODEL
 # =============================================================================
 
 class Session(BaseModel):
@@ -126,7 +174,7 @@ class Session(BaseModel):
     id: str  # MYLOVE-ROLE-USER-DATE-SEQ
     user_id: int
     role: str
-    status: str = "active"
+    status: SessionStatus = SessionStatus.ACTIVE
     start_time: float = Field(default_factory=time.time)
     end_time: Optional[float] = None
     last_message_time: float = Field(default_factory=time.time)
@@ -151,12 +199,12 @@ class Session(BaseModel):
         return v
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'id': self.id,
             'user_id': self.user_id,
             'role': self.role,
-            'status': self.status,
+            'status': self.status.value,
             'start_time': self.start_time,
             'end_time': self.end_time,
             'last_message_time': self.last_message_time,
@@ -169,12 +217,12 @@ class Session(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Session':
-        """Create from dictionary"""
+        """Create Session instance from database row"""
         return cls(
             id=data['id'],
             user_id=data['user_id'],
             role=data['role'],
-            status=data.get('status', 'active'),
+            status=SessionStatus(data.get('status', 'active')),
             start_time=data.get('start_time', time.time()),
             end_time=data.get('end_time'),
             last_message_time=data.get('last_message_time', time.time()),
@@ -194,11 +242,23 @@ class Session(BaseModel):
     @property
     def is_active(self) -> bool:
         """Check if session is active"""
-        return self.status == "active"
+        return self.status == SessionStatus.ACTIVE
+    
+    def close(self, summary: Optional[str] = None):
+        """Close the session"""
+        self.status = SessionStatus.CLOSED
+        self.end_time = time.time()
+        if summary:
+            self.summary = summary
+    
+    def add_message(self):
+        """Increment message count"""
+        self.total_messages += 1
+        self.last_message_time = time.time()
 
 
 # =============================================================================
-# CONVERSATION MODELS
+# CONVERSATION MODEL
 # =============================================================================
 
 class Conversation(BaseModel):
@@ -212,7 +272,7 @@ class Conversation(BaseModel):
     mood: Optional[str] = None
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'session_id': self.session_id,
             'timestamp': self.timestamp,
@@ -224,7 +284,7 @@ class Conversation(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Conversation':
-        """Create from dictionary"""
+        """Create Conversation instance from database row"""
         return cls(
             id=data.get('id'),
             session_id=data['session_id'],
@@ -237,7 +297,7 @@ class Conversation(BaseModel):
 
 
 # =============================================================================
-# MEMORY MODELS
+# MEMORY MODEL
 # =============================================================================
 
 class Memory(BaseModel):
@@ -259,7 +319,7 @@ class Memory(BaseModel):
         return v
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'user_id': self.user_id,
             'role': self.role,
@@ -273,7 +333,7 @@ class Memory(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Memory':
-        """Create from dictionary"""
+        """Create Memory instance from database row"""
         return cls(
             id=data.get('id'),
             user_id=data['user_id'],
@@ -288,7 +348,7 @@ class Memory(BaseModel):
 
 
 # =============================================================================
-# RELATIONSHIP MODELS
+# RELATIONSHIP MODEL
 # =============================================================================
 
 class Relationship(BaseModel):
@@ -315,7 +375,7 @@ class Relationship(BaseModel):
         return v
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'user_id': self.user_id,
             'role': self.role,
@@ -334,7 +394,7 @@ class Relationship(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Relationship':
-        """Create from dictionary"""
+        """Create Relationship instance from database row"""
         return cls(
             id=data.get('id'),
             user_id=data['user_id'],
@@ -358,10 +418,39 @@ class Relationship(BaseModel):
         if self.instance_id:
             return f"{self.role} #{self.instance_id[-4:]}"
         return self.role
+    
+    def increment_interaction(self):
+        """Increment interaction count"""
+        self.total_interactions += 1
+        self.last_interaction = time.time()
+    
+    def increment_intim_session(self, climax: bool = False):
+        """Increment intimacy session count"""
+        self.total_intim_sessions += 1
+        if climax:
+            self.total_climax += 1
+        self.last_interaction = time.time()
+    
+    def add_milestone(self, milestone_type: str, description: Optional[str] = None):
+        """Add milestone to relationship"""
+        self.milestones.append({
+            'type': milestone_type,
+            'description': description,
+            'timestamp': time.time(),
+            'intimacy_level': self.intimacy_level
+        })
+    
+    def add_history(self, event: str, details: Optional[Dict] = None):
+        """Add event to history"""
+        self.history.append({
+            'event': event,
+            'details': details or {},
+            'timestamp': time.time()
+        })
 
 
 # =============================================================================
-# PREFERENCE MODELS
+# PREFERENCE MODEL
 # =============================================================================
 
 class Preference(BaseModel):
@@ -369,7 +458,7 @@ class Preference(BaseModel):
     id: Optional[int] = None
     user_id: int
     role: Optional[str] = None
-    pref_type: str  # position, area, activity, location
+    pref_type: PreferenceType
     item: str
     score: float = 0.5
     count: int = 1
@@ -382,11 +471,11 @@ class Preference(BaseModel):
         return v
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'user_id': self.user_id,
             'role': self.role,
-            'pref_type': self.pref_type,
+            'pref_type': self.pref_type.value,
             'item': self.item,
             'score': self.score,
             'count': self.count,
@@ -395,21 +484,27 @@ class Preference(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Preference':
-        """Create from dictionary"""
+        """Create Preference instance from database row"""
         return cls(
             id=data.get('id'),
             user_id=data['user_id'],
             role=data.get('role'),
-            pref_type=data['pref_type'],
+            pref_type=PreferenceType(data['pref_type']),
             item=data['item'],
             score=data.get('score', 0.5),
             count=data.get('count', 1),
             last_updated=data.get('last_updated', time.time())
         )
+    
+    def update_score(self, delta: float):
+        """Update preference score"""
+        self.score = max(0.1, min(1.0, self.score + delta))
+        self.count += 1
+        self.last_updated = time.time()
 
 
 # =============================================================================
-# MILESTONE MODELS
+# MILESTONE MODEL
 # =============================================================================
 
 class Milestone(BaseModel):
@@ -424,7 +519,7 @@ class Milestone(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'user_id': self.user_id,
             'role': self.role,
@@ -437,7 +532,7 @@ class Milestone(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Milestone':
-        """Create from dictionary"""
+        """Create Milestone instance from database row"""
         return cls(
             id=data.get('id'),
             user_id=data['user_id'],
@@ -451,7 +546,7 @@ class Milestone(BaseModel):
 
 
 # =============================================================================
-# BACKUP MODELS
+# BACKUP MODEL
 # =============================================================================
 
 class Backup(BaseModel):
@@ -465,7 +560,7 @@ class Backup(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for DB"""
+        """Convert to dictionary for DB insertion"""
         return {
             'filename': self.filename,
             'size': self.size,
@@ -477,7 +572,7 @@ class Backup(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Backup':
-        """Create from dictionary"""
+        """Create Backup instance from database row"""
         return cls(
             id=data.get('id'),
             filename=data['filename'],
@@ -489,12 +584,169 @@ class Backup(BaseModel):
         )
 
 
+# =============================================================================
+# THREESOME MODELS
+# =============================================================================
+
+class ThreesomeParticipant(BaseModel):
+    """Model untuk partisipan threesome"""
+    id: Optional[int] = None
+    threesome_session_id: str
+    user_id: int
+    role: str
+    instance_id: Optional[str] = None
+    participant_type: str  # 'hts' or 'fwb'
+    name: str
+    intimacy_level: int = 1
+    status: str = "active"
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary"""
+        return {
+            'threesome_session_id': self.threesome_session_id,
+            'user_id': self.user_id,
+            'role': self.role,
+            'instance_id': self.instance_id,
+            'participant_type': self.participant_type,
+            'name': self.name,
+            'intimacy_level': self.intimacy_level,
+            'status': self.status
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'ThreesomeParticipant':
+        """Create from dictionary"""
+        return cls(
+            id=data.get('id'),
+            threesome_session_id=data['threesome_session_id'],
+            user_id=data['user_id'],
+            role=data['role'],
+            instance_id=data.get('instance_id'),
+            participant_type=data['participant_type'],
+            name=data['name'],
+            intimacy_level=data.get('intimacy_level', 1),
+            status=data.get('status', 'active')
+        )
+
+
+class ThreesomeSession(BaseModel):
+    """Model untuk session threesome"""
+    id: str  # 3some_user_timestamp_random
+    user_id: int
+    type: str  # hts_hts, fwb_fwb, hts_fwb, same_role
+    status: str = "active"  # pending, active, paused, completed, cancelled
+    created_at: float = Field(default_factory=time.time)
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+    last_activity: float = Field(default_factory=time.time)
+    total_messages: int = 0
+    climax_count: int = 0
+    aftercare_needed: bool = False
+    current_focus: Optional[int] = None
+    last_pattern: Optional[str] = None
+    participants: List[Dict[str, Any]] = Field(default_factory=list)
+    interactions: List[Dict[str, Any]] = Field(default_factory=list)
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for DB"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'type': self.type,
+            'status': self.status,
+            'created_at': self.created_at,
+            'started_at': self.started_at,
+            'completed_at': self.completed_at,
+            'last_activity': self.last_activity,
+            'total_messages': self.total_messages,
+            'climax_count': self.climax_count,
+            'aftercare_needed': self.aftercare_needed,
+            'current_focus': self.current_focus,
+            'last_pattern': self.last_pattern,
+            'participants': json.dumps(self.participants),
+            'interactions': json.dumps(self.interactions[-50:])  # Last 50 only
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'ThreesomeSession':
+        """Create from dictionary"""
+        return cls(
+            id=data['id'],
+            user_id=data['user_id'],
+            type=data['type'],
+            status=data.get('status', 'active'),
+            created_at=data.get('created_at', time.time()),
+            started_at=data.get('started_at'),
+            completed_at=data.get('completed_at'),
+            last_activity=data.get('last_activity', time.time()),
+            total_messages=data.get('total_messages', 0),
+            climax_count=data.get('climax_count', 0),
+            aftercare_needed=data.get('aftercare_needed', False),
+            current_focus=data.get('current_focus'),
+            last_pattern=data.get('last_pattern'),
+            participants=json.loads(data.get('participants', '[]')),
+            interactions=json.loads(data.get('interactions', '[]'))
+        )
+    
+    def add_interaction(self, user_message: str, speaker_index: int, speaker_name: str):
+        """Add interaction to session"""
+        self.interactions.append({
+            'timestamp': time.time(),
+            'user_message': user_message[:100],
+            'speaker_index': speaker_index,
+            'speaker': speaker_name
+        })
+        self.total_messages += 1
+        self.last_activity = time.time()
+    
+    def record_climax(self, participant_indices: List[int]):
+        """Record climax"""
+        self.climax_count += len(participant_indices)
+        if self.climax_count >= len(self.participants):
+            self.aftercare_needed = True
+    
+    def start(self):
+        """Start session"""
+        self.status = 'active'
+        self.started_at = time.time()
+    
+    def pause(self):
+        """Pause session"""
+        self.status = 'paused'
+    
+    def resume(self):
+        """Resume session"""
+        self.status = 'active'
+    
+    def complete(self):
+        """Complete session"""
+        self.status = 'completed'
+        self.completed_at = time.time()
+    
+    def cancel(self):
+        """Cancel session"""
+        self.status = 'cancelled'
+        self.completed_at = time.time()
+
+
+# =============================================================================
+# EXPORT ALL MODELS
+# =============================================================================
+
 __all__ = [
+    # Base
+    'Base',
+    
+    # Enums
     'RelationshipStatus',
     'MemoryType',
     'MilestoneType',
     'BackupType',
     'BackupStatus',
+    'SessionStatus',
+    'PreferenceType',
+    
+    # Main Models
     'User',
     'Session',
     'Conversation',
@@ -503,4 +755,8 @@ __all__ = [
     'Preference',
     'Milestone',
     'Backup',
+    
+    # Threesome Models
+    'ThreesomeParticipant',
+    'ThreesomeSession',
 ]
