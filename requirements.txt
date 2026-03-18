@@ -1,5 +1,5 @@
 # =============================================================================
-# MYLOVE ULTIMATE VERSI 1 - DEPENDENCIES (FIXED for NumPy)
+# MYLOVE ULTIMATE VERSI 1 - DEPENDENCIES (FIXED with Loguru & Flask)
 # =============================================================================
 
 # Telegram Bot
@@ -25,6 +25,10 @@ chromadb==0.4.22
 # Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
+# ===== ADDED FOR HEALTHCHECK & LOGGING =====
+flask>=2.0.0
+loguru>=0.7.2
 
 # Utilities
 aiofiles==23.2.0
