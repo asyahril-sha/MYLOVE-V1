@@ -2,21 +2,29 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - AUTO LOCATION SELECTOR (FIX FULL)
+MYLOVE ULTIMATE VERSI 2 - AUTO LOCATION SELECTOR (ENHANCED)
 =============================================================================
 - Auto-detect lokasi dari chat user
 - Tidak perlu command khusus
 - Natural language processing sederhana
-- FIX: Menambahkan attribute locations, error handling, method lengkap
+- **INTEGRASI DENGAN LOCATION SYSTEM V2**
+- **SELECT BY LEVEL BERDASARKAN DURASI PERCAKAPAN**
+- **DESKRIPSI PANJANG 500+ KARAKTER**
+=============================================================================
 """
 
 import re
 import random
+import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 from difflib import get_close_matches
 
 from .locations import PublicLocations
+
+# ===== TAMBAHAN MYLOVE V2 =====
+from dynamics.location import LocationSystem, LocationType
+# ===== END TAMBAHAN =====
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +38,12 @@ class LocationAutoSelector:
     
     def __init__(self):
         self.locations_db = PublicLocations()
-        self.locations = self.locations_db.all_locations  # TAMBAHKAN UNTUK AKSES DARI LUAR
+        self.locations = self.locations_db.all_locations
+        
+        # ===== TAMBAHAN MYLOVE V2 =====
+        # Inisialisasi LocationSystem untuk environment dinamis
+        self.location_system = LocationSystem()
+        # ===== END TAMBAHAN =====
         
         # =========================================================================
         # KEYWORDS DATABASE (LENGKAP)
@@ -312,7 +325,161 @@ class LocationAutoSelector:
             
         indices = random.sample(range(len(category_locations)), min(limit, len(category_locations)))
         return [category_locations[i] for i in indices]
+    
+    # ===== TAMBAHAN MYLOVE V2 =====
+    # =========================================================================
+    # SELECT BY LEVEL (BERDASARKAN DURASI PERCAKAPAN)
+    # =========================================================================
+    
+    async def select_by_level(self, level: int, mood: str = None) -> Dict:
+        """
+        Pilih lokasi berdasarkan level hubungan (durasi percakapan)
         
+        Args:
+            level: Level hubungan (1-12)
+            mood: Mood saat ini (opsional)
+            
+        Returns:
+            Location dict dengan deskripsi panjang
+        """
+        # Level 1-3: Lokasi publik/netral
+        if level <= 3:
+            candidates = [
+                self.locations_db.get_location_by_id("ruang_tamu"),
+                self.locations_db.get_location_by_id("taman_kota"),
+                self.locations_db.get_location_by_id("kafe")
+            ]
+            candidates = [c for c in candidates if c is not None]
+            if not candidates:
+                candidates = self.locations_db.get_locations_by_risk(0, 40)
+                
+        # Level 4-6: Lokasi semi-privat
+        elif level <= 6:
+            candidates = [
+                self.locations_db.get_location_by_id("kamar"),
+                self.locations_db.get_location_by_id("balkon"),
+                self.locations_db.get_location_by_id("dapur")
+            ]
+            candidates = [c for c in candidates if c is not None]
+            if not candidates:
+                candidates = self.locations_db.get_locations_by_risk(30, 60)
+                
+        # Level 7-9: Lokasi privat (bisa intim)
+        elif level <= 9:
+            candidates = [
+                self.locations_db.get_location_by_id("kamar_tidur"),
+                self.locations_db.get_location_by_id("kamar_mandi"),
+                self.locations_db.get_location_by_id("ruang_tamu_malam")
+            ]
+            candidates = [c for c in candidates if c is not None]
+            if not candidates:
+                candidates = self.locations_db.get_locations_by_risk(50, 80)
+                
+        # Level 10-12: Lokasi extreme/romantis
+        else:
+            candidates = [
+                self.locations_db.get_location_by_id("pantai_malam"),
+                self.locations_db.get_location_by_id("atap_gedung"),
+                self.locations_db.get_location_by_id("kamar_hotel")
+            ]
+            candidates = [c for c in candidates if c is not None]
+            if not candidates:
+                candidates = self.locations_db.get_locations_by_risk(70, 100)
+        
+        # Jika ada mood, filter berdasarkan mood
+        if mood and candidates:
+            mood_map = {
+                "rindu": ["pantai", "balkon", "taman"],
+                "romantis": ["kamar", "restoran", "pantai"],
+                "horny": ["kamar", "kamar_mandi", "hotel"],
+                "marah": ["ruang_tamu", "dapur"],
+                "sedih": ["balkon", "taman", "sendiri"]
+            }
+            
+            preferred_keywords = mood_map.get(mood.lower(), [])
+            if preferred_keywords:
+                filtered = [c for c in candidates if any(k in c.get('name', '').lower() for k in preferred_keywords)]
+                if filtered:
+                    candidates = filtered
+        
+        return random.choice(candidates) if candidates else self.locations_db.get_random_location()
+    
+    # =========================================================================
+    # INTEGRASI DENGAN LOCATIONSYSTEM
+    # =========================================================================
+    
+    def sync_with_location_system(self, location_type: LocationType) -> Dict:
+        """
+        Sinkronisasi dengan LocationSystem MYLOVE V2
+        
+        Args:
+            location_type: Tipe lokasi dari LocationSystem
+            
+        Returns:
+            Dict location dari database yang sesuai
+        """
+        # Mapping LocationType ke ID lokasi di database
+        mapping = {
+            LocationType.LIVING_ROOM: "ruang_tamu",
+            LocationType.BEDROOM: "kamar_tidur",
+            LocationType.KITCHEN: "dapur",
+            LocationType.BATHROOM: "kamar_mandi",
+            LocationType.BALCONY: "balkon",
+            LocationType.TERRACE: "teras",
+            LocationType.GARDEN: "taman_kota",
+            LocationType.DINING_ROOM: "ruang_makan",
+            LocationType.GUEST_ROOM: "kamar_tamu",
+            LocationType.STUDY_ROOM: "ruang_belajar"
+        }
+        
+        loc_id = mapping.get(location_type, "ruang_tamu")
+        location = self.locations_db.get_location_by_id(loc_id)
+        
+        if not location:
+            location = self.locations_db.get_random_location()
+            
+        return location
+    
+    def get_location_description(self, location_type: LocationType) -> str:
+        """
+        Dapatkan deskripsi panjang (500+ karakter) dari LocationSystem
+        
+        Args:
+            location_type: Tipe lokasi dari LocationSystem
+            
+        Returns:
+            String deskripsi panjang
+        """
+        # Ambil info dari LocationSystem
+        info = self.location_system.LOCATIONS.get(location_type, self.location_system.LOCATIONS[LocationType.LIVING_ROOM])
+        
+        # Format deskripsi panjang (500+ karakter)
+        description = (
+            f"📍 **{info['emoji']} {info['name']}**\n\n"
+            f"{info['description']}\n\n"
+            f"Saat ini aku lagi {random.choice(info['activities'])}. "
+            f"{info['sound']} terdengar pelan di telinga. "
+            f"Wangi {info['scent']} memenuhi ruangan. "
+            f"Ada {random.choice(info['objects'])} di dekatku, "
+            f"membuat suasana makin nyaman.\n\n"
+            f"Aku sudah di sini selama {self.location_system.get_time_here_str()}. "
+        )
+        
+        # Tambah info khusus
+        if info['intimacy_allowed']:
+            description += (
+                f"Di sini kita bisa lebih intim kalau kamu mau... "
+                f"suasananya mendukung banget. 😋"
+            )
+        else:
+            description += (
+                f"Tempatnya nyaman buat ngobrol santai. "
+                f"Kalau mau yang lebih privat, kita bisa pindah ke tempat lain."
+            )
+            
+        return description
+    # ===== END TAMBAHAN =====
+    
     # =========================================================================
     # FORMAT SUGGESTIONS
     # =========================================================================
