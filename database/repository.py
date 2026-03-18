@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - DATABASE REPOSITORY
+MYLOVE ULTIMATE VERSI 2 - DATABASE REPOSITORY (FIX FULL + PDKT)
 =============================================================================
 - CRUD operations untuk semua models
 - Query methods untuk akses data
 - Transaction management
+- **PDKT Repository methods**
+=============================================================================
 """
 
 import time
@@ -19,7 +21,8 @@ from .connection import get_db
 from .models import (
     User, Session, Conversation, Memory, Relationship,
     Preference, Milestone, Backup, RelationshipStatus,
-    MemoryType, MilestoneType, BackupType, BackupStatus
+    MemoryType, MilestoneType, BackupType, BackupStatus,
+    PDKT, PDKTStatus, PDKTDirection, PDKTStage
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +69,7 @@ class Repository:
             (
                 user.telegram_id, user.username, user.first_name, user.last_name,
                 user.created_at, user.last_active, user.total_interactions,
-                user.preferences, user.settings
+                json.dumps(user.preferences), json.dumps(user.settings)
             )
         )
         logger.info(f"✅ Created user: {user.telegram_id}")
@@ -158,12 +161,12 @@ class Repository:
         await db.execute(
             """
             INSERT INTO sessions 
-            (id, user_id, role, status, start_time, last_message_time, 
+            (id, user_id, bot_name, role, status, start_time, last_message_time, 
              total_messages, intimacy_level, location, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                session.id, session.user_id, session.role, session.status,
+                session.id, session.user_id, session.bot_name, session.role, session.status.value,
                 session.start_time, session.last_message_time,
                 session.total_messages, session.intimacy_level,
                 session.location, json.dumps(session.metadata)
@@ -183,7 +186,7 @@ class Repository:
             WHERE id = ?
             """,
             (
-                session.status, session.last_message_time, session.total_messages,
+                session.status.value, session.last_message_time, session.total_messages,
                 session.intimacy_level, session.location, session.summary,
                 json.dumps(session.metadata), session.id
             )
@@ -308,7 +311,7 @@ class Repository:
         )
         
     # =========================================================================
-    # RELATIONSHIP REPOSITORY
+    # RELATIONSHIP REPOSITORY (HTS/FWB)
     # =========================================================================
     
     async def get_relationship(self, user_id: int, role: str, instance_id: Optional[str] = None) -> Optional[Relationship]:
@@ -347,13 +350,13 @@ class Repository:
         cursor = await db.execute(
             """
             INSERT INTO relationships 
-            (user_id, role, instance_id, status, intimacy_level, total_interactions,
+            (user_id, bot_name, role, instance_id, status, intimacy_level, total_interactions,
              total_intim_sessions, total_climax, created_at, last_interaction,
              preferences, milestones, history)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                relationship.user_id, relationship.role, relationship.instance_id,
+                relationship.user_id, relationship.bot_name, relationship.role, relationship.instance_id,
                 relationship.status.value, relationship.intimacy_level,
                 relationship.total_interactions, relationship.total_intim_sessions,
                 relationship.total_climax, relationship.created_at,
@@ -392,6 +395,190 @@ class Repository:
         )
         
     # =========================================================================
+    # PDKT REPOSITORY (BARU)
+    # =========================================================================
+    
+    async def create_pdkt(self, pdkt: PDKT) -> str:
+        """Create new PDKT"""
+        db = await self._get_db()
+        await db.execute(
+            """
+            INSERT INTO pdkt 
+            (id, user_id, bot_name, role, status, is_paused, paused_at, direction, stage,
+             level, chemistry_score, chemistry_history, created_at, last_interaction,
+             total_minutes, paused_total, total_chats, total_intim, total_climax,
+             milestones, inner_thoughts, ended_at, end_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pdkt.id, pdkt.user_id, pdkt.bot_name, pdkt.role,
+                pdkt.status.value, 1 if pdkt.is_paused else 0, pdkt.paused_at,
+                pdkt.direction.value, pdkt.stage.value, pdkt.level,
+                pdkt.chemistry_score, json.dumps(pdkt.chemistry_history),
+                pdkt.created_at, pdkt.last_interaction,
+                pdkt.total_minutes, pdkt.paused_total,
+                pdkt.total_chats, pdkt.total_intim, pdkt.total_climax,
+                json.dumps(pdkt.milestones), json.dumps(pdkt.inner_thoughts),
+                pdkt.ended_at, pdkt.end_reason
+            )
+        )
+        logger.info(f"✅ Created PDKT: {pdkt.id} for user {pdkt.user_id}")
+        return pdkt.id
+        
+    async def get_pdkt(self, pdkt_id: str) -> Optional[PDKT]:
+        """Get PDKT by ID"""
+        db = await self._get_db()
+        result = await db.fetch_one(
+            "SELECT * FROM pdkt WHERE id = ?",
+            (pdkt_id,)
+        )
+        return PDKT.from_dict(result) if result else None
+        
+    async def get_user_pdkt(self, user_id: int, include_ended: bool = False) -> List[PDKT]:
+        """Get all PDKT for user"""
+        db = await self._get_db()
+        if include_ended:
+            results = await db.fetch_all(
+                "SELECT * FROM pdkt WHERE user_id = ? ORDER BY last_interaction DESC",
+                (user_id,)
+            )
+        else:
+            results = await db.fetch_all(
+                "SELECT * FROM pdkt WHERE user_id = ? AND status != 'stopped' ORDER BY last_interaction DESC",
+                (user_id,)
+            )
+        return [PDKT.from_dict(r) for r in results]
+        
+    async def get_active_pdkt(self, user_id: int) -> List[PDKT]:
+        """Get active PDKT for user (not paused and not ended)"""
+        db = await self._get_db()
+        results = await db.fetch_all(
+            "SELECT * FROM pdkt WHERE user_id = ? AND status = 'active' AND is_paused = 0 ORDER BY last_interaction DESC",
+            (user_id,)
+        )
+        return [PDKT.from_dict(r) for r in results]
+        
+    async def get_paused_pdkt(self, user_id: int) -> List[PDKT]:
+        """Get paused PDKT for user"""
+        db = await self._get_db()
+        results = await db.fetch_all(
+            "SELECT * FROM pdkt WHERE user_id = ? AND is_paused = 1 ORDER BY last_interaction DESC",
+            (user_id,)
+        )
+        return [PDKT.from_dict(r) for r in results]
+        
+    async def update_pdkt(self, pdkt: PDKT):
+        """Update PDKT data"""
+        db = await self._get_db()
+        await db.execute(
+            """
+            UPDATE pdkt SET
+                status = ?, is_paused = ?, paused_at = ?, direction = ?, stage = ?,
+                level = ?, chemistry_score = ?, chemistry_history = ?,
+                last_interaction = ?, total_minutes = ?, paused_total = ?,
+                total_chats = ?, total_intim = ?, total_climax = ?,
+                milestones = ?, inner_thoughts = ?, ended_at = ?, end_reason = ?
+            WHERE id = ?
+            """,
+            (
+                pdkt.status.value, 1 if pdkt.is_paused else 0, pdkt.paused_at,
+                pdkt.direction.value, pdkt.stage.value, pdkt.level,
+                pdkt.chemistry_score, json.dumps(pdkt.chemistry_history),
+                pdkt.last_interaction, pdkt.total_minutes, pdkt.paused_total,
+                pdkt.total_chats, pdkt.total_intim, pdkt.total_climax,
+                json.dumps(pdkt.milestones), json.dumps(pdkt.inner_thoughts),
+                pdkt.ended_at, pdkt.end_reason, pdkt.id
+            )
+        )
+        logger.debug(f"Updated PDKT: {pdkt.id}")
+        
+    async def pause_pdkt(self, pdkt_id: str):
+        """Pause PDKT"""
+        db = await self._get_db()
+        await db.execute(
+            "UPDATE pdkt SET is_paused = 1, paused_at = ? WHERE id = ?",
+            (time.time(), pdkt_id)
+        )
+        logger.info(f"⏸️ PDKT paused: {pdkt_id}")
+        
+    async def resume_pdkt(self, pdkt_id: str):
+        """Resume PDKT"""
+        db = await self._get_db()
+        await db.execute(
+            "UPDATE pdkt SET is_paused = 0, paused_at = NULL WHERE id = ?",
+            (pdkt_id,)
+        )
+        logger.info(f"▶️ PDKT resumed: {pdkt_id}")
+        
+    async def stop_pdkt(self, pdkt_id: str, reason: str = "user_stopped"):
+        """Stop PDKT (end)"""
+        db = await self._get_db()
+        await db.execute(
+            "UPDATE pdkt SET status = 'stopped', ended_at = ?, end_reason = ? WHERE id = ?",
+            (time.time(), reason, pdkt_id)
+        )
+        logger.info(f"💔 PDKT stopped: {pdkt_id}")
+        
+    async def add_pdkt_milestone(self, pdkt_id: str, milestone: Dict):
+        """Add milestone to PDKT"""
+        pdkt = await self.get_pdkt(pdkt_id)
+        if pdkt:
+            pdkt.milestones.append(milestone)
+            await self.update_pdkt(pdkt)
+            
+    async def add_pdkt_inner_thought(self, pdkt_id: str, thought: Dict):
+        """Add inner thought to PDKT"""
+        pdkt = await self.get_pdkt(pdkt_id)
+        if pdkt:
+            pdkt.inner_thoughts.append(thought)
+            # Keep last 20 thoughts
+            if len(pdkt.inner_thoughts) > 20:
+                pdkt.inner_thoughts = pdkt.inner_thoughts[-20:]
+            await self.update_pdkt(pdkt)
+            
+    async def get_pdkt_stats(self, user_id: int) -> Dict:
+        """Get PDKT statistics for user"""
+        db = await self._get_db()
+        
+        # Total PDKT
+        total = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM pdkt WHERE user_id = ?",
+            (user_id,)
+        )
+        
+        # Active PDKT
+        active = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM pdkt WHERE user_id = ? AND status = 'active' AND is_paused = 0",
+            (user_id,)
+        )
+        
+        # Paused PDKT
+        paused = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM pdkt WHERE user_id = ? AND is_paused = 1",
+            (user_id,)
+        )
+        
+        # Ended PDKT
+        ended = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM pdkt WHERE user_id = ? AND status = 'stopped'",
+            (user_id,)
+        )
+        
+        # Average level
+        avg_level = await db.fetch_one(
+            "SELECT AVG(level) as avg FROM pdkt WHERE user_id = ? AND status = 'active'",
+            (user_id,)
+        )
+        
+        return {
+            'total_pdkt': total['count'] if total else 0,
+            'active_pdkt': active['count'] if active else 0,
+            'paused_pdkt': paused['count'] if paused else 0,
+            'ended_pdkt': ended['count'] if ended else 0,
+            'avg_level': round(avg_level['avg'], 1) if avg_level and avg_level['avg'] else 0
+        }
+        
+    # =========================================================================
     # PREFERENCE REPOSITORY
     # =========================================================================
     
@@ -405,7 +592,7 @@ class Repository:
             SELECT * FROM preferences 
             WHERE user_id = ? AND pref_type = ? AND item = ?
             """,
-            (preference.user_id, preference.pref_type, preference.item)
+            (preference.user_id, preference.pref_type.value, preference.item)
         )
         
         if existing:
@@ -428,7 +615,7 @@ class Repository:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    preference.user_id, preference.role, preference.pref_type,
+                    preference.user_id, preference.role, preference.pref_type.value,
                     preference.item, preference.score, preference.count,
                     preference.last_updated
                 )
@@ -587,12 +774,16 @@ class Repository:
             (user_id,)
         )
         
+        # PDKT stats
+        pdkt_stats = await self.get_pdkt_stats(user_id)
+        
         return {
             'total_sessions': sessions['count'] if sessions else 0,
             'total_messages': messages['count'] if messages else 0,
             'total_memories': memories['count'] if memories else 0,
             'total_climax': climax['total'] if climax and climax['total'] else 0,
-            'active_relationships': active['count'] if active else 0
+            'active_relationships': active['count'] if active else 0,
+            'pdkt': pdkt_stats
         }
         
     async def cleanup_old_data(self, days: int = 30):
@@ -621,6 +812,12 @@ class Repository:
         # Delete old memories (low importance)
         await db.execute(
             "DELETE FROM memories WHERE importance < 0.3 AND timestamp < ?",
+            (cutoff,)
+        )
+        
+        # Delete old PDKT (stopped more than 30 days)
+        await db.execute(
+            "DELETE FROM pdkt WHERE status = 'stopped' AND ended_at < ?",
             (cutoff,)
         )
         
