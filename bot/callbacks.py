@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - BOT CALLBACKS
+MYLOVE ULTIMATE VERSI 1 - BOT CALLBACKS (FIXED)
 =============================================================================
 Semua callback handlers untuk inline keyboard:
 - Role selection callbacks
@@ -10,6 +10,7 @@ Semua callback handlers untuk inline keyboard:
 - Threesome callbacks
 - HTS/FWB callbacks
 - Location callbacks
+- Kembali ke menu utama setelah sesi berakhir
 =============================================================================
 """
 
@@ -25,28 +26,61 @@ from utils.logger import logger
 
 
 # =============================================================================
+# HELPER FUNCTION - SHOW MAIN MENU
+# =============================================================================
+async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginkan:**"):
+    """Tampilkan menu utama pilihan role"""
+    keyboard = [
+        [InlineKeyboardButton("👩 Ipar", callback_data="role_ipar"),
+         InlineKeyboardButton("👩‍💼 Teman Kantor", callback_data="role_teman_kantor")],
+        [InlineKeyboardButton("👩 Janda", callback_data="role_janda"),
+         InlineKeyboardButton("💃 Pelakor", callback_data="role_pelakor")],
+        [InlineKeyboardButton("👰 Istri Orang", callback_data="role_istri_orang"),
+         InlineKeyboardButton("💕 PDKT", callback_data="role_pdkt")],
+        [InlineKeyboardButton("👧 Sepupu", callback_data="role_sepupu"),
+         InlineKeyboardButton("👩‍🎓 Teman SMA", callback_data="role_teman_sma")],
+        [InlineKeyboardButton("💔 Mantan", callback_data="role_mantan")],
+        [InlineKeyboardButton("🎭 Threesome", callback_data="threesome_menu"),
+         InlineKeyboardButton("❓ Bantuan", callback_data="help")],
+        [InlineKeyboardButton("✅ Setuju 18+", callback_data="agree_18")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+    return Constants.SELECTING_ROLE
+
+
+# =============================================================================
 # 1. AGREE 18 CALLBACK
 # =============================================================================
 
 async def agree_18_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle agree 18+ callback"""
+    """Handle agree 18+ callback - LANGSUNG TAMPILKAN MENU ROLE"""
     query = update.callback_query
     await query.answer()
     
     user = update.effective_user
     logger.info(f"User {user.id} agreed to 18+ content")
     
-    await query.edit_message_text(
-        "✅ **Terima kasih telah menyetujui syarat 18+.**\n\n"
-        "Sekarang kamu bisa memilih role untuk memulai petualanganmu.\n"
-        "Gunakan /start untuk kembali ke menu utama."
-    )
-    
-    return Constants.SELECTING_ROLE
+    # Tampilkan menu pilihan role langsung
+    return await show_main_menu(query, "✅ **Terima kasih telah menyetujui syarat 18+.**\n\n💕 **Pilih role yang kamu inginkan:**")
 
 
 # =============================================================================
-# 2. START/PAUSE CALLBACK
+# 2. BACK TO MAIN MENU CALLBACK
+# =============================================================================
+
+async def back_to_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Kembali ke menu utama"""
+    query = update.callback_query
+    await query.answer()
+    
+    logger.info(f"User {update.effective_user.id} returned to main menu")
+    return await show_main_menu(query, "💕 **Kembali ke menu utama. Pilih role:**")
+
+
+# =============================================================================
+# 3. START/PAUSE CALLBACK
 # =============================================================================
 
 async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -65,16 +99,14 @@ async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         # Reset session
         context.user_data.clear()
         logger.info(f"User {user.id} started new session")
-        await query.edit_message_text(
-            "🆕 **Memulai sesi baru**\n\n"
-            "Ketik /start untuk memilih role."
-        )
+        # Tampilkan menu utama
+        return await show_main_menu(query, "🆕 **Memulai sesi baru**\n\n💕 **Pilih role yang kamu inginkan:**")
     
     return ConversationHandler.END
 
 
 # =============================================================================
-# 3. ROLE SELECTION CALLBACKS
+# 4. ROLE SELECTION CALLBACKS
 # =============================================================================
 
 async def role_ipar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -376,11 +408,11 @@ async def role_mantan_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # =============================================================================
-# 4. END/CLOSE CALLBACKS
+# 5. END/CLOSE CALLBACKS
 # =============================================================================
 
 async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle end callback"""
+    """Handle end callback - KEMBALI KE MENU UTAMA"""
     query = update.callback_query
     await query.answer()
     
@@ -391,19 +423,18 @@ async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         # Clear all user data
         context.user_data.clear()
         logger.info(f"User {user.id} ended session")
-        await query.edit_message_text(
-            "🏁 **Sesi diakhiri**\n\n"
-            "Terima kasih telah menggunakan MYLOVE!\n"
-            "Ketik /start untuk memulai lagi."
-        )
+        
+        # Tampilkan menu utama
+        return await show_main_menu(query, "🏁 **Sesi diakhiri**\n\n💕 **Pilih role untuk memulai lagi:**")
     elif data == "end_no":
         await query.edit_message_text("✅ Sesi dilanjutkan.")
+        return ConversationHandler.END
     
     return ConversationHandler.END
 
 
 async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle close callback"""
+    """Handle close callback - KEMBALI KE MENU UTAMA"""
     query = update.callback_query
     await query.answer()
     
@@ -415,18 +446,18 @@ async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data.pop('current_session', None)
         context.user_data.pop('current_role', None)
         logger.info(f"User {user.id} closed session")
-        await query.edit_message_text(
-            "🔒 **Percakapan ditutup**\n\n"
-            "Ketik /start untuk memulai lagi."
-        )
+        
+        # Tampilkan menu utama
+        return await show_main_menu(query, "🔒 **Percakapan ditutup**\n\n💕 **Pilih role untuk memulai lagi:**")
     elif data == "close_no":
         await query.edit_message_text("✅ Percakapan dilanjutkan.")
+        return ConversationHandler.END
     
     return ConversationHandler.END
 
 
 # =============================================================================
-# 5. RELATIONSHIP CALLBACKS (JADIPACAR, BREAK, BREAKUP, FWB)
+# 6. RELATIONSHIP CALLBACKS (JADIPACAR, BREAK, BREAKUP, FWB)
 # =============================================================================
 
 async def jadipacar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -519,7 +550,7 @@ async def fwb_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 # =============================================================================
-# 6. HELPER FUNCTIONS
+# 7. HELPER FUNCTIONS
 # =============================================================================
 
 def get_role_info(role: str) -> Dict:
@@ -602,11 +633,12 @@ def get_role_info(role: str) -> Dict:
 
 
 # =============================================================================
-# 7. EXPORT ALL CALLBACKS
+# 8. EXPORT ALL CALLBACKS
 # =============================================================================
 
 __all__ = [
     'agree_18_callback',
+    'back_to_main_callback',
     'start_pause_callback',
     'role_ipar_callback',
     'role_teman_kantor_callback',
