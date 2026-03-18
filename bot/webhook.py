@@ -334,26 +334,33 @@ async def reset_webhook(app: Application, url: Optional[str] = None):
 # SYNC WRAPPER FOR MAIN.PY
 # =============================================================================
 
-def setup_webhook_sync(app: Application) -> str:
-    """
-    Synchronous wrapper untuk setup webhook
-    Digunakan di main.py yang synchronous
-    """
-    import asyncio
-    
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+async def check_webhook_status(app: Application) -> dict:
+    """Check current webhook status"""
     try:
-        # Buat instance WebhookManager
-        manager = WebhookManager(app)
-        # Jalankan setup webhook async
-        result = loop.run_until_complete(manager.setup_webhook(retry=True))
-        return "webhook" if result else "polling"
+        info = await app.bot.get_webhook_info()
+        return {
+            "url": info.url,
+            "pending_updates": info.pending_update_count,
+            "last_error": info.last_error_message,
+            "last_error_date": info.last_error_date,
+            "max_connections": info.max_connections,
+            "allowed_updates": info.allowed_updates
+        }
     except Exception as e:
-        logger.error(f"Error in setup_webhook_sync: {e}")
-        return "polling"
-    finally:
-        loop.close()        
+        return {"error": str(e)}
+
+
+async def reset_webhook(app: Application, url: Optional[str] = None):
+    """Reset webhook"""
+    try:
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ Existing webhook deleted")
+        
+        if url:
+            await app.bot.set_webhook(url=url)
+            logger.info(f"✅ New webhook set: {url}")
+    except Exception as e:
+        logger.error(f"Error resetting webhook: {e}")     
 
 __all__ = [
     'WebhookManager',
