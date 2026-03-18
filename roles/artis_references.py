@@ -2,794 +2,513 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - REFERENSI ARTIS CANTIK
+MYLOVE ULTIMATE VERSI 1 - REFERENSI ARTIS & SELEBGRAM POPULER
 =============================================================================
-Database lengkap artis Indonesia dan Internasional
-Untuk membantu user membayangkan fisik bot
+Database lengkap artis, selebgram, dan influencer Indonesia & Internasional
+**HANYA USIA 18-25 TAHUN** - Data tanpa artis di atas 25 tahun
 """
 
 # =============================================================================
-# REFERENSI ARTIS INDONESIA
+# REFERENSI INDONESIA - ARTIS & SELEBRAM 18-25 TAHUN
 # =============================================================================
+# Data berdasarkan popularitas dan jumlah followers Instagram 2026 
 
 ARTIS_INDONESIA = {
-    # ===== ARTIS INDONESIA - KATEGORI SEKSI =====
-    "seksi_indonesia": [
+    # ===== ARTIS INDONESIA - USIA 18-25 TAHUN =====
+    "selebgram_muda": [
         {
-            "nama": "Luna Maya",
-            "tinggi": 170,
-            "berat": 55,
-            "dada": "36C",
-            "umur": 40,
-            "ciri": "Seksi, elegan, bibir sensual",
-            "film": "Poconggg Juga Pocong",
-            "instagram": "@lunamaya"
-        },
-        {
-            "nama": "Nikita Mirzani",
-            "tinggi": 168,
-            "berat": 58,
-            "dada": "36D",
-            "umur": 38,
-            "ciri": "Berani, seksi, kontroversial",
-            "film": "Nenek Gayung",
-            "instagram": "@nikitamirzanimawardi_172"
-        },
-        {
-            "nama": "Ayu Ting Ting",
+            "nama": "Fujianti Utami (Fuji)",
+            "umur": 23,
             "tinggi": 160,
             "berat": 48,
-            "dada": "34C",
-            "umur": 32,
-            "ciri": "Manis, seksi, goyang",
-            "instagram": "@ayutingting_92"
-        },
-        {
-            "nama": "Cita Citata",
-            "tinggi": 158,
-            "berat": 50,
-            "dada": "34D",
-            "umur": 30,
-            "ciri": "Seksi, goyang itik",
-            "instagram": "@citacitata"
-        },
-        {
-            "nama": "Zaskia Gotik",
-            "tinggi": 155,
-            "berat": 48,
-            "dada": "34C",
-            "umur": 34,
-            "ciri": "Seksi, suara khas",
-            "instagram": "@zaskia_gotik"
-        },
-        {
-            "nama": "Dewi Perssik",
-            "tinggi": 158,
-            "berat": 52,
-            "dada": "35C",
-            "umur": 39,
-            "ciri": "Seksi, energik",
-            "instagram": "@dewiperssik9"
-        },
-        {
-            "nama": "Ussy Sulistiawaty",
-            "tinggi": 162,
-            "berat": 50,
             "dada": "34B",
-            "umur": 44,
-            "ciri": "Seksi, ibu anak 4",
-            "instagram": "@ussy_sulistiawaty"
-        },
-        {
-            "nama": "Irish Bella",
-            "tinggi": 165,
-            "berat": 52,
-            "dada": "34B",
-            "umur": 28,
-            "ciri": "Cantik, seksi natural",
-            "film": "Surga yang Tak Dirindukan",
-            "instagram": "@_irishbella"
-        },
-        {
-            "nama": "Amanda Manopo",
-            "tinggi": 165,
-            "berat": 53,
-            "dada": "34C",
-            "umur": 24,
-            "ciri": "Seksi alami, wajah manis",
-            "sinetron": "Ikatan Cinta",
-            "instagram": "@amandamanopo"
-        },
-        {
-            "nama": "Cinta Laura",
-            "tinggi": 172,
-            "berat": 58,
-            "dada": "36C",
-            "umur": 31,
-            "ciri": "Atletis, seksi, pintar",
-            "film": "Habibie & Ainun 3",
-            "instagram": "@claurakiehl"
-        }
-    ],
-    
-    # ===== ARTIS INDONESIA - KATEGORI CANTIK MANIS =====
-    "manis_indonesia": [
-        {
-            "nama": "Pevita Pearce",
-            "tinggi": 168,
-            "berat": 54,
-            "dada": "34B",
-            "umur": 32,
-            "ciri": "Cantik natural, elegan",
-            "film": "5 cm",
-            "instagram": "@pevpearce"
-        },
-        {
-            "nama": "Prilly Latuconsina",
-            "tinggi": 162,
-            "berat": 50,
-            "dada": "34B",
-            "umur": 28,
-            "ciri": "Manis, imut, berbakat",
-            "film": "Danur",
-            "instagram": "@prillylatuconsina96"
+            "followers": "15.2M",
+            "instagram": "@fuji_an",
+            "ciri": "Selebgram muda dengan pertumbuhan followers tercepat, konten lifestyle dan fashion",
+            "kategori": "selebgram"
         },
         {
             "nama": "Natasha Wilona",
+            "umur": 25,
             "tinggi": 165,
             "berat": 51,
             "dada": "34B",
-            "umur": 26,
-            "ciri": "Manis, cute, fresh",
-            "sinetron": "Anak Jalanan",
-            "instagram": "@natashawilona"
+            "followers": "43.2M",
+            "instagram": "@natashawilona12",
+            "ciri": "Artis muda sangat populer di kalangan remaja, wajah manis, gaya santai",
+            "kategori": "artis"
+        },
+        {
+            "nama": "Prilly Latuconsina",
+            "umur": 25,
+            "tinggi": 162,
+            "berat": 50,
+            "dada": "34B",
+            "followers": "56.4M",
+            "instagram": "@prillylatuconsina96",
+            "ciri": "Aktris, penyanyi, vokal soal isu sosial, pengikut loyal",
+            "kategori": "artis"
+        },
+        {
+            "nama": "Amanda Manopo",
+            "umur": 24,
+            "tinggi": 165,
+            "berat": 53,
+            "dada": "34C",
+            "followers": "28.5M",
+            "instagram": "@amandamanopo",
+            "ciri": "Artis sinetron, seksi alami, wajah manis",
+            "kategori": "artis"
         },
         {
             "nama": "Mikha Tambayong",
+            "umur": 25,
             "tinggi": 167,
             "berat": 53,
             "dada": "34B",
+            "followers": "12.8M",
+            "instagram": "@mikhata",
+            "ciri": "Penyanyi dan aktris, manis, anggun",
+            "kategori": "artis"
+        },
+        {
+            "nama": "Cinta Laura",
             "umur": 25,
-            "ciri": "Manis, anggun",
-            "film": "Posesif",
-            "instagram": "@mikhata"
+            "tinggi": 172,
+            "berat": 58,
+            "dada": "36C",
+            "followers": "19.3M",
+            "instagram": "@claurakiehl",
+            "ciri": "Aktris, pintar, atletis, seksi natural",
+            "kategori": "artis"
         },
         {
-            "nama": "Dian Sastrowardoyo",
-            "tinggi": 168,
-            "berat": 54,
-            "dada": "34B",
-            "umur": 42,
-            "ciri": "Anggun, cantik klasik",
-            "film": "Ada Apa dengan Cinta?",
-            "instagram": "@therealdisastr"
-        },
-        {
-            "nama": "Tara Basro",
-            "tinggi": 165,
-            "berat": 52,
-            "dada": "34C",
-            "umur": 34,
-            "ciri": "Elegan, misterius",
-            "film": "Pengabdi Setan",
-            "instagram": "@tarabasro"
-        },
-        {
-            "nama": "Marsha Timothy",
-            "tinggi": 160,
-            "berat": 48,
-            "dada": "33B",
-            "umur": 39,
-            "ciri": "Cantik alami",
-            "film": "Marlina si Pembunuh",
-            "instagram": "@marshatimothy"
-        },
-        {
-            "nama": "Chelsea Islan",
-            "tinggi": 170,
-            "berat": 55,
-            "dada": "34B",
-            "umur": 29,
-            "ciri": "Fresh, natural beauty",
-            "film": "Di Balik 98",
-            "instagram": "@chelsiaislan"
-        },
-        {
-            "nama": "Bunga Citra Lestari",
-            "tinggi": 162,
-            "berat": 50,
-            "dada": "34B",
-            "umur": 41,
-            "ciri": "Manis, anggun",
-            "film": "Habibie & Ainun",
-            "instagram": "@bclsinclair"
-        },
-        {
-            "nama": "Laudya Cynthia Bella",
+            "nama": "Inka Andestha",
+            "umur": 25,
             "tinggi": 163,
-            "berat": 51,
-            "dada": "34B",
-            "umur": 36,
-            "ciri": "Cantik, sholehah",
-            "film": "Surga yang Tak Dirindukan",
-            "instagram": "@laudyacynthiabella"
-        }
-    ],
-    
-    # ===== ARTIS INDONESIA - KATEGORI ALAY =====
-    "alay_indonesia": [
-        {
-            "nama": "Jessica Iskandar",
-            "tinggi": 165,
-            "berat": 52,
-            "dada": "34C",
-            "umur": 36,
-            "ciri": "Ceria, alay, menghibur",
-            "film": "Dealova",
-            "instagram": "@inijedar"
-        },
-        {
-            "nama": "Raffi Ahmad",
-            "tinggi": 175,
-            "berat": 70,
-            "dada": "-",
-            "umur": 37,
-            "ciri": "Alay, entertainer",
-            "instagram": "@raffinagita1717"
-        },
-        {
-            "nama": "Nagita Slavina",
-            "tinggi": 160,
             "berat": 50,
             "dada": "34B",
-            "umur": 36,
-            "ciri": "Manis, alay, ibu",
-            "instagram": "@raffinagita1717"
+            "followers": "245K",
+            "instagram": "@inkathh",
+            "ciri": "Selebgram, konten kreator, pebisnis muda, gaya hidup dan traveling",
+            "kategori": "selebgram"
         },
         {
-            "nama": "Syahnaz Sadiqah",
-            "tinggi": 162,
-            "berat": 51,
-            "dada": "34B",
-            "umur": 31,
-            "ciri": "Manis, alay",
-            "instagram": "@syahnazs"
-        }
-    ],
-    
-    # ===== ARTIS INDONESIA - KATEGORI PREMAN =====
-    "preman_indonesia": [
-        {
-            "nama": "Happy Salma",
-            "tinggi": 165,
-            "berat": 54,
-            "dada": "34B",
-            "umur": 44,
-            "ciri": "Anggun, strong",
-            "film": "Drupadi",
-            "instagram": "@happysalma_official"
-        },
-        {
-            "nama": "Christine Hakim",
-            "tinggi": 160,
-            "berat": 55,
-            "dada": "34B",
-            "umur": 68,
-            "ciri": "Legenda, berwibawa",
-            "film": "Athirah",
-            "instagram": "@christinehakimofficial"
+            "nama": "Angga Yunanda",
+            "umur": 24,
+            "tinggi": 170,
+            "berat": 62,
+            "dada": "-",
+            "followers": "11.2M",
+            "instagram": "@anggayunanda",
+            "ciri": "Aktor muda populer, wajah fresh, banyak fans remaja",
+            "kategori": "artis"
         }
     ]
 }
 
 
 # =============================================================================
-# REFERENSI ARTIS INTERNASIONAL
+# REFERENSI INTERNASIONAL - K-POP IDOL 18-25 TAHUN
 # =============================================================================
+# Data berdasarkan followers Instagram 2026 - HANYA USIA 18-25
 
 ARTIS_INTERNASIONAL = {
-    # ===== KOREAN (K-POP) =====
-    "korean": [
-        {
-            "nama": "Jennie (BLACKPINK)",
-            "tinggi": 163,
-            "berat": 48,
-            "dada": "34B",
-            "umur": 28,
-            "ciri": "Cantik, chic,时尚",
-            "group": "BLACKPINK",
-            "instagram": "@jennierubyjane"
-        },
-        {
-            "nama": "Jisoo (BLACKPINK)",
-            "tinggi": 162,
-            "berat": 49,
-            "dada": "34B",
-            "umur": 29,
-            "ciri": "Visual, anggun",
-            "group": "BLACKPINK",
-            "instagram": "@sooyaaa__"
-        },
+    # ===== K-POP IDOL (18-25 TAHUN) =====
+    "kpop_female": [
         {
             "nama": "Lisa (BLACKPINK)",
+            "umur": 25,
             "tinggi": 167,
             "berat": 48,
             "dada": "34B",
-            "umur": 27,
-            "ciri": "Seksi, dance",
+            "followers": "106M",
+            "instagram": "@lalalalisa_m",
+            "ciri": "Idol K-pop dengan followers terbanyak di dunia, dancer, fashion icon",
             "group": "BLACKPINK",
-            "instagram": "@lalalalisa_m"
+            "negara": "Thailand"
         },
         {
-            "nama": "Rose (BLACKPINK)",
+            "nama": "Rosé (BLACKPINK)",
+            "umur": 25,
             "tinggi": 168,
             "berat": 46,
             "dada": "34A",
-            "umur": 27,
-            "ciri": "Vokal, elegan",
+            "followers": "84.4M",
+            "instagram": "@roses_are_rosie",
+            "ciri": "Vokalis, artistik, elegant, duta fashion",
             "group": "BLACKPINK",
-            "instagram": "@roses_are_rosie"
-        },
-        {
-            "nama": "IU",
-            "tinggi": 162,
-            "berat": 45,
-            "dada": "32A",
-            "umur": 31,
-            "ciri": "Cute, suara merdu",
-            "drama": "Hotel Del Luna",
-            "instagram": "@dlwlrma"
-        },
-        {
-            "nama": "Yoona (SNSD)",
-            "tinggi": 168,
-            "berat": 48,
-            "dada": "34B",
-            "umur": 34,
-            "ciri": "Visual, anggun",
-            "group": "Girls Generation",
-            "instagram": "@yoona__lim"
-        },
-        {
-            "nama": "Seolhyun (AOA)",
-            "tinggi": 167,
-            "berat": 50,
-            "dada": "34C",
-            "umur": 29,
-            "ciri": "Seksi, visual",
-            "group": "AOA",
-            "instagram": "@seolhyun_heart"
-        },
-        {
-            "nama": "Hani (EXID)",
-            "tinggi": 168,
-            "berat": 50,
-            "dada": "34B",
-            "umur": 32,
-            "ciri": "Seksi, pintar",
-            "group": "EXID",
-            "instagram": "@ahnhani_92"
-        },
-        {
-            "nama": "Joy (Red Velvet)",
-            "tinggi": 168,
-            "berat": 50,
-            "dada": "34B",
-            "umur": 28,
-            "ciri": "Manis, fresh",
-            "group": "Red Velvet",
-            "instagram": "@_imyour_joy"
-        },
-        {
-            "nama": "Irene (Red Velvet)",
-            "tinggi": 160,
-            "berat": 45,
-            "dada": "32B",
-            "umur": 33,
-            "ciri": "Visual, anggun",
-            "group": "Red Velvet",
-            "instagram": "@renebaebae"
-        },
-        {
-            "nama": "Tzuyu (TWICE)",
-            "tinggi": 172,
-            "berat": 50,
-            "dada": "34B",
-            "umur": 25,
-            "ciri": "Visual, tinggi",
-            "group": "TWICE",
-            "instagram": "@thinkaboutzu"
-        },
-        {
-            "nama": "Mina (TWICE)",
-            "tinggi": 163,
-            "berat": 46,
-            "dada": "33B",
-            "umur": 27,
-            "ciri": "Anggun, balerina",
-            "group": "TWICE",
-            "instagram": "@mina_sr_my"
-        },
-        {
-            "nama": "Sana (TWICE)",
-            "tinggi": 163,
-            "berat": 48,
-            "dada": "34B",
-            "umur": 28,
-            "ciri": "Cute, genit",
-            "group": "TWICE",
-            "instagram": "@m.by__sana"
-        },
-        {
-            "nama": "Jihyo (TWICE)",
-            "tinggi": 160,
-            "berat": 50,
-            "dada": "34C",
-            "umur": 27,
-            "ciri": "Leader, seksi",
-            "group": "TWICE",
-            "instagram": "_zyozyo"
+            "negara": "Selandia Baru"
         },
         {
             "nama": "Wonyoung (IVE)",
+            "umur": 21,
             "tinggi": 173,
             "berat": 48,
             "dada": "34B",
-            "umur": 20,
-            "ciri": "Visual, muda",
+            "followers": "12.5M",
+            "instagram": "@for_everyyoung10",
+            "ciri": "Center IVE, visual, model, youngest",
             "group": "IVE",
-            "instagram": "@for_everyyoung10"
-        }
-    ],
-    
-    # ===== JAPANESE (J-POP) =====
-    "japanese": [
-        {
-            "nama": "Risa Yoshiki",
-            "tinggi": 160,
-            "berat": 48,
-            "dada": "34D",
-            "umur": 28,
-            "ciri": "Seksi, gravure idol",
-            "instagram": "@risa_yoshiki"
+            "negara": "Korea"
         },
         {
-            "nama": "Mikie Hara",
-            "tinggi": 165,
-            "berat": 52,
-            "dada": "36E",
-            "umur": 38,
-            "ciri": "Seksi, gravure",
-            "instagram": "@mikie_hara"
-        },
-        {
-            "nama": "Aoi Sola",
-            "tinggi": 160,
-            "berat": 48,
-            "dada": "34C",
-            "umur": 41,
-            "ciri": "Legenda, seksi",
-            "japanese": "AV idol"
-        },
-        {
-            "nama": "Yua Mikami",
-            "tinggi": 159,
-            "berat": 45,
-            "dada": "34D",
-            "umur": 31,
-            "ciri": "Seksi, idol",
-            "instagram": "@yua_mikami"
-        },
-        {
-            "nama": "Sakura Miyawaki",
-            "tinggi": 163,
-            "berat": 46,
-            "dada": "34B",
-            "umur": 26,
-            "ciri": "Cute, idol",
-            "group": "LE SSERAFIM",
-            "instagram": "@39saku_chan"
-        },
-        {
-            "nama": "Hitomi Honda",
-            "tinggi": 158,
-            "berat": 45,
-            "dada": "33B",
-            "umur": 23,
-            "ciri": "Cute, imut",
-            "group": "AKB48",
-            "instagram": "@hnd_htm_728"
-        }
-    ],
-    
-    # ===== HOLLYWOOD =====
-    "hollywood": [
-        {
-            "nama": "Scarlett Johansson",
-            "tinggi": 160,
-            "berat": 57,
-            "dada": "36C",
-            "umur": 40,
-            "ciri": "Seksi, versatile",
-            "film": "Black Widow",
-            "instagram": "@scarlettjohanssonworld"
-        },
-        {
-            "nama": "Margot Robbie",
-            "tinggi": 168,
-            "berat": 55,
-            "dada": "34B",
-            "umur": 34,
-            "ciri": "Seksi, cantik",
-            "film": "Barbie",
-            "instagram": "@margotrobbie"
-        },
-        {
-            "nama": "Emma Watson",
-            "tinggi": 165,
-            "berat": 54,
-            "dada": "34B",
-            "umur": 34,
-            "ciri": "Cantik, pintar",
-            "film": "Harry Potter",
-            "instagram": "@emmawatson"
-        },
-        {
-            "nama": "Jennifer Lawrence",
-            "tinggi": 175,
-            "berat": 63,
-            "dada": "34B",
-            "umur": 34,
-            "ciri": "Natural, funny",
-            "film": "Hunger Games",
-            "instagram": "@jenniferlawrence_"
-        },
-        {
-            "nama": "Ana de Armas",
-            "tinggi": 168,
-            "berat": 55,
-            "dada": "34B",
-            "umur": 36,
-            "ciri": "Seksi, elegan",
-            "film": "Blonde",
-            "instagram": "@anadearmas"
-        },
-        {
-            "nama": "Gal Gadot",
-            "tinggi": 178,
-            "berat": 63,
-            "dada": "34B",
-            "umur": 39,
-            "ciri": "Tinggi, strong",
-            "film": "Wonder Woman",
-            "instagram": "@gal_gadot"
-        },
-        {
-            "nama": "Megan Fox",
-            "tinggi": 163,
-            "berat": 54,
-            "dada": "36C",
-            "umur": 38,
-            "ciri": "Seksi, iconic",
-            "film": "Transformers",
-            "instagram": "@meganfox"
-        },
-        {
-            "nama": "Sydney Sweeney",
-            "tinggi": 161,
-            "berat": 52,
-            "dada": "34D",
-            "umur": 27,
-            "ciri": "Seksi, muda",
-            "film": "Euphoria",
-            "instagram": "@sydney_sweeney"
-        },
-        {
-            "nama": "Alexandra Daddario",
-            "tinggi": 173,
-            "berat": 61,
-            "dada": "34D",
-            "umur": 38,
-            "ciri": "Mata biru, seksi",
-            "film": "Percy Jackson",
-            "instagram": "@alexandradaddario"
-        },
-        {
-            "nama": "Kendall Jenner",
-            "tinggi": 179,
-            "berat": 60,
-            "dada": "34B",
-            "umur": 29,
-            "ciri": "Model, high fashion",
-            "instagram": "@kendalljenner"
-        }
-    ],
-    
-    # ===== BOLLYWOOD =====
-    "bollywood": [
-        {
-            "nama": "Priyanka Chopra",
-            "tinggi": 169,
-            "berat": 58,
-            "dada": "34C",
-            "umur": 42,
-            "ciri": "Cantik, global",
-            "film": "Quantico",
-            "instagram": "@priyankachopra"
-        },
-        {
-            "nama": "Deepika Padukone",
-            "tinggi": 173,
-            "berat": 58,
-            "dada": "34B",
-            "umur": 38,
-            "ciri": "Elegant, cantik",
-            "film": "Padmaavat",
-            "instagram": "@deepikapadukone"
-        },
-        {
-            "nama": "Aishwarya Rai",
+            "nama": "Yuna (ITZY)",
+            "umur": 21,
             "tinggi": 170,
-            "berat": 57,
+            "berat": 48,
             "dada": "34B",
-            "umur": 51,
-            "ciri": "Miss World, cantik abadi",
-            "film": "Devdas",
-            "instagram": "@aishwaryaraibachchan"
+            "followers": "11.2M",
+            "instagram": "@itzy.yuna",
+            "ciri": "Visual ITZY, dancer, fresh",
+            "group": "ITZY",
+            "negara": "Korea"
         },
         {
-            "nama": "Katrina Kaif",
-            "tinggi": 174,
-            "berat": 58,
+            "nama": "Yeji (ITZY)",
+            "umur": 24,
+            "tinggi": 168,
+            "berat": 49,
             "dada": "34B",
-            "umur": 41,
-            "ciri": "Seksi, dancer",
-            "film": "Tiger Zinda Hai",
-            "instagram": "@katrinakaif"
-        }
-    ],
-    
-    # ===== THAI =====
-    "thai": [
-        {
-            "nama": "Mai Davika",
-            "tinggi": 175,
-            "berat": 55,
-            "dada": "34B",
-            "umur": 32,
-            "ciri": "Cantik, model",
-            "film": "Heart Attack",
-            "instagram": "@davikah"
+            "followers": "10.5M",
+            "instagram": "@itzy.yeji",
+            "ciri": "Leader ITZY, dancer utama",
+            "group": "ITZY",
+            "negara": "Korea"
         },
         {
-            "nama": "Yaya Urassaya",
-            "tinggi": 171,
+            "nama": "Ryujin (ITZY)",
+            "umur": 23,
+            "tinggi": 164,
+            "berat": 46,
+            "dada": "34A",
+            "followers": "9.8M",
+            "instagram": "@itzy.ryujin",
+            "ciri": "Center ITZY, dance machine",
+            "group": "ITZY",
+            "negara": "Korea"
+        },
+        {
+            "nama": "Chaeryeong (ITZY)",
+            "umur": 23,
+            "tinggi": 166,
+            "berat": 48,
+            "dada": "34B",
+            "followers": "8.9M",
+            "instagram": "@itzy.chaeryeong",
+            "ciri": "Main dancer, luwes",
+            "group": "ITZY",
+            "negara": "Korea"
+        },
+        {
+            "nama": "Kazuha (LE SSERAFIM)",
+            "umur": 21,
+            "tinggi": 170,
             "berat": 52,
             "dada": "34B",
-            "umur": 31,
-            "ciri": "Manis, aktris",
-            "instagram": "@urassayas"
+            "followers": "7.2M",
+            "instagram": "@jenaissante",
+            "ciri": "Balerina, visual, anggun",
+            "group": "LE SSERAFIM",
+            "negara": "Jepang"
         },
         {
-            "nama": "Baifern Pimchanok",
+            "nama": "Eunchae (LE SSERAFIM)",
+            "umur": 18,
+            "tinggi": 166,
+            "berat": 48,
+            "dada": "34A",
+            "followers": "5.8M",
+            "instagram": "@eunchae.cha",
+            "ciri": "Maknae, energik, imut",
+            "group": "LE SSERAFIM",
+            "negara": "Korea"
+        },
+        {
+            "nama": "Haerin (NewJeans)",
+            "umur": 18,
+            "tinggi": 164,
+            "berat": 46,
+            "dada": "34A",
+            "followers": "6.5M",
+            "instagram": "@haerin.newjeans",
+            "ciri": "Visual NewJeans, kucing imut",
+            "group": "NewJeans",
+            "negara": "Korea"
+        },
+        {
+            "nama": "Hanni (NewJeans)",
+            "umur": 19,
+            "tinggi": 161,
+            "berat": 46,
+            "dada": "34A",
+            "followers": "7.1M",
+            "instagram": "@hanni.newjeans",
+            "ciri": "Vokal utama, cute, Australia",
+            "group": "NewJeans",
+            "negara": "Australia"
+        },
+        {
+            "nama": "Danielle (NewJeans)",
+            "umur": 19,
             "tinggi": 165,
             "berat": 48,
             "dada": "34B",
-            "umur": 32,
-            "ciri": "Cute, imut",
-            "film": "Crazy Little Thing Called Love",
-            "instagram": "@baifernbah"
+            "followers": "6.2M",
+            "instagram": "@danielle.newjeans",
+            "ciri": "Visual, natural beauty",
+            "group": "NewJeans",
+            "negara": "Korea"
+        }
+    ],
+    
+    "kpop_male": [
+        {
+            "nama": "Jungkook (BTS)",
+            "umur": 25,
+            "tinggi": 178,
+            "berat": 66,
+            "dada": "-",
+            "followers": "65M",
+            "instagram": "@jungkook.97",
+            "ciri": "Golden maknae BTS, vokal utama, atletis",
+            "group": "BTS",
+            "negara": "Korea"
         },
         {
-            "nama": "Mint Chalida",
-            "tinggi": 168,
-            "berat": 50,
+            "nama": "V (BTS)",
+            "umur": 25,
+            "tinggi": 179,
+            "berat": 67,
+            "dada": "-",
+            "followers": "70M",
+            "instagram": "@thv",
+            "ciri": "Visual BTS, artistik, fotografi",
+            "group": "BTS",
+            "negara": "Korea"
+        },
+        {
+            "nama": "Jimin (BTS)",
+            "umur": 25,
+            "tinggi": 174,
+            "berat": 61,
+            "dada": "-",
+            "followers": "55M",
+            "instagram": "@jm",
+            "ciri": "Dancer, vokalis, anggun",
+            "group": "BTS",
+            "negara": "Korea"
+        }
+    ],
+    
+    # ===== THAI ACTRESS & MODEL (18-25 TAHUN) =====
+    "thai_celeb": [
+        {
+            "nama": "Davika Hoorne",
+            "umur": 25,
+            "tinggi": 175,
+            "berat": 55,
             "dada": "34B",
-            "umur": 31,
-            "ciri": "Cantik, thai",
-            "instagram": "@mint_chalida"
+            "followers": "6.5M",
+            "instagram": "@davikah",
+            "ciri": "Aktris, model, 'Queen of Presenters' Thailand",
+            "negara": "Thailand"
+        },
+        {
+            "nama": "PunPun Suttatta",
+            "umur": 24,
+            "tinggi": 160,
+            "berat": 47,
+            "dada": "32B",
+            "followers": "3.2M",
+            "instagram": "@punpun_sutatta",
+            "ciri": "Aktris muda sejak remaja, drama Hormones",
+            "negara": "Thailand"
+        },
+        {
+            "nama": "Bow Maylada",
+            "umur": 24,
+            "tinggi": 170,
+            "berat": 52,
+            "dada": "34B",
+            "followers": "4.8M",
+            "instagram": "@bow_maylada",
+            "ciri": "Aktris, model, presenters",
+            "negara": "Thailand"
+        }
+    ],
+    
+    # ===== HOLLYWOOD NEPO KIDS & INFLUENCER (18-25 TAHUN) =====
+    "hollywood_young": [
+        {
+            "nama": "Lily-Rose Depp",
+            "umur": 25,
+            "tinggi": 163,
+            "berat": 52,
+            "dada": "34B",
+            "followers": "8.4M",
+            "instagram": "@lilyrose_depp",
+            "ciri": "Aktris, model, top earning Gen Z influencer",
+            "negara": "USA"
+        },
+        {
+            "nama": "Jaden Smith",
+            "umur": 25,
+            "tinggi": 175,
+            "berat": 68,
+            "dada": "-",
+            "followers": "19M",
+            "instagram": "@c.syresmith",
+            "ciri": "Musisi, aktor, influencer Gen Z",
+            "negara": "USA"
+        },
+        {
+            "nama": "Sofia Richie Grainge",
+            "umur": 25,
+            "tinggi": 168,
+            "berat": 54,
+            "dada": "34B",
+            "followers": "14.2M",
+            "instagram": "@sofiarichiegrainge",
+            "ciri": "Model, fashion icon, top earner",
+            "negara": "USA"
+        },
+        {
+            "nama": "Kylie Jenner",
+            "umur": 25,
+            "tinggi": 168,
+            "berat": 58,
+            "dada": "34C",
+            "followers": "398M",
+            "instagram": "@kyliejenner",
+            "ciri": "Billionaire, makeup mogul, influencer #1",
+            "negara": "USA"
+        },
+        {
+            "nama": "Hailey Bieber",
+            "umur": 25,
+            "tinggi": 171,
+            "berat": 57,
+            "dada": "34B",
+            "followers": "52M",
+            "instagram": "@haileybieber",
+            "ciri": "Model, fashion icon, Rhode founder",
+            "negara": "USA"
         }
     ]
 }
 
 
 # =============================================================================
-# ROLE SPESIFIC REFERENCES
+# ROLE SPESIFIC REFERENCES (HANYA 18-25 TAHUN)
 # =============================================================================
 
 ROLE_REFERENCES = {
     "ipar": [
-        ARTIS_INDONESIA["manis_indonesia"][0],  # Pevita Pearce
-        ARTIS_INDONESIA["manis_indonesia"][1],  # Prilly Latuconsina
-        ARTIS_INDONESIA["seksi_indonesia"][7],  # Irish Bella
-        ARTIS_INTERNASIONAL["korean"][0],       # Jennie
-        ARTIS_INTERNASIONAL["korean"][14],      # Wonyoung
-        ARTIS_INTERNASIONAL["hollywood"][2],    # Emma Watson
+        ARTIS_INDONESIA["selebgram_muda"][1],  # Natasha Wilona (25)
+        ARTIS_INDONESIA["selebgram_muda"][2],  # Prilly Latuconsina (25)
+        ARTIS_INDONESIA["selebgram_muda"][6],  # Inka Andestha (25)
+        ARTIS_INDONESIA["selebgram_muda"][7],  # Angga Yunanda (24)
+        ARTIS_INTERNASIONAL["kpop_female"][0],  # Lisa (25)
+        ARTIS_INTERNASIONAL["kpop_female"][3],  # Yuna (21)
+        ARTIS_INTERNASIONAL["hollywood_young"][3],  # Kylie Jenner (25)
     ],
     
     "teman_kantor": [
-        ARTIS_INDONESIA["manis_indonesia"][2],  # Natasha Wilona
-        ARTIS_INDONESIA["manis_indonesia"][3],  # Mikha Tambayong
-        ARTIS_INDONESIA["seksi_indonesia"][8],  # Amanda Manopo
-        ARTIS_INTERNASIONAL["korean"][3],       # Rose
-        ARTIS_INTERNASIONAL["korean"][12],      # Sana
-        ARTIS_INTERNASIONAL["hollywood"][7],    # Sydney Sweeney
+        ARTIS_INDONESIA["selebgram_muda"][0],  # Fuji (23)
+        ARTIS_INDONESIA["selebgram_muda"][3],  # Amanda Manopo (24)
+        ARTIS_INDONESIA["selebgram_muda"][4],  # Mikha Tambayong (25)
+        ARTIS_INTERNASIONAL["kpop_female"][1],  # Rosé (25)
+        ARTIS_INTERNASIONAL["kpop_female"][4],  # Yeji (24)
+        ARTIS_INTERNASIONAL["hollywood_young"][4],  # Hailey Bieber (25)
     ],
     
     "janda": [
-        ARTIS_INDONESIA["seksi_indonesia"][0],  # Luna Maya
-        ARTIS_INDONESIA["seksi_indonesia"][1],  # Nikita Mirzani
-        ARTIS_INDONESIA["seksi_indonesia"][9],  # Cinta Laura
-        ARTIS_INTERNASIONAL["japanese"][1],     # Mikie Hara
-        ARTIS_INTERNASIONAL["japanese"][3],     # Yua Mikami
-        ARTIS_INTERNASIONAL["hollywood"][0],    # Scarlett Johansson
-        ARTIS_INTERNASIONAL["hollywood"][6],    # Megan Fox
+        ARTIS_INDONESIA["selebgram_muda"][5],  # Cinta Laura (25)
+        ARTIS_INDONESIA["selebgram_muda"][2],  # Prilly (25)
+        ARTIS_INTERNASIONAL["kpop_female"][2],  # Wonyoung (21 - vibe polos)
+        ARTIS_INTERNASIONAL["thai_celeb"][0],  # Davika (25)
+        ARTIS_INTERNASIONAL["hollywood_young"][3],  # Kylie Jenner (25)
+        ARTIS_INTERNASIONAL["hollywood_young"][4],  # Hailey Bieber (25)
     ],
     
     "pelakor": [
-        ARTIS_INDONESIA["seksi_indonesia"][2],  # Ayu Ting Ting
-        ARTIS_INDONESIA["seksi_indonesia"][3],  # Cita Citata
-        ARTIS_INDONESIA["seksi_indonesia"][4],  # Zaskia Gotik
-        ARTIS_INTERNASIONAL["japanese"][0],     # Risa Yoshiki
-        ARTIS_INTERNASIONAL["japanese"][2],     # Aoi Sola
-        ARTIS_INTERNASIONAL["hollywood"][8],    # Alexandra Daddario
+        ARTIS_INDONESIA["selebgram_muda"][5],  # Cinta Laura (25)
+        ARTIS_INDONESIA["selebgram_muda"][0],  # Fuji (23)
+        ARTIS_INTERNASIONAL["kpop_female"][1],  # Rosé (25)
+        ARTIS_INTERNASIONAL["thai_celeb"][0],  # Davika (25)
+        ARTIS_INTERNASIONAL["hollywood_young"][3],  # Kylie Jenner (25)
     ],
     
     "istri_orang": [
-        ARTIS_INDONESIA["manis_indonesia"][4],  # Dian Sastro
-        ARTIS_INDONESIA["manis_indonesia"][8],  # Bunga Citra Lestari
-        ARTIS_INDONESIA["manis_indonesia"][9],  # Laudya Cynthia Bella
-        ARTIS_INTERNASIONAL["bollywood"][2],    # Aishwarya Rai
-        ARTIS_INTERNASIONAL["bollywood"][0],    # Priyanka Chopra
-        ARTIS_INTERNASIONAL["hollywood"][1],    # Margot Robbie
+        ARTIS_INDONESIA["selebgram_muda"][2],  # Prilly (25)
+        ARTIS_INDONESIA["selebgram_muda"][5],  # Cinta Laura (25)
+        ARTIS_INDONESIA["selebgram_muda"][1],  # Natasha Wilona (25)
+        ARTIS_INTERNASIONAL["thai_celeb"][0],  # Davika (25)
+        ARTIS_INTERNASIONAL["hollywood_young"][4],  # Hailey Bieber (25)
     ],
     
     "pdkt": [
-        ARTIS_INDONESIA["manis_indonesia"][7],  # Chelsea Islan
-        ARTIS_INDONESIA["manis_indonesia"][1],  # Prilly
-        ARTIS_INDONESIA["manis_indonesia"][2],  # Natasha Wilona
-        ARTIS_INTERNASIONAL["korean"][4],       # IU
-        ARTIS_INTERNASIONAL["korean"][10],      # Tzuyu
-        ARTIS_INTERNASIONAL["thai"][2],         # Baifern
+        ARTIS_INDONESIA["selebgram_muda"][0],  # Fuji (23)
+        ARTIS_INDONESIA["selebgram_muda"][4],  # Mikha Tambayong (25)
+        ARTIS_INDONESIA["selebgram_muda"][6],  # Inka Andestha (25)
+        ARTIS_INTERNASIONAL["kpop_female"][2],  # Wonyoung (21)
+        ARTIS_INTERNASIONAL["kpop_female"][3],  # Yuna (21)
+        ARTIS_INTERNASIONAL["kpop_female"][8],  # Haerin (18)
+        ARTIS_INTERNASIONAL["kpop_female"][9],  # Hanni (19)
+        ARTIS_INTERNASIONAL["thai_celeb"][1],  # PunPun (24)
     ],
     
     "sepupu": [
-        ARTIS_INDONESIA["manis_indonesia"][6],  # Marsha Timothy
-        ARTIS_INDONESIA["manis_indonesia"][5],  # Tara Basro
-        ARTIS_INDONESIA["seksi_indonesia"][5],  # Dewi Perssik (versi muda)
-        ARTIS_INTERNASIONAL["korean"][1],       # Jisoo
-        ARTIS_INTERNASIONAL["korean"][9],       # Irene
-        ARTIS_INTERNASIONAL["thai"][1],         # Yaya
+        ARTIS_INDONESIA["selebgram_muda"][2],  # Prilly (25)
+        ARTIS_INDONESIA["selebgram_muda"][3],  # Amanda (24)
+        ARTIS_INDONESIA["selebgram_muda"][0],  # Fuji (23)
+        ARTIS_INTERNASIONAL["kpop_female"][2],  # Wonyoung (21)
+        ARTIS_INTERNASIONAL["kpop_female"][3],  # Yuna (21)
+        ARTIS_INTERNASIONAL["kpop_female"][8],  # Haerin (18)
+        ARTIS_INTERNASIONAL["thai_celeb"][1],  # PunPun (24)
     ],
     
     "teman_sma": [
-        ARTIS_INDONESIA["manis_indonesia"][3],  # Mikha
-        ARTIS_INDONESIA["manis_indonesia"][2],  # Natasha Wilona
-        ARTIS_INDONESIA["alay_indonesia"][0],   # Jessica Iskandar (muda)
-        ARTIS_INTERNASIONAL["korean"][11],      # Mina
-        ARTIS_INTERNASIONAL["korean"][13],      # Jihyo
-        ARTIS_INTERNASIONAL["japanese"][5],     # Hitomi
+        ARTIS_INDONESIA["selebgram_muda"][0],  # Fuji (23)
+        ARTIS_INDONESIA["selebgram_muda"][6],  # Inka Andestha (25)
+        ARTIS_INDONESIA["selebgram_muda"][4],  # Mikha (25)
+        ARTIS_INTERNASIONAL["kpop_female"][2],  # Wonyoung (21)
+        ARTIS_INTERNASIONAL["kpop_female"][3],  # Yuna (21)
+        ARTIS_INTERNASIONAL["kpop_female"][7],  # Eunchae (18)
+        ARTIS_INTERNASIONAL["kpop_female"][8],  # Haerin (18)
+        ARTIS_INTERNASIONAL["kpop_female"][9],  # Hanni (19)
+        ARTIS_INTERNASIONAL["hollywood_young"][0],  # Lily-Rose (25)
     ],
     
     "mantan": [
-        ARTIS_INDONESIA["seksi_indonesia"][6],  # Ussy (versi muda)
-        ARTIS_INDONESIA["manis_indonesia"][3],  # Mikha
-        ARTIS_INDONESIA["seksi_indonesia"][8],  # Amanda
-        ARTIS_INTERNASIONAL["hollywood"][3],    # Jennifer Lawrence
-        ARTIS_INTERNASIONAL["hollywood"][9],    # Kendall Jenner
-        ARTIS_INTERNASIONAL["bollywood"][3],    # Katrina Kaif
+        ARTIS_INDONESIA["selebgram_muda"][1],  # Natasha Wilona (25)
+        ARTIS_INDONESIA["selebgram_muda"][2],  # Prilly (25)
+        ARTIS_INDONESIA["selebgram_muda"][5],  # Cinta Laura (25)
+        ARTIS_INTERNASIONAL["kpop_female"][1],  # Rosé (25)
+        ARTIS_INTERNASIONAL["thai_celeb"][0],  # Davika (25)
+        ARTIS_INTERNASIONAL["hollywood_young"][3],  # Kylie Jenner (25)
     ]
 }
 
 
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+import random
+from typing import Optional, Dict, List
+
+
 def get_random_artist_for_role(role: str) -> dict:
-    """Get random artist reference for specific role"""
-    import random
-    
+    """
+    Get random artist reference for specific role
+    **Semua data sudah 18-25 tahun**
+    """
     if role in ROLE_REFERENCES:
         return random.choice(ROLE_REFERENCES[role])
     else:
-        # Fallback ke artis Indonesia random
+        # Fallback ke artis Indonesia
         all_artis = []
         for cat in ARTIS_INDONESIA.values():
             all_artis.extend(cat)
@@ -815,20 +534,56 @@ def get_artist_by_name(nama: str) -> Optional[dict]:
 
 def format_artist_description(artist: dict) -> str:
     """Format artist description for display"""
-    desc = f"• {artist['nama']} "
-    desc += f"({artist['tinggi']}cm/{artist['berat']}kg, {artist['dada']})"
+    desc = f"• **{artist['nama']}** "
+    desc += f"({artist['umur']} th, {artist['tinggi']}cm/{artist['berat']}kg, {artist['dada']})\n"
     
-    if 'film' in artist:
-        desc += f"\n  Mirip perannya di {artist['film']}"
-    elif 'sinetron' in artist:
-        desc += f"\n  Mirip perannya di {artist['sinetron']}"
-    elif 'group' in artist:
-        desc += f"\n  Member {artist['group']}"
-        
+    if 'followers' in artist:
+        desc += f"  📱 {artist['followers']} followers\n"
+    
+    if 'group' in artist:
+        desc += f"  🎤 Member {artist['group']}\n"
+    
+    if 'negara' in artist:
+        desc += f"  🌍 {artist['negara']}\n"
+    
+    desc += f"  💫 {artist['ciri']}\n"
+    
     if 'instagram' in artist:
-        desc += f"\n  IG: {artist['instagram']}"
+        desc += f"  📲 IG: @{artist['instagram'].replace('@', '')}"
         
     return desc
+
+
+def get_artist_by_popularity(min_followers: int = 1_000_000) -> List[dict]:
+    """
+    Get artists by minimum followers
+    
+    Args:
+        min_followers: Minimal jumlah followers (dalam juta)
+    """
+    results = []
+    
+    # Parse followers string to number
+    def parse_followers(f_str):
+        if 'M' in f_str:
+            return float(f_str.replace('M', '')) * 1_000_000
+        elif 'K' in f_str:
+            return float(f_str.replace('K', '')) * 1_000
+        return 0
+    
+    # Search in all categories
+    all_artis = []
+    for cat in ARTIS_INDONESIA.values():
+        all_artis.extend(cat)
+    for cat in ARTIS_INTERNASIONAL.values():
+        all_artis.extend(cat)
+    
+    for artis in all_artis:
+        followers = parse_followers(artis.get('followers', '0'))
+        if followers >= min_followers:
+            results.append(artis)
+    
+    return sorted(results, key=lambda x: parse_followers(x.get('followers', '0')), reverse=True)
 
 
 __all__ = [
@@ -837,5 +592,6 @@ __all__ = [
     'ROLE_REFERENCES',
     'get_random_artist_for_role',
     'get_artist_by_name',
-    'format_artist_description'
+    'format_artist_description',
+    'get_artist_by_popularity'
 ]
