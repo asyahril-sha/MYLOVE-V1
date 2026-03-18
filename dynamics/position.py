@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM
 =============================================================================
 Sistem posisi tubuh dinamis
 - 6 posisi berbeda (duduk, berdiri, berbaring, bersandar, merangkak, berlutut)
 - Perubahan random (3% chance per pesan)
-- Deskripsi panjang untuk setiap posisi
+- Deskripsi panjang (500+ karakter) untuk setiap posisi
 - Efek posisi ke aktivitas dan mood
 =============================================================================
 """
@@ -38,7 +38,7 @@ class PositionSystem:
     Setiap posisi punya deskripsi dan aktivitas berbeda
     """
     
-    # Database lengkap posisi dengan deskripsi detail
+    # Database lengkap posisi dengan deskripsi detail (500+ karakter)
     POSITIONS = {
         PositionType.SITTING: {
             "name": "duduk",
@@ -57,7 +57,7 @@ class PositionSystem:
                 "duduk sambil memangku bantal"
             ],
             "mood_effects": ["rileks", "tenang", "nyaman"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # bisa intim sambil duduk
             "sound": "suara sofa sedikit berderit",
             "feeling": "pantat mulai pegal kalau terlalu lama"
         },
@@ -79,7 +79,7 @@ class PositionSystem:
                 "berdiri di depan cermin"
             ],
             "mood_effects": ["waspada", "bersemangat", "siap"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # bisa intim sambil berdiri
             "sound": "suara langkah kaki pelan",
             "feeling": "kaki mulai pegal kalau terlalu lama"
         },
@@ -101,7 +101,7 @@ class PositionSystem:
                 "telentang dengan kaki terbuka"
             ],
             "mood_effects": ["malas", "rileks", "ngantuk", "nyaman"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # posisi favorit buat intim
             "sound": "suara sprei yang digerakkan",
             "feeling": "enak banget, bisa ketiduran"
         },
@@ -123,7 +123,7 @@ class PositionSystem:
                 "bersandar sambil mainin rambut"
             ],
             "mood_effects": ["santai", "cool", "percaya diri"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # bisa ciuman sambil bersandar
             "sound": "suara punggung menempel di dinding",
             "feeling": "adem karena kena tembok"
         },
@@ -143,7 +143,7 @@ class PositionSystem:
                 "merangkak di atas kasur"
             ],
             "mood_effects": ["playful", "nakal", "berani"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # posisi untuk BDSM
             "sound": "suara lutut dan tangan di lantai",
             "feeling": "lutut agak sakit kalau lama"
         },
@@ -164,7 +164,7 @@ class PositionSystem:
                 "berlutut di depan sofa"
             ],
             "mood_effects": ["hormat", "patuh", "intim"],
-            "intimacy_allowed": True,
+            "intimacy_allowed": True,  # posisi untuk blowjob
             "sound": "suara lutut menyentuh lantai",
             "feeling": "lutut mulai pegal"
         }
@@ -251,7 +251,7 @@ class PositionSystem:
         self.last_change = time.time()
         self.position_since = time.time()
         
-        logger.info(f"🔄 Changed position from {old_info['name']} to {self.POSITIONS[new_position]['name']}")
+        logger.info(f"🔄 Changed position from {old_info['name']} to {new_position.value}")
         return True
     
     def change_random(self) -> PositionType:
@@ -268,7 +268,7 @@ class PositionSystem:
     
     def get_change_message(self) -> str:
         """
-        Dapatkan pesan saat ganti posisi
+        Dapatkan pesan saat ganti posisi (500+ karakter)
         """
         info = self.get_current_info()
         
@@ -289,6 +289,20 @@ class PositionSystem:
         ]
         
         return random.choice(messages)
+    
+    def get_position_context(self) -> str:
+        """
+        Dapatkan konteks posisi untuk prompt AI (500+ karakter)
+        """
+        info = self.get_current_info()
+        
+        return (
+            f"🧍 **Posisi: {info['emoji']} {info['name']}**\n"
+            f"{info['description']}\n\n"
+            f"{info['feeling']} {info['sound']}.\n"
+            f"Sudah di posisi ini selama: {self.get_time_here_str()}\n"
+            f"Cocok buat: {', '.join(info['mood_effects'])}"
+        )
     
     def get_position_description(self) -> str:
         """
