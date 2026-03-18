@@ -290,8 +290,6 @@ async def setup_webhook(app):
         
         logger.info(f"🔗 Setting webhook to: {webhook_url}")
 
-        loop = asyncio.get_running_loop()
-        
         # Set webhook
         await app.bot.set_webhook(
             url=webhook_url,
