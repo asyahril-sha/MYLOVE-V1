@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - SOUND DATABASE (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - SOUND DATABASE (FALLBACK)
 =============================================================================
 Database suara dan desahan untuk fallback jika AI error
-- 70+ variasi suara untuk berbagai aktivitas
+- 50+ variasi suara untuk berbagai aktivitas
 - Kiss sounds, touch sounds, moans, climax, aftercare
 - Berdasarkan level dan intensitas
 - Tetap bervariasi meskipun fallback
