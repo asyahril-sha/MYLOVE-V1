@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-GADIS V81 - MAIN ENTRY POINT (FULL FIX)
+GADIS V81 - MAIN ENTRY POINT (FIXED)
 =============================================================================
-Native python-telegram-bot v20+ dengan polling mode + healthcheck server
 """
 
 import asyncio
@@ -14,19 +13,16 @@ import threading
 import os
 from pathlib import Path
 
-# Tambahkan path ke root project
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import settings
 from utils.logger import setup_logging
 
-# Setup logging
 logger = setup_logging("gadis_v81")
 
 # ===== HEALTHCHECK SERVER =====
 try:
     from flask import Flask, jsonify
-
     health_app = Flask(__name__)
 
     @health_app.route('/health')
@@ -44,23 +40,54 @@ except ImportError:
     def run_health_server():
         pass
 
-# ===== BANNER =====
+# ===== BANNER with safe attribute access =====
 print("="*70)
 print("    GADIS V81 - ULTIMATE AI BOT")
 print("    Premium Edition - All Features")
 print("="*70)
-print(f"📊 Database: {settings.db.name} @ {settings.db.host}")
-print(f"🤖 AI Model: {settings.ai.primary_model}")
+
+# Database info
+try:
+    db_info = f"{settings.db.name} @ {settings.db.host}"
+except AttributeError:
+    db_info = "SQLite (gadis_v81.db)"
+print(f"📊 Database: {db_info}")
+
+# AI Model
+try:
+    ai_model = settings.ai.primary_model
+except AttributeError:
+    ai_model = "deepseek"
+print(f"🤖 AI Model: {ai_model}")
+
+# Admin ID
 print(f"👑 Admin ID: {settings.admin_id}")
-print(f"🔞 Sexual Features: {'ENABLED' if settings.sexual.enabled else 'DISABLED'}")
-print(f"🌍 Public Areas: {settings.sexual.max_positions} positions")
-print(f"🎯 Bot Initiative: {'ON' if settings.sexual.bot_initiative_enabled else 'OFF'}")
+
+# Sexual features
+try:
+    sexual_enabled = "ENABLED" if settings.sexual.enabled else "DISABLED"
+except AttributeError:
+    sexual_enabled = "ENABLED"
+print(f"🔞 Sexual Features: {sexual_enabled}")
+
+# Public areas
+try:
+    max_positions = settings.sexual.max_positions
+except AttributeError:
+    max_positions = 50
+print(f"🌍 Public Areas: {max_positions} positions")
+
+# Bot initiative
+try:
+    bot_initiative = "ON" if settings.sexual.bot_initiative_enabled else "OFF"
+except AttributeError:
+    bot_initiative = "ON"
+print(f"🎯 Bot Initiative: {bot_initiative}")
+
 print("="*70)
 
 
-# ===== INISIALISASI ASYNC =====
 async def init_components():
-    """Inisialisasi semua komponen (database, redis, bot app)"""
     logger.info("🚀 Starting GADIS V81...")
 
     # Database
@@ -68,12 +95,8 @@ async def init_components():
         from database.connection import init_db
         await init_db()
         logger.info("✅ Database initialized")
-    except ImportError as e:
-        logger.error(f"❌ Database module error: {e}")
-        raise
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
-        traceback.print_exc()
         raise
 
     # Redis (mock)
@@ -85,22 +108,17 @@ async def init_components():
         logger.warning("⚠️ Redis module not found, skipping...")
     except Exception as e:
         logger.error(f"❌ Redis initialization failed: {e}")
-        # non-critical
 
-    # Bot application (synchronous)
+    # Bot application
     try:
         from bot.application import create_application
         app = create_application()
         logger.info("✅ Bot application created")
-    except ImportError as e:
-        logger.error(f"❌ Bot application module error: {e}")
-        raise
     except Exception as e:
         logger.error(f"❌ Bot application creation failed: {e}")
-        traceback.print_exc()
         raise
 
-    # Setup webhook (sync wrapper)
+    # Webhook setup
     try:
         from bot.webhook import setup_webhook_sync
         mode = setup_webhook_sync(app)
@@ -109,32 +127,23 @@ async def init_components():
         logger.warning("⚠️ Webhook module not found, continuing with polling")
     except Exception as e:
         logger.error(f"❌ Webhook setup failed: {e}")
-        # continue with polling anyway
 
     logger.info("🚀 GADIS V81 is ready!")
     return app
 
 
-# ===== MAIN FUNCTION =====
 def main():
-    """Main entry point – fully synchronous after init"""
-    # Start healthcheck server di thread terpisah
     if HEALTH_SERVER_AVAILABLE:
         threading.Thread(target=run_health_server, daemon=True).start()
         logger.info(f"✅ Healthcheck server started on port {os.getenv('PORT', 8080)}")
 
     try:
-        # Inisialisasi async components
         app = asyncio.run(init_components())
-
         logger.info("📡 Starting bot in polling mode...")
-
-        # Jalankan polling (blocking, synchronous)
         app.run_polling(
             allowed_updates=['message', 'callback_query'],
-            drop_pending_updates=True  # Hindari konflik instance
+            drop_pending_updates=True
         )
-
     except KeyboardInterrupt:
         logger.info("👋 Bot stopped by user")
     except Exception as e:
