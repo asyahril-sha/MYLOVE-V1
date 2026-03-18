@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-GADIS V81 - MAIN ENTRY POINT (SINGLE FLASK SERVER)
+MYLOVE-V1 - MAIN ENTRY POINT (SINGLE FLASK SERVER)
 =============================================================================
 Satu Flask server untuk healthcheck DAN webhook
 """
@@ -57,7 +57,7 @@ try:
     def root():
         """Root endpoint - info bot"""
         return jsonify({
-            "name": "GADIS V81",
+            "name": "MYLOV-V1",
             "version": "1.0.0",
             "status": "running",
             "admin_id": str(settings.admin_id)
@@ -149,7 +149,7 @@ def signal_handler(sig, frame):
 def print_banner():
     """Print startup banner"""
     print("="*70)
-    print("    GADIS V81 - ULTIMATE AI BOT")
+    print("    MYLOVE-v1 - ULTIMATE AI BOT")
     print("    Premium Edition - All Features")
     print("="*70)
     
@@ -223,7 +223,7 @@ def print_banner():
 async def init_components():
     """Initialize all components asynchronously"""
     global _bot_app
-    logger.info("🚀 Starting GADIS V81...")
+    logger.info("🚀 Starting MYLOVE-v1...")
 
     # Database
     try:
@@ -259,7 +259,7 @@ async def init_components():
         logger.error(f"❌ Bot application creation failed: {e}")
         raise
 
-    logger.info("🚀 GADIS V81 is ready!")
+    logger.info("🚀 MYLOVE-v1 is ready!")
     return _bot_app
 
 
