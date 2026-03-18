@@ -307,7 +307,7 @@ class MyLoveUltimate:
             from relationship.intimacy import IntimacySystem
             from relationship.ranking import RankingSystem
             self.intimacy = IntimacySystem()
-            self.ranking = RankingSystem()
+            self.ranking = RankingSystem(relationship_memory=self.relationship_memory)
             self.debug.log_component_success("RELATIONSHIP_SYSTEM")
         except Exception as e:
             self.debug.log_component_error("RELATIONSHIP_SYSTEM", e)
