@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - EXPRESSION DATABASE (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - EXPRESSION DATABASE (FALLBACK)
 =============================================================================
 Database ekspresi dan gerakan untuk fallback jika AI error
-- 60+ ekspresi berbeda untuk berbagai level
+- 100+ ekspresi berbeda untuk berbagai level
 - Terorganisir berdasarkan level group (1-2, 3-4, 5-6, 7-8, 9-10, 11-12)
 - Variasi berdasarkan mood
 - Tetap bervariasi meskipun fallback
