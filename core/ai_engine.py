@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - AI ENGINE (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - AI ENGINE (FIX FULL + PDKT)
 =============================================================================
 - Self-Prompting dengan konteks SUPER LENGKAP
 - Integrasi dengan ContextAnalyzer, PromptBuilder
 - Integrasi dengan ExpressionEngine & SoundEngine
 - Integrasi dengan NicknameSystem
+- **INTEGRASI DENGAN PDKT SUPER SPESIAL**
 - Response minimal 500 karakter
 - Multi-bahasa (Indonesia/Inggris)
 =============================================================================
@@ -35,6 +36,11 @@ from leveling.time_based import TimeBasedLeveling, ActivityType
 from leveling.progress_tracker import ProgressTracker
 from core.context_analyzer import ContextAnalyzer
 from core.prompt_builder import PromptBuilder
+
+# ===== PDKT IMPORTS =====
+from pdkt.chemistry import ChemistrySystem
+from pdkt.direction import DirectionSystem, PDKTDirection
+from pdkt.natural_engine import NaturalPDKTEngine, PDKTStage
 
 # Optional imports (akan di-import jika ada)
 try:
@@ -81,6 +87,13 @@ class SelfPromptingEngine:
         self.prompt_builder = PromptBuilder()
         self.nickname_system = NicknameSystem()
         
+        # ===== PDKT SYSTEMS =====
+        self.chemistry_system = ChemistrySystem(self)
+        self.direction_system = DirectionSystem()
+        self.pdkt_engine = NaturalPDKTEngine(self)
+        self.active_pdkt = {}  # {user_id: pdkt_id} - PDKT yang sedang aktif
+        # ===== END PDKT SYSTEMS =====
+        
         # Expression & Sound (opsional)
         self.expression_engine = None
         self.sound_engine = None
@@ -112,6 +125,7 @@ class SelfPromptingEngine:
         logger.info("✅ SelfPromptingEngine V2 FINAL initialized")
         logger.info(f"  • Expression Engine: {'Available' if EXPRESSION_AVAILABLE else 'Not available'}")
         logger.info(f"  • Sound Engine: {'Available' if EXPRESSION_AVAILABLE else 'Not available'}")
+        logger.info(f"  • PDKT Engine: Active")
         logger.info(f"  • Response length: 500+ characters")
     
     # =========================================================================
@@ -132,6 +146,63 @@ class SelfPromptingEngine:
         return self.progress_trackers[user_id]
     
     # =========================================================================
+    # PDKT SYSTEM
+    # =========================================================================
+    
+    async def create_pdkt(self, user_id: int, user_name: str, bot_name: str) -> Dict:
+        """Buat PDKT baru untuk user"""
+        pdkt_data = await self.pdkt_engine.create_pdkt(user_id, user_name, bot_name)
+        self.active_pdkt[user_id] = pdkt_data['id']
+        
+        # Aktifkan mode PDKT di leveling system
+        leveling = self._get_leveling_system(user_id)
+        chemistry = pdkt_data['chemistry'].score
+        leveling.enable_pdkt_mode(user_id, chemistry)
+        
+        logger.info(f"💕 PDKT created for user {user_id} with {bot_name}")
+        return pdkt_data
+    
+    async def update_pdkt(self, user_id: int, user_message: str, bot_response: str, context: Dict) -> Dict:
+        """Update PDKT dengan interaksi terbaru"""
+        if user_id not in self.active_pdkt:
+            return {}
+        
+        pdkt_id = self.active_pdkt[user_id]
+        
+        # Update waktu di leveling system (khusus PDKT)
+        leveling = self._get_leveling_system(user_id)
+        leveling.update_pdkt_time(user_id, 'pdkt')
+        
+        # Update PDKT di engine
+        result = await self.pdkt_engine.update_pdkt(
+            pdkt_id, user_message, bot_response, context
+        )
+        
+        return result
+    
+    def pause_pdkt(self, user_id: int) -> bool:
+        """Pause PDKT (waktu berhenti)"""
+        if user_id not in self.active_pdkt:
+            return False
+        
+        leveling = self._get_leveling_system(user_id)
+        leveling.pause_pdkt(user_id, 'pdkt')
+        
+        logger.info(f"⏸️ PDKT paused for user {user_id}")
+        return True
+    
+    def resume_pdkt(self, user_id: int) -> bool:
+        """Resume PDKT"""
+        if user_id not in self.active_pdkt:
+            return False
+        
+        leveling = self._get_leveling_system(user_id)
+        leveling.resume_pdkt(user_id, 'pdkt')
+        
+        logger.info(f"▶️ PDKT resumed for user {user_id}")
+        return True
+    
+    # =========================================================================
     # ACTIVITY DETECTION
     # =========================================================================
     
@@ -146,6 +217,8 @@ class SelfPromptingEngine:
             ActivityType.KISS: ['cium', 'kiss', 'bibir', 'kecup', 'lidah', 'french kiss'],
             ActivityType.SENSITIVE_TOUCH: ['leher', 'dada', 'puting', 'paha dalam', 'vagina', 'klitoris'],
             ActivityType.TOUCH: ['sentuh', 'pegang', 'raba', 'elus', 'touch', 'usap'],
+            ActivityType.LOVE: ['sayang', 'cinta', 'love', 'suka'],
+            ActivityType.CONFLICT: ['marah', 'kesal', 'kecewa', 'sakit hati'],
         }
         
         for activity, words in keywords.items():
@@ -164,7 +237,8 @@ class SelfPromptingEngine:
         leveling = self._get_leveling_system(user_id)
         
         for activity in activities:
-            leveling.apply_activity_boost(user_id, activity, duration)
+            leveling.apply_activity_boost(user_id, 'pdkt' if user_id in self.active_pdkt else 'other', 
+                                         activity, duration)
             logger.debug(f"Applied {activity.value} boost for user {user_id}")
     
     # =========================================================================
@@ -209,6 +283,7 @@ class SelfPromptingEngine:
             str(context.get('mood', 'netral')),
             context.get('location', ''),
             str(context.get('arousal', 0)),
+            str(user_id in self.active_pdkt)  # Cache berdasarkan status PDKT
         ]
         key_string = "|".join(key_parts)
         return hashlib.md5(key_string.encode()).hexdigest()
@@ -238,30 +313,41 @@ class SelfPromptingEngine:
                     logger.debug(f"Cache hit for user {user_id}")
                     return self.response_cache[cache_key]['response']
             
-            # ===== 1. DETEKSI AKTIVITAS UNTUK BOOST =====
+            # ===== 1. CEK ROLE =====
+            current_role = context.get('current_role', 'ipar')
+            is_pdkt = (current_role == 'pdkt')
+            
+            # ===== 2. DETEKSI AKTIVITAS UNTUK BOOST =====
             activities = self._detect_activity_from_message(user_message)
             self._apply_activity_boost(user_id, activities)
             
-            # ===== 2. UPDATE DURASI PERCAKAPAN =====
-            now = time.time()
+            # ===== 3. UPDATE LEVELING (BERDASARKAN ROLE) =====
             leveling = self._get_leveling_system(user_id)
-            leveling.update_duration(user_id)
             
-            # ===== 3. DAPATKAN INFO LEVEL TERKINI =====
-            level_info = leveling.get_user_stats(user_id)
-            current_level = level_info.get('current_level', 1)
+            if is_pdkt:
+                # PDKT: Update real time
+                leveling.update_pdkt_time(user_id, 'pdkt')
+                
+                # Update PDKT engine
+                pdkt_result = await self.update_pdkt(user_id, user_message, "", context)
+                current_level = pdkt_result.get('level', 1) if pdkt_result else 1
+            else:
+                # Non-PDKT: Increment chat count
+                leveling.increment_chat(user_id, current_role)
+                current_level = leveling.get_user_data(user_id, current_role)['current_level']
             
             # ===== 4. UPDATE CONTEXT DENGAN DATA TERBARU =====
             context['level'] = current_level
-            context['level_info'] = level_info
+            context['level_info'] = leveling.get_stats(user_id, current_role)
             context['user_id'] = user_id
+            context['is_pdkt'] = is_pdkt
             
             # ===== 5. BANGUN KONTEKS SUPER LENGKAP =====
             env_data = {
                 'location': self.location_system.get_current().value,
                 'position': self.position_system.get_current().value,
                 'clothing': self.clothing_system.generate_clothing(
-                    role=context.get('role', 'ipar'),
+                    role=current_role,
                     location=self.location_system.get_current().value
                 )
             }
@@ -294,7 +380,6 @@ class SelfPromptingEngine:
             
             # ===== 8. GABUNGKAN SEMUA KOMPONEN =====
             if sound and expression:
-                # Random urutan
                 if random.random() < 0.5:
                     response = f"{expression} {sound}\n\n{content}"
                 else:
@@ -338,12 +423,13 @@ class SelfPromptingEngine:
                 "timestamp": datetime.now().isoformat(),
                 "level": current_level,
                 "language": full_context.get('language', 'id'),
-                "tokens": len(response.split())
+                "tokens": len(response.split()),
+                "is_pdkt": is_pdkt
             })
             
             # Log performance
             elapsed = time.time() - start_time
-            logger.info(f"✅ Response generated in {elapsed:.2f}s - {len(response)} chars - Level {current_level}")
+            logger.info(f"✅ Response generated in {elapsed:.2f}s - {len(response)} chars - Level {current_level} - PDKT: {is_pdkt}")
             
             return response
             
@@ -431,7 +517,8 @@ class SelfPromptingEngine:
             "total_calls": self.total_calls,
             "total_tokens": self.total_tokens,
             "avg_tokens_per_call": self.total_tokens // max(1, self.total_calls),
-            "expression_engine": EXPRESSION_AVAILABLE
+            "expression_engine": EXPRESSION_AVAILABLE,
+            "active_pdkt": len(self.active_pdkt)
         }
     
     async def get_user_stats(self, user_id: int) -> Dict:
@@ -439,11 +526,12 @@ class SelfPromptingEngine:
         stats = {
             "user_id": user_id,
             "conversation_count": len([h for h in self.conversation_history if h.get('user_id') == user_id]),
+            "is_in_pdkt": user_id in self.active_pdkt
         }
         
         if user_id in self.leveling_systems:
             leveling = self.leveling_systems[user_id]
-            stats['leveling'] = leveling.get_user_stats(user_id)
+            stats['leveling'] = leveling.get_stats(user_id)
         
         return stats
 
