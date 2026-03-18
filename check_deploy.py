@@ -59,6 +59,8 @@ def main():
             from config import settings
             print(f"   • Admin ID: {settings.admin_id}")
             print(f"   • Telegram Token: {settings.telegram_token[:5]}...{settings.telegram_token[-5:]}")
+            print(f"   • Log Dir: {settings.logging.log_dir}")
+            print(f"   • Database Path: {settings.database.path}")
         except Exception as e:
             print(f"   ❌ Cannot access settings: {e}")
             errors.append("settings")
