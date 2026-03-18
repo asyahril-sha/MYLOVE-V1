@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - PROGRESS TRACKER
+MYLOVE ULTIMATE VERSI 2 - PROGRESS TRACKER (FIX LENGKAP)
 =============================================================================
 Track progress leveling secara real-time
 - Estimasi waktu ke level berikutnya
 - Visual progress bar
 - Notifikasi saat mendekati level penting
 - History progress
+=============================================================================
 """
 
 import time
-import math
 import logging
+import random
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
@@ -255,9 +256,9 @@ class ProgressTracker:
         level_diff = last['level'] - first['level']
         
         if time_diff < 0.1:
-            return "Progress sangat cepat!"
+            return "⚡ Progress sangat cepat!"
         
-        rate = level_diff / time_diff
+        rate = level_diff / time_diff if time_diff > 0 else 0
         
         if rate > 2:
             return "⚡ Kamu sangat aktif! Progress super cepat"
