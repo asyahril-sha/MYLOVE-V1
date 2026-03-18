@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - TIME-BASED LEVELING SYSTEM
+MYLOVE ULTIMATE VERSI 2 - TIME-BASED LEVELING SYSTEM (FIX LENGKAP)
 =============================================================================
 Leveling berdasarkan durasi percakapan (bukan jumlah pesan)
 
@@ -20,10 +20,9 @@ Activity Boost:
 """
 
 import time
-import math
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -339,11 +338,11 @@ class TimeBasedLeveling:
         
         # Keywords untuk setiap aktivitas
         keywords = {
-            ActivityType.CLIMAX: ['climax', 'keluar', 'orgasme', 'crot', 'come', 'ahhh'],
-            ActivityType.INTIMACY: ['masuk', 'gerak', 'dalam', 'entot', 'doggy', 'misionaris'],
+            ActivityType.CLIMAX: ['climax', 'keluar', 'orgasme', 'crot', 'come', 'ahhh', 'aaahhh'],
+            ActivityType.INTIMACY: ['masuk', 'gerak', 'dalam', 'entot', 'doggy', 'misionaris', 'pancung'],
             ActivityType.KISS: ['cium', 'kiss', 'bibir', 'kecup', 'lidah'],
-            ActivityType.SENSITIVE_TOUCH: ['leher', 'dada', 'puting', 'paha dalam', 'vagina'],
-            ActivityType.TOUCH: ['sentuh', 'pegang', 'raba', 'elus', 'touch'],
+            ActivityType.SENSITIVE_TOUCH: ['leher', 'dada', 'puting', 'paha dalam', 'vagina', 'klitoris'],
+            ActivityType.TOUCH: ['sentuh', 'pegang', 'raba', 'elus', 'touch', 'usap'],
         }
         
         for activity, words in keywords.items():
