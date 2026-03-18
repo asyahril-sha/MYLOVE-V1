@@ -11,6 +11,7 @@ from .application import BotApplication
 from .commands import *
 from .handlers import *
 from .webhook import WebhookManager, setup_webhook_with_fallback
+from bot.application import create_application
 
 __all__ = [
     # Application
