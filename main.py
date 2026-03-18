@@ -271,13 +271,10 @@ def main():
         # Initialize components
         app = asyncio.run(init_components())
 
-        logger.info("📡 Starting bot in polling mode...")
+        from bot.webhook import setup_webhook_with_fallback
 
-        # Run polling (blocking)
-        app.run_polling(
-            allowed_updates=['message', 'callback_query'],
-            drop_pending_updates=True
-        )
+        logger.info("🚀 Starting webhook mode...")
+        asyncio.run(setup_webhook_with_fallback(app))
 
     except KeyboardInterrupt:
         logger.info("👋 Bot stopped by user")
