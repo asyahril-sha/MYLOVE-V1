@@ -18,7 +18,7 @@ from telegram.ext import (
 from telegram.request import HTTPXRequest
 
 from config import settings
-from utils.logger import logger  # ← ini sekarang bisa diimport
+from utils.logger import logger
 from database.models import Constants
 
 # Import semua handler dan callback
@@ -39,8 +39,8 @@ from bot.handlers import (
     fwb_command,
     htslist_command,
     fwblist_command,
-    hts_call_command,
-    fwb_call_command,
+    hts_call_handler,  # ← diperbaiki dari hts_call_command
+    fwb_call_handler,  # ← diperbaiki dari fwb_call_command
     tophts_command,
     myclimax_command,
     climaxrank_command,
@@ -255,8 +255,8 @@ def create_application() -> Application:
     app.add_handler(CommandHandler("fwblist", fwblist_command))
     
     # HTS/FWB call commands (pattern matching)
-    app.add_handler(MessageHandler(filters.Regex(r'^/hts-'), hts_call_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^/fwb-'), fwb_call_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/hts-'), hts_call_handler))
+    app.add_handler(MessageHandler(filters.Regex(r'^/fwb-'), fwb_call_handler))
     
     # Ranking commands
     app.add_handler(CommandHandler("tophts", tophts_command))
