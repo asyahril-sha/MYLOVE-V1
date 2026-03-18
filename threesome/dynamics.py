@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - THREESOME DYNAMICS
+MYLOVE ULTIMATE VERSI 1 - THREESOME DYNAMICS (FIX)
 =============================================================================
 - Interaksi 3 arah antara user dan 2 role
 - Dinamika percakapan dalam threesome
 - Respons bergantian dari kedua role
 - Meningkatkan intimacy kedua role secara bersamaan
+- FIX: Mengganti relative imports dengan absolute imports
 """
 
 import time
@@ -16,8 +17,9 @@ import random
 import asyncio
 from typing import Dict, List, Optional, Any, Tuple
 
-from ..utils.logger import setup_logging
-from .manager import ThreesomeManager, ThreesomeStatus
+# FIX: Ganti relative imports dengan absolute imports
+from utils.logger import setup_logging
+from threesome.manager import ThreesomeManager, ThreesomeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,13 @@ class ThreesomeDynamics:
     Mengatur bagaimana 2 role berinteraksi dengan user dan satu sama lain
     """
     
-    def __init__(self, manager: ThreesomeManager, ai_engine, intimacy_system):
+    def __init__(self, manager: ThreesomeManager = None, ai_engine=None, intimacy_system=None):
+        """
+        Args:
+            manager: ThreesomeManager instance (optional)
+            ai_engine: AI engine instance (optional)
+            intimacy_system: IntimacySystem instance (optional)
+        """
         self.manager = manager
         self.ai_engine = ai_engine
         self.intimacy_system = intimacy_system
@@ -154,56 +162,68 @@ class ThreesomeDynamics:
         Returns:
             Dict dengan response dan konteks
         """
-        # Get session
-        session = await self.manager.get_session(session_id)
-        if not session:
-            return {"error": "Session not found"}
+        try:
+            # Get session
+            session = None
+            if self.manager:
+                session = await self.manager.get_session(session_id)
+                
+            if not session:
+                return {"error": "Session not found"}
+                
+            if session['status'] != ThreesomeStatus.ACTIVE:
+                return {"error": f"Session is {session['status']}"}
+                
+            # Pilih pola interaksi
+            if not pattern:
+                pattern = random.choice(self.interaction_patterns)
+                
+            # Dapatkan partisipan
+            p1 = session['participants'][0]
+            p2 = session['participants'][1]
             
-        if session['status'] != ThreesomeStatus.ACTIVE:
-            return {"error": f"Session is {session['status']}"}
+            # Generate response berdasarkan pola
+            if pattern == "both_respond":
+                response = await self._both_respond(p1, p2, user_message)
+            elif pattern == "one_dominant":
+                response = await self._one_dominant(p1, p2, user_message)
+            elif pattern == "competitive":
+                response = await self._competitive(p1, p2, user_message)
+            elif pattern == "cooperative":
+                response = await self._cooperative(p1, p2, user_message)
+            elif pattern == "jealous":
+                response = await self._jealous(p1, p2, user_message)
+            elif pattern == "playful":
+                response = await self._playful(p1, p2, user_message)
+            else:
+                response = await self._both_respond(p1, p2, user_message)
+                
+            # Update session dengan pola yang digunakan
+            session['last_pattern'] = pattern
+            session['interactions'].append({
+                "timestamp": time.time(),
+                "user_message": user_message[:50],
+                "pattern": pattern,
+                "response": response[:50]
+            })
             
-        # Pilih pola interaksi
-        if not pattern:
-            pattern = random.choice(self.interaction_patterns)
+            # Update intimacy untuk kedua partisipan
+            if self.intimacy_system and self.manager:
+                await self._update_intimacy(session, user_message)
+                
+            return {
+                "session_id": session_id,
+                "pattern": pattern,
+                "response": response,
+                "participants": [p1['name'], p2['name']]
+            }
             
-        # Dapatkan partisipan
-        p1 = session['participants'][0]
-        p2 = session['participants'][1]
-        
-        # Generate response berdasarkan pola
-        if pattern == "both_respond":
-            response = await self._both_respond(p1, p2, user_message)
-        elif pattern == "one_dominant":
-            response = await self._one_dominant(p1, p2, user_message)
-        elif pattern == "competitive":
-            response = await self._competitive(p1, p2, user_message)
-        elif pattern == "cooperative":
-            response = await self._cooperative(p1, p2, user_message)
-        elif pattern == "jealous":
-            response = await self._jealous(p1, p2, user_message)
-        elif pattern == "playful":
-            response = await self._playful(p1, p2, user_message)
-        else:
-            response = await self._both_respond(p1, p2, user_message)
-            
-        # Update session dengan pola yang digunakan
-        session['last_pattern'] = pattern
-        session['interactions'].append({
-            "timestamp": time.time(),
-            "user_message": user_message[:50],
-            "pattern": pattern,
-            "response": response[:50]
-        })
-        
-        # Update intimacy untuk kedua partisipan
-        await self._update_intimacy(session, user_message)
-        
-        return {
-            "session_id": session_id,
-            "pattern": pattern,
-            "response": response,
-            "participants": [p1['name'], p2['name']]
-        }
+        except Exception as e:
+            logger.error(f"Error generating threesome response: {e}")
+            return {
+                "error": str(e),
+                "response": "Maaf, terjadi kesalahan dalam mode threesome."
+            }
         
     async def _both_respond(self, p1: Dict, p2: Dict, user_message: str) -> str:
         """Kedua role merespon bergantian"""
@@ -325,41 +345,56 @@ class ThreesomeDynamics:
     
     async def _update_intimacy(self, session: Dict, user_message: str):
         """Update intimacy untuk kedua partisipan"""
-        user_id = session['user_id']
-        
-        for participant in session['participants']:
-            role = participant['role']
-            
-            # Increment interaction count
-            await self.intimacy_system.increment_level(user_id, role)
-            
-            # Cek special messages
-            if 'climax' in user_message.lower() or 'come' in user_message.lower():
-                participant['climax_count'] = participant.get('climax_count', 0) + 1
+        try:
+            if not self.intimacy_system:
+                return
                 
+            user_id = session['user_id']
+            
+            for participant in session['participants']:
+                role = participant['role']
+                
+                # Increment interaction count
+                await self.intimacy_system.increment_level(user_id, role)
+                
+                # Cek special messages
+                if 'climax' in user_message.lower() or 'come' in user_message.lower():
+                    participant['climax_count'] = participant.get('climax_count', 0) + 1
+                    
+        except Exception as e:
+            logger.error(f"Error updating intimacy in threesome: {e}")
+        
     async def handle_climax(self, session_id: str) -> Dict:
         """Handle climax dalam threesome"""
-        result = await self.manager.record_climax(session_id)
-        
-        if 'error' in result:
-            return result
+        try:
+            if not self.manager:
+                return {"error": "Manager not available"}
+                
+            result = await self.manager.record_climax(session_id)
             
-        session = result['session']
-        
-        # Generate climax message
-        climax_messages = [
-            "Bersama-sama mencapai puncak...",
-            "Satu, dua, tiga... semua climax!",
-            "Wow... bareng-bareng gini rasanya beda.",
-            "Puas banget... mau lagi?",
-            "Nggak nyangka bisa gini enaknya."
-        ]
-        
-        return {
-            "message": random.choice(climax_messages),
-            "climax_count": session['climax_count'],
-            "aftercare_needed": session['aftercare_needed']
-        }
+            if 'error' in result:
+                return result
+                
+            session = result['session']
+            
+            # Generate climax message
+            climax_messages = [
+                "Bersama-sama mencapai puncak...",
+                "Satu, dua, tiga... semua climax!",
+                "Wow... bareng-bareng gini rasanya beda.",
+                "Puas banget... mau lagi?",
+                "Nggak nyangka bisa gini enaknya."
+            ]
+            
+            return {
+                "message": random.choice(climax_messages),
+                "climax_count": session['climax_count'],
+                "aftercare_needed": session['aftercare_needed']
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling climax: {e}")
+            return {"error": str(e)}
         
     # =========================================================================
     # SWITCH PATTERN
@@ -367,20 +402,28 @@ class ThreesomeDynamics:
     
     async def switch_pattern(self, session_id: str, new_pattern: str) -> Dict:
         """Switch interaction pattern"""
-        session = await self.manager.get_session(session_id)
-        if not session:
-            return {"error": "Session not found"}
+        try:
+            if not self.manager:
+                return {"error": "Manager not available"}
+                
+            session = await self.manager.get_session(session_id)
+            if not session:
+                return {"error": "Session not found"}
+                
+            if new_pattern not in self.interaction_patterns:
+                return {"error": f"Invalid pattern. Choose from: {self.interaction_patterns}"}
+                
+            session['pattern'] = new_pattern
             
-        if new_pattern not in self.interaction_patterns:
-            return {"error": f"Invalid pattern. Choose from: {self.interaction_patterns}"}
+            return {
+                "success": True,
+                "new_pattern": new_pattern,
+                "message": f"Pola interaksi berubah menjadi {new_pattern}"
+            }
             
-        session['pattern'] = new_pattern
-        
-        return {
-            "success": True,
-            "new_pattern": new_pattern,
-            "message": f"Pola interaksi berubah menjadi {new_pattern}"
-        }
+        except Exception as e:
+            logger.error(f"Error switching pattern: {e}")
+            return {"error": str(e)}
         
     # =========================================================================
     # GET PATTERN INFO
@@ -415,6 +458,9 @@ class ThreesomeDynamics:
     async def get_stats(self, session_id: Optional[str] = None) -> Dict:
         """Get dynamics statistics"""
         if session_id:
+            if not self.manager:
+                return {"error": "Manager not available"}
+                
             session = await self.manager.get_session(session_id)
             if not session:
                 return {"error": "Session not found"}
