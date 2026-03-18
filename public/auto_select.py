@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - AUTO LOCATION SELECTOR (ENHANCED)
+MYLOVE ULTIMATE VERSI 2 - AUTO LOCATION SELECTOR (FIX FULL + PDKT)
 =============================================================================
 - Auto-detect lokasi dari chat user
 - Tidak perlu command khusus
 - Natural language processing sederhana
-- **INTEGRASI DENGAN LOCATION SYSTEM V2**
-- **SELECT BY LEVEL BERDASARKAN DURASI PERCAKAPAN**
-- **DESKRIPSI PANJANG 500+ KARAKTER**
+- **INTEGRASI DENGAN PDKT - lokasi favorit berdasarkan chemistry**
 =============================================================================
 """
 
@@ -24,6 +22,7 @@ from .locations import PublicLocations
 
 # ===== TAMBAHAN MYLOVE V2 =====
 from dynamics.location import LocationSystem, LocationType
+from pdkt.chemistry import ChemistryLevel
 # ===== END TAMBAHAN =====
 
 logger = logging.getLogger(__name__)
@@ -43,6 +42,9 @@ class LocationAutoSelector:
         # ===== TAMBAHAN MYLOVE V2 =====
         # Inisialisasi LocationSystem untuk environment dinamis
         self.location_system = LocationSystem()
+        
+        # Cache lokasi favorit berdasarkan chemistry
+        self.favorite_locations_cache = {}  # {user_id: {pdkt_id: [locations]}}
         # ===== END TAMBAHAN =====
         
         # =========================================================================
@@ -325,7 +327,7 @@ class LocationAutoSelector:
             
         indices = random.sample(range(len(category_locations)), min(limit, len(category_locations)))
         return [category_locations[i] for i in indices]
-    
+        
     # ===== TAMBAHAN MYLOVE V2 =====
     # =========================================================================
     # SELECT BY LEVEL (BERDASARKAN DURASI PERCAKAPAN)
@@ -442,7 +444,7 @@ class LocationAutoSelector:
     
     def get_location_description(self, location_type: LocationType) -> str:
         """
-        Dapatkan deskripsi panjang (500+ karakter) dari LocationSystem
+        Dapatkan deskripsi panjang dari LocationSystem
         
         Args:
             location_type: Tipe lokasi dari LocationSystem
@@ -453,7 +455,7 @@ class LocationAutoSelector:
         # Ambil info dari LocationSystem
         info = self.location_system.LOCATIONS.get(location_type, self.location_system.LOCATIONS[LocationType.LIVING_ROOM])
         
-        # Format deskripsi panjang (500+ karakter)
+        # Format deskripsi panjang
         description = (
             f"📍 **{info['emoji']} {info['name']}**\n\n"
             f"{info['description']}\n\n"
@@ -478,6 +480,108 @@ class LocationAutoSelector:
             )
             
         return description
+    
+    # =========================================================================
+    # PDKT LOCATION PREFERENCES
+    # =========================================================================
+    
+    async def update_favorite_locations(self, user_id: int, pdkt_id: str, 
+                                         location_name: str, chemistry_score: float):
+        """
+        Update lokasi favorit berdasarkan interaksi PDKT
+        
+        Args:
+            user_id: ID user
+            pdkt_id: ID PDKT
+            location_name: Nama lokasi
+            chemistry_score: Score chemistry saat itu
+        """
+        key = f"{user_id}_{pdkt_id}"
+        
+        if key not in self.favorite_locations_cache:
+            self.favorite_locations_cache[key] = []
+        
+        # Tambah lokasi dengan bobot chemistry
+        self.favorite_locations_cache[key].append({
+            'location': location_name,
+            'chemistry': chemistry_score,
+            'timestamp': time.time()
+        })
+        
+        # Keep last 20
+        if len(self.favorite_locations_cache[key]) > 20:
+            self.favorite_locations_cache[key] = self.favorite_locations_cache[key][-20:]
+    
+    async def get_favorite_locations(self, user_id: int, pdkt_id: str, limit: int = 3) -> List[str]:
+        """
+        Dapatkan lokasi favorit berdasarkan chemistry
+        
+        Args:
+            user_id: ID user
+            pdkt_id: ID PDKT
+            limit: Jumlah lokasi
+            
+        Returns:
+            List nama lokasi favorit
+        """
+        key = f"{user_id}_{pdkt_id}"
+        
+        if key not in self.favorite_locations_cache:
+            return []
+        
+        # Hitung bobot berdasarkan chemistry
+        locations = {}
+        for entry in self.favorite_locations_cache[key]:
+            loc = entry['location']
+            if loc not in locations:
+                locations[loc] = 0
+            locations[loc] += entry['chemistry'] / 100  # Bobot 0-1
+        
+        # Sort by weight
+        sorted_locs = sorted(locations.items(), key=lambda x: x[1], reverse=True)
+        
+        return [loc for loc, _ in sorted_locs[:limit]]
+    
+    async def suggest_location_by_chemistry(self, user_id: int, pdkt_id: str, 
+                                              chemistry_level: ChemistryLevel) -> Dict:
+        """
+        Suggest lokasi berdasarkan level chemistry
+        
+        Args:
+            user_id: ID user
+            pdkt_id: ID PDKT
+            chemistry_level: Level chemistry
+            
+        Returns:
+            Location dict
+        """
+        # Cek favorite locations dulu
+        favorites = await self.get_favorite_locations(user_id, pdkt_id, 2)
+        
+        if favorites and random.random() < 0.7:  # 70% pilih favorit
+            for fav in favorites:
+                for loc in self.locations:
+                    if loc['name'].lower() in fav.lower():
+                        return loc
+        
+        # Kalau tidak ada favorit, pilih berdasarkan chemistry
+        if chemistry_level == ChemistryLevel.SOULMATE:
+            # Lokasi romantis
+            candidates = self.locations_db.get_locations_by_category("nature")
+        elif chemistry_level == ChemistryLevel.SANGAT_COCOK:
+            # Lokasi privat
+            candidates = self.locations_db.get_locations_by_risk(50, 80)
+        elif chemistry_level == ChemistryLevel.COCOK:
+            # Lokasi nyaman
+            candidates = self.locations_db.get_locations_by_risk(30, 60)
+        elif chemistry_level == ChemistryLevel.HANGAT:
+            # Lokasi publik
+            candidates = self.locations_db.get_locations_by_risk(0, 40)
+        else:
+            # Random
+            candidates = self.locations_db.all_locations
+        
+        return random.choice(candidates) if candidates else self.locations_db.get_random_location()
     # ===== END TAMBAHAN =====
     
     # =========================================================================
@@ -598,7 +702,8 @@ class LocationAutoSelector:
             "keyword_categories": len(self.location_keywords),
             "total_keywords": sum(len(kw) for kw in self.location_keywords.values()),
             "phrase_patterns": len(self.phrase_patterns),
-            "cache_size": len(self.detection_cache)
+            "cache_size": len(self.detection_cache),
+            "favorite_cache_size": len(self.favorite_locations_cache)
         }
         
     def get_help_text(self) -> str:
@@ -622,6 +727,7 @@ class LocationAutoSelector:
     def clear_cache(self):
         """Clear detection cache"""
         self.detection_cache.clear()
+        self.favorite_locations_cache.clear()
         logger.info("Location detection cache cleared")
         
     # =========================================================================
