@@ -18,11 +18,72 @@ from telegram.ext import (
 from telegram.request import HTTPXRequest
 
 from config import settings
-from utils.logger import logger
+from utils.logger import logger  # ← ini sekarang bisa diimport
 from database.models import Constants
-from bot.handlers import *
-from bot.callbacks import *
-from bot.commands import *
+
+# Import semua handler dan callback
+from bot.handlers import (
+    start_command,
+    help_command,
+    status_command,
+    cancel_command,
+    dominant_command,
+    pause_command,
+    unpause_command,
+    close_command,
+    end_command,
+    jadipacar_command,
+    break_command,
+    unbreak_command,
+    breakup_command,
+    fwb_command,
+    htslist_command,
+    fwblist_command,
+    hts_call_command,
+    fwb_call_command,
+    tophts_command,
+    myclimax_command,
+    climaxrank_command,
+    climaxhistory_command,
+    explore_command,
+    go_command,
+    positions_command,
+    risk_command,
+    mood_command,
+    admin_command,
+    stats_command,
+    db_stats_command,
+    list_users_command,
+    get_user_command,
+    force_reset_command,
+    backup_db_command,
+    vacuum_command,
+    memory_stats_command,
+    reload_command,
+    message_handler,
+)
+
+from bot.callbacks import (
+    agree_18_callback,
+    start_pause_callback,
+    role_ipar_callback,
+    role_teman_kantor_callback,
+    role_janda_callback,
+    role_pelakor_callback,
+    role_istri_orang_callback,
+    role_pdkt_callback,
+    role_sepupu_callback,
+    role_teman_sma_callback,
+    role_mantan_callback,
+    end_callback,
+    close_callback,
+    jadipacar_callback,
+    break_callback,
+    breakup_callback,
+    fwb_callback,
+)
+
+from bot.commands import error_handler
 
 
 # ===== FALLBACK STATES (jika Constants belum punya) =====
@@ -49,6 +110,7 @@ class BotStates:
 def create_application() -> Application:
     """
     Create and configure telegram application
+    (Synchronous function, bukan async)
     """
     
     logger.info("🔧 Creating PTB application...")
@@ -71,21 +133,11 @@ def create_application() -> Application:
     
     # ===== AMBIL STATE DARI CONSTANTS ATAU FALLBACK =====
     SELECTING_ROLE = getattr(Constants, 'SELECTING_ROLE', BotStates.SELECTING_ROLE)
-    SELECTING_BOT_NAME = getattr(Constants, 'SELECTING_BOT_NAME', BotStates.SELECTING_BOT_NAME)
-    SELECTING_BOT_ROLE = getattr(Constants, 'SELECTING_BOT_ROLE', BotStates.SELECTING_BOT_ROLE)
-    SELECTING_DOMINANCE = getattr(Constants, 'SELECTING_DOMINANCE', BotStates.SELECTING_DOMINANCE)
-    SELECTING_PERSONALITY = getattr(Constants, 'SELECTING_PERSONALITY', BotStates.SELECTING_PERSONALITY)
-    SELECTING_APPEARANCE = getattr(Constants, 'SELECTING_APPEARANCE', BotStates.SELECTING_APPEARANCE)
-    CONFIRMATION = getattr(Constants, 'CONFIRMATION', BotStates.CONFIRMATION)
-    CHATTING = getattr(Constants, 'CHATTING', BotStates.CHATTING)
-    SELECTING_ACTION = getattr(Constants, 'SELECTING_ACTION', BotStates.SELECTING_ACTION)
-    SELECTING_LOCATION = getattr(Constants, 'SELECTING_LOCATION', BotStates.SELECTING_LOCATION)
-    SELECTING_CLOTHING = getattr(Constants, 'SELECTING_CLOTHING', BotStates.SELECTING_CLOTHING)
-    SELECTING_ACTIVITY = getattr(Constants, 'SELECTING_ACTIVITY', BotStates.SELECTING_ACTIVITY)
-    AWAITING_RESPONSE = getattr(Constants, 'AWAITING_RESPONSE', BotStates.AWAITING_RESPONSE)
     CONFIRM_END = getattr(Constants, 'CONFIRM_END', BotStates.CONFIRM_END)
     CONFIRM_CLOSE = getattr(Constants, 'CONFIRM_CLOSE', BotStates.CONFIRM_CLOSE)
     CONFIRM_BROADCAST = getattr(Constants, 'CONFIRM_BROADCAST', BotStates.CONFIRM_BROADCAST)
+    
+    logger.info(f"  • Using SELECTING_ROLE = {SELECTING_ROLE}")
     
     # ===== CONVERSATION HANDLERS =====
     logger.info("  • Setting up conversation handlers...")
