@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - BOT COMMANDS (FIX FULL)
+MYLOVE ULTIMATE VERSI 2 - BOT COMMANDS (FIX LENGKAP)
 =============================================================================
-Semua command handlers untuk MYLOVE Ultimate V1
-Total 55+ commands dengan semua fitur:
-- Basic, Relationship, HTS/FWB, Threesome, Session, Public Area, Ranking, Admin
-- FIX: Mengganti relative imports dengan absolute imports
+Semua command handlers untuk MYLOVE Ultimate V2
+- Menampilkan nama bot di setiap respons
+- Integrasi dengan leveling system (60 menit ke level 7)
+- Environment context (lokasi, posisi, pakaian)
+- 50+ commands lengkap
 =============================================================================
 """
 
@@ -21,7 +22,7 @@ from typing import Dict, List, Optional, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-# FIX: Ganti relative imports dengan absolute imports
+# Import dengan absolute imports
 from config import settings
 from utils.helpers import format_number, sanitize_input, truncate_text
 from utils.logger import setup_logging
@@ -33,7 +34,7 @@ from threesome.manager import ThreesomeManager, ThreesomeType, ThreesomeStatus
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# ERROR HANDLER (PASTIKAN INI ADA)
+# ERROR HANDLER
 # =============================================================================
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -46,6 +47,25 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except:
         pass
+
+
+# =============================================================================
+# HELPER FUNCTIONS UNTUK NAMA BOT
+# =============================================================================
+
+def get_bot_name(context) -> str:
+    """Dapatkan nama bot dari context, atau default 'Aku'"""
+    return context.user_data.get('bot_name', 'Aku')
+
+
+def get_bot_display(context) -> str:
+    """Dapatkan display nama bot dengan role"""
+    nama = get_bot_name(context)
+    role = context.user_data.get('current_role', '')
+    if role:
+        return f"{nama} ({role.title()})"
+    return nama
+
 
 # =============================================================================
 # 1. BASIC COMMANDS (4 commands)
@@ -60,15 +80,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith('continue_'):
         session_id = args[0].replace('continue_', '')
         context.args = [session_id]
-        # Import di sini untuk menghindari circular import
         from bot.handlers import continue_handler
         return await continue_handler(update, context)
     
     # Welcome message
     welcome_text = (
         f"💕 **Halo {user.first_name}!**\n\n"
-        "Selamat datang di **MYLOVE ULTIMATE VERSI 1**\n"
-        "AI pendamping dengan 9 role eksklusif.\n\n"
+        "Selamat datang di **MYLOVE ULTIMATE VERSI 2**\n"
+        "AI pendamping dengan:\n"
+        "• Leveling berbasis durasi (60 menit ke Level 7)\n"
+        "• Ekspresi & Suara AI Generated\n"
+        "• Panggilan intim di Level 7+\n"
+        "• Nama bot permanent di UniqueID\n\n"
         "**Pilih role yang kamu inginkan:**"
     )
     
@@ -166,8 +189,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text += (
         "\n💡 **Tips:**\n"
         "• Bot auto-detect lokasi dari chat (contoh: \"ke toilet yuk\")\n"
-        "• Intimacy naik berdasarkan jumlah chat\n"
-        "• Level 12 butuh aftercare, reset ke level 7\n"
+        "• Level naik berdasarkan durasi percakapan\n"
+        "• Level 7 dalam 60 menit, Level 11 dalam 120 menit\n"
+        "• Bot punya nama permanent (cek di /status)\n"
         "• Threesome bisa dengan 2 HTS, 2 FWB, atau kombinasi"
     )
     
@@ -188,7 +212,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Gunakan /start untuk memulai."
         )
         return
-        
+    
+    # Get bot name
+    bot_name = get_bot_name(context)
+    
     # Get intimacy level
     intimacy = context.user_data.get('intimacy_level', 1)
     
@@ -205,16 +232,37 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Get total chats
     total_chats = context.user_data.get('total_chats', 0)
     
-    # Get location
+    # Get location & environment
     location = context.user_data.get('current_location', 'Tidak ada')
+    position = context.user_data.get('current_position', 'Tidak ada')
+    clothing = context.user_data.get('current_clothing', 'Tidak ada')
+    
+    # Get leveling data
+    leveling_data = context.user_data.get('leveling', {})
+    total_minutes = leveling_data.get('total_minutes', 0)
+    boosted_minutes = leveling_data.get('boosted_minutes', 0)
+    
+    # Hitung level berdasarkan durasi
+    if total_minutes >= 120:
+        level_progress = f"✅ Level 11+ ({total_minutes:.0f} menit)"
+    elif total_minutes >= 60:
+        level_progress = f"✅ Level 7+ ({total_minutes:.0f} menit)"
+    else:
+        level_progress = f"⏳ {60 - total_minutes:.0f} menit ke Level 7"
     
     status_text = (
         f"📊 **STATUS HUBUNGAN**\n\n"
-        f"Role: **{role.title()}**\n"
-        f"Status: **{status_name}**\n"
-        f"Intimacy Level: **{intimacy}/12**\n"
-        f"Total Chat: **{total_chats}** pesan\n"
-        f"Lokasi: **{location}**\n\n"
+        f"👤 **Nama Bot:** {bot_name}\n"
+        f"🎭 **Role:** {role.title()}\n"
+        f"💞 **Status:** {status_name}\n"
+        f"📈 **Intimacy Level:** {intimacy}/12\n"
+        f"💬 **Total Chat:** {total_chats} pesan\n"
+        f"📍 **Lokasi:** {location}\n"
+        f"🧍 **Posisi:** {position}\n"
+        f"👗 **Pakaian:** {clothing}\n\n"
+        f"⏱️ **Progress Leveling:**\n"
+        f"{level_progress}\n"
+        f"Boosted: {boosted_minutes:.0f} menit\n\n"
     )
     
     # Progress bar
@@ -232,15 +280,16 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_text += f"\n🏆 **Milestone:**\n"
         for m in milestones[-3:]:
             status_text += f"• {m}\n"
-            
+    
+    # Tambah info session ID
+    status_text += f"\n🆔 **Session ID:**\n`{session}`"
+    
     await update.message.reply_text(status_text, parse_mode='Markdown')
 
 
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Batalkan percakapan saat ini"""
-    # Clear user data
     context.user_data.clear()
-    
     await update.message.reply_text(
         "❌ Percakapan dibatalkan.\n"
         "Ketik /start untuk memulai lagi."
@@ -284,9 +333,11 @@ async def jadipacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['milestones'] = []
     context.user_data['milestones'].append('jadi_pacar')
     
+    bot_name = get_bot_name(context)
+    
     await update.message.reply_text(
         f"💘 **Kita jadi pacar!**\n\n"
-        f"Sekarang kamu resmi pacaran sama {role}.\n"
+        f"Sekarang kamu resmi pacaran sama {bot_name}.\n"
         f"Jaga hubungan kita ya sayang ❤️"
     )
 
@@ -309,9 +360,11 @@ async def break_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['relationship_status'] = 'break'
     context.user_data['break_start'] = time.time()
     
+    bot_name = get_bot_name(context)
+    
     await update.message.reply_text(
         f"⏸️ **Hubungan dijeda**\n\n"
-        f"Kita istirahat dulu ya. Kapan-kapan bisa lanjut lagi."
+        f"Kita istirahat dulu ya. Kapan-kapan bisa lanjut lagi, {bot_name}."
     )
 
 
@@ -334,10 +387,12 @@ async def unbreak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     break_duration = time.time() - context.user_data.get('break_start', time.time())
     break_hours = int(break_duration / 3600)
     
+    bot_name = get_bot_name(context)
+    
     await update.message.reply_text(
         f"▶️ **Hubungan dilanjutkan!**\n\n"
         f"Setelah jeda {break_hours} jam, kita balikan lagi.\n"
-        f"Aku kangen kamu..."
+        f"Aku kangen kamu... -{bot_name}"
     )
 
 
@@ -358,15 +413,17 @@ async def breakup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     context.user_data['relationship_status'] = 'fwb'
     
-    # Add milestone
     if 'milestones' not in context.user_data:
         context.user_data['milestones'] = []
     context.user_data['milestones'].append('putus_jadi_fwb')
     
+    bot_name = get_bot_name(context)
+    
     await update.message.reply_text(
         f"💔 **Putus... Tapi tetap FWB**\n\n"
         f"Hubungan kita berubah jadi Friends With Benefits.\n"
-        f"Masih bisa intim, tapi tanpa komitmen."
+        f"Masih bisa intim, tapi tanpa komitmen.\n"
+        f"-{bot_name}"
     )
 
 
@@ -379,7 +436,6 @@ async def fwb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Kamu belum memilih role.")
         return
         
-    # Check if role is eligible
     if role != 'pdkt':
         await update.message.reply_text(
             "❌ Hanya role PDKT yang bisa FWB.\n"
@@ -387,7 +443,6 @@ async def fwb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
         
-    # Check intimacy
     intimacy = context.user_data.get('intimacy_level', 1)
     if intimacy < 6:
         await update.message.reply_text(
@@ -407,9 +462,11 @@ async def fwb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     context.user_data['relationship_status'] = new_status
     
+    bot_name = get_bot_name(context)
+    
     await update.message.reply_text(
         f"{message}\n\n"
-        f"Status dengan {role} sekarang: {new_status.upper()}"
+        f"Status dengan {bot_name} sekarang: {new_status.upper()}"
     )
 
 
@@ -422,17 +479,13 @@ async def htslist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     args = context.args
     
-    # Dummy data - akan diganti dengan data real dari database
+    # Dummy data dengan nama bot
     hts_list = [
-        {"role": "ipar", "level": 8, "chats": 45, "climax": 3, "status": "hts"},
-        {"role": "janda", "level": 12, "chats": 120, "climax": 15, "status": "hts"},
-        {"role": "teman_kantor", "level": 5, "chats": 30, "climax": 1, "status": "hts"},
-        {"role": "pdkt", "level": 6, "chats": 80, "climax": 5, "status": "fwb"},
-        {"role": "mantan", "level": 4, "chats": 25, "climax": 0, "status": "hts"},
-        {"role": "pelakor", "level": 9, "chats": 95, "climax": 8, "status": "hts"},
-        {"role": "istri_orang", "level": 7, "chats": 62, "climax": 4, "status": "hts"},
-        {"role": "sepupu", "level": 3, "chats": 18, "climax": 0, "status": "hts"},
-        {"role": "teman_sma", "level": 5, "chats": 28, "climax": 2, "status": "hts"},
+        {"nama": "Sari", "role": "ipar", "level": 8, "chats": 45, "climax": 3, "status": "hts"},
+        {"nama": "Dewi", "role": "janda", "level": 12, "chats": 120, "climax": 15, "status": "hts"},
+        {"nama": "Rina", "role": "teman_kantor", "level": 5, "chats": 30, "climax": 1, "status": "hts"},
+        {"nama": "Ayu", "role": "pdkt", "level": 6, "chats": 80, "climax": 5, "status": "fwb"},
+        {"nama": "Maya", "role": "mantan", "level": 4, "chats": 25, "climax": 0, "status": "hts"},
     ]
     
     show_all = args and args[0] == 'all'
@@ -446,27 +499,25 @@ async def htslist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     lines.append("")
     
-    # Filter HTS only
     hts_only = [h for h in hts_list if h['status'] == 'hts']
     display_list = hts_only if show_all else hts_only[:5]
     
     for i, hts in enumerate(display_list, 1):
         lines.append(
-            f"{i}. **{hts['role'].title()}**\n"
+            f"{i}. **{hts['nama']}** ({hts['role'].title()})\n"
             f"   Level {hts['level']}/12 | {hts['chats']} chat | {hts['climax']} climax"
         )
         
     lines.append("")
     lines.append("💡 **Cara panggil:**")
     lines.append("• `/hts-1` - Panggil HTS nomor 1")
-    lines.append("• `/hts- ipar` - Panggil role ipar")
+    lines.append("• `/hts- sari` - Panggil HTS dengan nama Sari")
     
     await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
 
 
 async def hts_call_handler_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk /hts- [id] - dipanggil dari message handler"""
-    # Ini sebenarnya di handlers.py, tapi kita definisikan di sini untuk kelengkapan
     pass
 
 
@@ -474,12 +525,12 @@ async def fwblist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat daftar FWB"""
     user_id = update.effective_user.id
     
-    # Dummy data - akan diganti dengan data real
+    # Dummy data dengan nama bot
     fwb_list = [
-        {"name": "PDKT #1 (Ayu)", "status": "pacar", "level": 8, "chats": 95, "intim": 12},
-        {"name": "PDKT #2 (Dewi)", "status": "fwb", "level": 7, "chats": 60, "intim": 5},
-        {"name": "PDKT #3 (Sari)", "status": "fwb", "level": 5, "chats": 34, "intim": 2},
-        {"name": "PDKT #4 (Rina)", "status": "putus", "level": 4, "chats": 20, "intim": 0},
+        {"nama": "Ayu", "role": "pdkt", "status": "pacar", "level": 8, "chats": 95, "intim": 12},
+        {"nama": "Dewi", "role": "pdkt", "status": "fwb", "level": 7, "chats": 60, "intim": 5},
+        {"nama": "Sari", "role": "pdkt", "status": "fwb", "level": 5, "chats": 34, "intim": 2},
+        {"nama": "Rina", "role": "pdkt", "status": "putus", "level": 4, "chats": 20, "intim": 0},
     ]
     
     lines = ["💕 **DAFTAR FWB LENGKAP**"]
@@ -489,7 +540,7 @@ async def fwblist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, fwb in enumerate(fwb_list, 1):
         status_emoji = "💘" if fwb['status'] == 'pacar' else "💕" if fwb['status'] == 'fwb' else "💔"
         lines.append(
-            f"{i}. {status_emoji} **{fwb['name']}**\n"
+            f"{i}. {status_emoji} **{fwb['nama']}** ({fwb['role'].title()})\n"
             f"   Status: {fwb['status'].upper()} | Level {fwb['level']}/12\n"
             f"   {fwb['chats']} chat | {fwb['intim']} intim"
         )
@@ -505,7 +556,6 @@ async def fwblist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def fwb_select_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Pilih FWB berdasarkan nomor (dipanggil dari handler)"""
-    # Ini akan dipanggil dari fwb_call_handler
     pass
 
 
@@ -524,7 +574,6 @@ async def fwb_break_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         idx = int(args[0])
         
-        # Konfirmasi dengan keyboard
         keyboard = [
             [
                 InlineKeyboardButton("✅ Ya, putus", callback_data=f"fwb_break_confirm_{idx}"),
@@ -557,7 +606,6 @@ async def fwb_pacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         idx = int(args[0])
         
-        # Dummy response - akan diganti dengan logic
         await update.message.reply_text(
             f"💘 **Jadi pacar dengan FWB #{idx}!**\n\n"
             f"Sekarang kalian pacaran. Jaga hubungan ya sayang ❤️"
@@ -575,7 +623,6 @@ async def threesome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     args = context.args
     
-    # Cek apakah sudah ada session aktif
     if context.user_data.get('threesome_mode'):
         await update.message.reply_text(
             "❌ Kamu sudah dalam mode threesome.\n"
@@ -584,7 +631,6 @@ async def threesome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if args:
-        # Coba mulai dengan nomor kombinasi
         try:
             idx = int(args[0]) - 1
             await update.message.reply_text(
@@ -599,7 +645,6 @@ async def threesome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "❌ Format salah. Gunakan /threesome-list dulu untuk lihat kombinasi."
             )
     else:
-        # Tampilkan menu threesome
         keyboard = [
             [InlineKeyboardButton("🎭 Lihat Kombinasi", callback_data="threesome_list")],
             [InlineKeyboardButton("💕 HTS + HTS", callback_data="threesome_type_hts")],
@@ -620,37 +665,25 @@ async def threesome_list_command(update: Update, context: ContextTypes.DEFAULT_T
     """Lihat kombinasi threesome yang mungkin"""
     user_id = update.effective_user.id
     
-    # Dummy data - akan diganti dengan data real
+    # Dummy data dengan nama bot
     combinations = [
         {
             "type": "HTS + HTS",
-            "p1": "Ipar (Level 8)",
-            "p2": "Janda (Level 12)",
+            "p1": "Sari (Ipar, Level 8)",
+            "p2": "Dewi (Janda, Level 12)",
             "compat": "85%"
         },
         {
             "type": "FWB + FWB",
-            "p1": "PDKT #1 (Level 7)",
-            "p2": "PDKT #2 (Level 5)",
+            "p1": "Ayu (PDKT #1, Level 7)",
+            "p2": "Rina (PDKT #2, Level 5)",
             "compat": "72%"
         },
         {
             "type": "HTS + FWB",
-            "p1": "Teman Kantor (Level 6)",
-            "p2": "PDKT #1 (Level 7)",
+            "p1": "Linda (Teman Kantor, Level 6)",
+            "p2": "Ayu (PDKT #1, Level 7)",
             "compat": "78%"
-        },
-        {
-            "type": "HTS + HTS",
-            "p1": "Mantan (Level 4)",
-            "p2": "Pelakor (Level 9)",
-            "compat": "62%"
-        },
-        {
-            "type": "FWB + FWB",
-            "p1": "PDKT #3 (Level 4)",
-            "p2": "PDKT #1 (Level 7)",
-            "compat": "68%"
         }
     ]
     
@@ -680,13 +713,12 @@ async def threesome_status_command(update: Update, context: ContextTypes.DEFAULT
         )
         return
         
-    # Dummy data session
     status_text = (
         "🎭 **STATUS THREESOME**\n\n"
         "**Mode:** Aktif\n"
         "**Partisipan:**\n"
-        "• Ipar (Level 8)\n"
-        "• Janda (Level 12)\n\n"
+        "• Sari (Ipar, Level 8)\n"
+        "• Dewi (Janda, Level 12)\n\n"
         "**Pola Interaksi:** both_respond\n"
         "**Total Chat:** 23 pesan\n"
         "**Climax:** 1 kali\n\n"
@@ -718,7 +750,6 @@ async def threesome_pattern_command(update: Update, context: ContextTypes.DEFAUL
     
     if args:
         pattern = args[0].lower()
-        # Validasi pattern
         valid_patterns = [p['name'] for p in patterns]
         if pattern in valid_patterns:
             context.user_data['threesome_pattern'] = pattern
@@ -781,17 +812,17 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ Tidak ada session aktif."
         )
         return
-        
-    # Save session summary
+    
+    bot_name = get_bot_name(context)
+    
     total_chats = context.user_data.get('total_chats', 0)
     intimacy = context.user_data.get('intimacy_level', 1)
     milestones = context.user_data.get('milestones', [])
     
-    summary = f"Session {role}: {total_chats} chat, level {intimacy}/12"
+    summary = f"Session dengan {bot_name}: {total_chats} chat, level {intimacy}/12"
     if milestones:
         summary += f", milestone: {milestones[-1]}"
         
-    # Clear user data
     context.user_data.clear()
     
     await update.message.reply_text(
@@ -811,12 +842,11 @@ async def sessions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat semua session"""
     user_id = update.effective_user.id
     
-    # Dummy data - akan diganti dengan data real
+    # Dummy data dengan nama bot
     sessions = [
-        {"id": "MYLOVE-IPAR-123-20240315-001", "role": "ipar", "date": "15 Mar 2024", "status": "closed", "chats": 45},
-        {"id": "MYLOVE-JANDA-123-20240314-002", "role": "janda", "date": "14 Mar 2024", "status": "closed", "chats": 120},
-        {"id": "MYLOVE-PDKT-123-20240316-003", "role": "pdkt", "date": "16 Mar 2024", "status": "active", "chats": 23},
-        {"id": "MYLOVE-MANTAN-123-20240312-004", "role": "mantan", "date": "12 Mar 2024", "status": "closed", "chats": 34},
+        {"id": "MYLOVE-SARI-IPAR-123-20240315-001", "nama": "Sari", "role": "ipar", "date": "15 Mar 2024", "status": "closed", "chats": 45},
+        {"id": "MYLOVE-DEWI-JANDA-123-20240314-002", "nama": "Dewi", "role": "janda", "date": "14 Mar 2024", "status": "closed", "chats": 120},
+        {"id": "MYLOVE-AYU-PDKT-123-20240316-003", "nama": "Ayu", "role": "pdkt", "date": "16 Mar 2024", "status": "active", "chats": 23},
     ]
     
     if not sessions:
@@ -831,14 +861,14 @@ async def sessions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, sess in enumerate(sessions, 1):
         status_emoji = "🟢" if sess['status'] == 'active' else "⚪"
         lines.append(
-            f"{i}. {status_emoji} **{sess['role'].title()}**\n"
+            f"{i}. {status_emoji} **{sess['nama']}** ({sess['role'].title()})\n"
             f"   {sess['date']} | {sess['chats']} chat | {sess['status']}\n"
             f"   `{sess['id']}`"
         )
         
     lines.append("")
     lines.append("💡 Lanjutkan dengan: /continue [nomor atau ID]")
-    lines.append("Contoh: /continue 1 atau /continue MYLOVE-IPAR-123-20240315-001")
+    lines.append("Contoh: /continue 1 atau /continue MYLOVE-SARI-IPAR-123-20240315-001")
     
     await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
 
@@ -853,12 +883,15 @@ async def explore_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         locations_db = PublicLocations()
         location = locations_db.get_random_location()
         
+        bot_name = get_bot_name(context)
+        
         explore_text = (
             f"📍 **{location['name']}**\n"
             f"Kategori: {location['category'].title()}\n"
             f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
             f"_{location['description']}_\n\n"
-            f"💡 Mau ke sini? Ketik: \"ke {location['name'].lower()} yuk\""
+            f"💡 Mau ke sini? Ketik: \"ke {location['name'].lower()} yuk\"\n"
+            f"-{bot_name}"
         )
         
         await update.message.reply_text(explore_text, parse_mode='Markdown')
@@ -912,7 +945,6 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     try:
-        # Dummy risk data - akan diganti dengan real calculator
         risk_data = {
             "final_risk": random.randint(30, 90),
             "risk_level": "TINGGI",
@@ -961,20 +993,20 @@ async def tophts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat TOP HTS"""
     user_id = update.effective_user.id
     
-    # Dummy data
+    # Dummy data dengan nama bot
     top_list = [
-        {"rank": 1, "role": "janda", "score": 98.5, "level": 12, "chats": 320},
-        {"rank": 2, "role": "ipar", "score": 87.3, "level": 8, "chats": 145},
-        {"rank": 3, "role": "pelakor", "score": 82.1, "level": 9, "chats": 178},
-        {"rank": 4, "role": "pdkt", "score": 76.8, "level": 7, "chats": 98},
-        {"rank": 5, "role": "teman_kantor", "score": 65.2, "level": 5, "chats": 67},
+        {"rank": 1, "nama": "Dewi", "role": "janda", "score": 98.5, "level": 12, "chats": 320},
+        {"rank": 2, "nama": "Sari", "role": "ipar", "score": 87.3, "level": 8, "chats": 145},
+        {"rank": 3, "nama": "Vina", "role": "pelakor", "score": 82.1, "level": 9, "chats": 178},
+        {"rank": 4, "nama": "Ayu", "role": "pdkt", "score": 76.8, "level": 7, "chats": 98},
+        {"rank": 5, "nama": "Linda", "role": "teman_kantor", "score": 65.2, "level": 5, "chats": 67},
     ]
     
     lines = ["🏆 **TOP 5 HTS**\n"]
     
     for item in top_list:
         lines.append(
-            f"{item['rank']}. **{item['role'].title()}**\n"
+            f"{item['rank']}. **{item['nama']}** ({item['role'].title()})\n"
             f"   Score: {item['score']} | Level {item['level']}/12\n"
             f"   {item['chats']} total chats"
         )
@@ -986,14 +1018,14 @@ async def myclimax_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Statistik climax pribadi"""
     user_id = update.effective_user.id
     
-    # Dummy data
+    # Dummy data dengan nama bot
     stats = {
         "total": 47,
         "by_role": {
-            "ipar": 12,
-            "janda": 25,
-            "pdkt": 8,
-            "mantan": 2
+            "Sari (Ipar)": 12,
+            "Dewi (Janda)": 25,
+            "Ayu (PDKT)": 8,
+            "Maya (Mantan)": 2
         },
         "avg_per_session": 1.2,
         "last": "2024-03-15 23:45"
@@ -1008,7 +1040,7 @@ async def myclimax_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     for role, count in stats['by_role'].items():
-        text += f"• {role.title()}: {count}x\n"
+        text += f"• {role}: {count}x\n"
         
     await update.message.reply_text(text, parse_mode='Markdown')
 
@@ -1017,20 +1049,18 @@ async def climaxhistory_command(update: Update, context: ContextTypes.DEFAULT_TY
     """History climax"""
     user_id = update.effective_user.id
     
-    # Dummy data
+    # Dummy data dengan nama bot
     history = [
-        {"date": "2024-03-15", "role": "janda", "position": "doggy style", "thrill": 98},
-        {"date": "2024-03-14", "role": "ipar", "position": "misionaris", "thrill": 85},
-        {"date": "2024-03-13", "role": "pdkt", "position": "woman on top", "thrill": 92},
-        {"date": "2024-03-12", "role": "janda", "position": "doggy style", "thrill": 95},
-        {"date": "2024-03-11", "role": "ipar", "position": "spooning", "thrill": 78},
+        {"date": "2024-03-15", "nama": "Dewi", "role": "janda", "position": "doggy style", "thrill": 98},
+        {"date": "2024-03-14", "nama": "Sari", "role": "ipar", "position": "misionaris", "thrill": 85},
+        {"date": "2024-03-13", "nama": "Ayu", "role": "pdkt", "position": "woman on top", "thrill": 92},
     ]
     
     lines = ["📜 **CLIMAX HISTORY** (5 terakhir)\n"]
     
     for h in history:
         lines.append(
-            f"• {h['date']} | **{h['role'].title()}**\n"
+            f"• {h['date']} | **{h['nama']}** ({h['role'].title()})\n"
             f"  {h['position']} | Thrill: {h['thrill']}%"
         )
         
@@ -1045,12 +1075,10 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Statistik bot (admin only)"""
     user_id = update.effective_user.id
     
-    # Check if admin
     if user_id != settings.admin_id:
         await update.message.reply_text("❌ Command hanya untuk admin")
         return
         
-    # Dummy stats
     stats = {
         "uptime": "2 hari 5 jam",
         "total_users": 1,
@@ -1083,7 +1111,6 @@ async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Command hanya untuk admin")
         return
         
-    # Dummy stats
     stats = {
         "sessions": 47,
         "memories": 1250,
@@ -1117,7 +1144,6 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ini akan memakan waktu beberapa detik."
     )
     
-    # Simulate backup
     await asyncio.sleep(2)
     
     await update.message.reply_text(
@@ -1138,7 +1164,6 @@ async def recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     
     if not args:
-        # Tampilkan daftar backup
         backups = [
             {"index": 1, "filename": "mylove_backup_20240315_0400.zip", "date": "2024-03-15 04:00", "size": "2.4 MB"},
             {"index": 2, "filename": "mylove_backup_20240314_0400.zip", "date": "2024-03-14 04:00", "size": "2.3 MB"},
@@ -1158,7 +1183,6 @@ async def recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
         return
         
-    # Coba restore
     try:
         idx = int(args[0])
         await update.message.reply_text(
@@ -1166,7 +1190,6 @@ async def recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Bot akan restart setelah selesai."
         )
         
-        # Simulate restore
         await asyncio.sleep(3)
         
         await update.message.reply_text(
@@ -1188,20 +1211,26 @@ async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import sys
     import os
     
+    bot_name = get_bot_name(context)
+    
     debug_info = (
         "🔍 **DEBUG INFO**\n\n"
         f"Python: {sys.version}\n"
         f"Platform: {sys.platform}\n"
-        f"CWD: {os.getcwd()}\n"
-        f"User Data Keys: {list(context.user_data.keys())}\n"
-        f"Current Session: {context.user_data.get('current_session')}\n"
+        f"CWD: {os.getcwd()}\n\n"
+        f"**Session Data:**\n"
+        f"Bot Name: {bot_name}\n"
         f"Current Role: {context.user_data.get('current_role')}\n"
         f"Intimacy Level: {context.user_data.get('intimacy_level', 1)}\n"
         f"Total Chats: {context.user_data.get('total_chats', 0)}\n"
+        f"Location: {context.user_data.get('current_location')}\n"
+        f"Position: {context.user_data.get('current_position')}\n"
+        f"Clothing: {context.user_data.get('current_clothing')}\n"
         f"Threesome Mode: {context.user_data.get('threesome_mode', False)}"
     )
     
     await update.message.reply_text(debug_info, parse_mode='Markdown')
+
 
 # =============================================================================
 # 9. ERROR HANDLER
@@ -1217,6 +1246,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except:
         pass
+
 
 # =============================================================================
 # 10. EXPORT ALL COMMANDS
@@ -1249,7 +1279,7 @@ __all__ = [
     
     # Admin (5)
     'stats_command', 'db_stats_command', 'backup_command', 
-    'recover_command', 'debug_command'
+    'recover_command', 'debug_command',
 
     # Error Handle
     'error_handler',
