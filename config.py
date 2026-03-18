@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - KONFIGURASI UTAMA
+MYLOVE ULTIMATE VERSI 1 - KONFIGURASI UTAMA (FIXED)
 =============================================================================
 Menggunakan Pydantic untuk validasi dan type safety
 Semua konfigurasi terpusat di sini
@@ -427,7 +427,8 @@ class Settings(BaseSettings):
     
     @validator('admin_id')
     def validate_admin_id(cls, v):
-        if v == 0 or v == your_telegram_id_here:
+        """Validasi admin_id - tidak boleh 0"""
+        if v == 0:
             raise ValueError("ADMIN_ID harus diisi dengan ID Telegram kamu")
         return v
     
