@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - DATABASE MODELS (FIX FULL + PDKT)
+MYLOVE ULTIMATE VERSI 2 - DATABASE MODELS (ENHANCED)
 =============================================================================
 - Data models untuk semua entitas
 - Pydantic models untuk validasi
 - SQLAlchemy Base class untuk import
+- Semua model lengkap dengan method to_dict/from_dict
 - PLUS Constants class untuk PTB ConversationHandler
-- **TAMBAHAN: Tabel untuk PDKT dengan dual leveling system**
+- **TAMBAHAN: Kolom nama_bot di tabel relationships**
 =============================================================================
 """
 
@@ -127,32 +128,6 @@ class RelationshipStatus(str, Enum):
     PUTUS = "putus"
     BREAK = "break"
     ENDED = "ended"
-
-
-class PDKTStatus(str, Enum):
-    """Status PDKT"""
-    ACTIVE = "active"      # Sedang berjalan
-    PAUSED = "paused"      # Di-pause
-    STOPPED = "stopped"    # Dihentikan (putus)
-    COMPLETED = "completed" # Jadi pacar
-
-
-class PDKTDirection(str, Enum):
-    """Arah PDKT"""
-    USER_TO_BOT = "user_to_bot"   # User yang ngejar
-    BOT_TO_USER = "bot_to_user"   # Bot yang ngejar
-    MUTUAL = "mutual"              # Saling suka
-    CONFUSED = "confused"          # Bingung
-
-
-class PDKTStage(str, Enum):
-    """Tahapan PDKT"""
-    MENGENAL = "mengenal"
-    DEKAT = "dekat"
-    AKRAB = "akrab"
-    SPESIAL = "spesial"
-    JATUH_CINTA = "jatuh_cinta"
-    PACAR = "pacar"
 
 
 class MemoryType(str, Enum):
@@ -285,7 +260,9 @@ class Session(BaseModel):
     """Model untuk session chat"""
     id: str  # MYLOVE-NAMA_BOT-ROLE-USER-DATE-SEQ
     user_id: int
+    # ===== TAMBAHAN MYLOVE V2 =====
     bot_name: str  # Nama bot yang dipilih
+    # ===== END TAMBAHAN =====
     role: str
     status: SessionStatus = SessionStatus.ACTIVE
     start_time: float = Field(default_factory=time.time)
@@ -316,7 +293,9 @@ class Session(BaseModel):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            # ===== TAMBAHAN MYLOVE V2 =====
             'bot_name': self.bot_name,
+            # ===== END TAMBAHAN =====
             'role': self.role,
             'status': self.status.value,
             'start_time': self.start_time,
@@ -335,7 +314,9 @@ class Session(BaseModel):
         return cls(
             id=data['id'],
             user_id=data['user_id'],
-            bot_name=data.get('bot_name', 'Aurora'),
+            # ===== TAMBAHAN MYLOVE V2 =====
+            bot_name=data.get('bot_name', 'Aurora'),  # Default jika belum ada
+            # ===== END TAMBAHAN =====
             role=data['role'],
             status=SessionStatus(data.get('status', 'active')),
             start_time=data.get('start_time', time.time()),
@@ -463,16 +444,18 @@ class Memory(BaseModel):
 
 
 # =============================================================================
-# RELATIONSHIP MODEL (HTS/FWB)
+# RELATIONSHIP MODEL (DENGAN NAMA BOT)
 # =============================================================================
 
 class Relationship(BaseModel):
     """Model untuk hubungan (HTS/FWB/Pacar)"""
     id: Optional[int] = None
     user_id: int
-    bot_name: str
+    # ===== TAMBAHAN MYLOVE V2 =====
+    bot_name: str  # Nama bot yang dipilih (permanent)
+    # ===== END TAMBAHAN =====
     role: str
-    instance_id: Optional[str] = None
+    instance_id: Optional[str] = None  # Untuk multiple FWB
     status: RelationshipStatus = RelationshipStatus.HTS
     intimacy_level: int = 1
     total_interactions: int = 0
@@ -494,7 +477,9 @@ class Relationship(BaseModel):
         """Convert to dictionary for DB insertion"""
         return {
             'user_id': self.user_id,
+            # ===== TAMBAHAN MYLOVE V2 =====
             'bot_name': self.bot_name,
+            # ===== END TAMBAHAN =====
             'role': self.role,
             'instance_id': self.instance_id,
             'status': self.status.value,
@@ -515,7 +500,9 @@ class Relationship(BaseModel):
         return cls(
             id=data.get('id'),
             user_id=data['user_id'],
-            bot_name=data.get('bot_name', 'Aurora'),
+            # ===== TAMBAHAN MYLOVE V2 =====
+            bot_name=data.get('bot_name', 'Aurora'),  # Default jika belum ada
+            # ===== END TAMBAHAN =====
             role=data['role'],
             instance_id=data.get('instance_id'),
             status=RelationshipStatus(data.get('status', 'hts')),
@@ -533,9 +520,11 @@ class Relationship(BaseModel):
     @property
     def display_name(self) -> str:
         """Get display name for relationship with nama bot"""
+        # ===== TAMBAHAN MYLOVE V2 =====
         if self.instance_id:
             return f"{self.bot_name} ({self.role}) #{self.instance_id[-4:]}"
         return f"{self.bot_name} ({self.role})"
+        # ===== END TAMBAHAN =====
     
     def increment_interaction(self):
         """Increment interaction count"""
@@ -565,145 +554,6 @@ class Relationship(BaseModel):
             'details': details or {},
             'timestamp': time.time()
         })
-
-
-# =============================================================================
-# PDKT MODEL (BARU)
-# =============================================================================
-
-class PDKT(BaseModel):
-    """Model untuk PDKT Super Spesial"""
-    id: str  # PDKT001_12345678_1710873600
-    user_id: int
-    bot_name: str
-    role: str = "pdkt"
-    
-    # Status
-    status: PDKTStatus = PDKTStatus.ACTIVE
-    is_paused: bool = False
-    paused_at: Optional[float] = None
-    
-    # Arah dan tahap
-    direction: PDKTDirection
-    stage: PDKTStage = PDKTStage.MENGENAL
-    level: int = 1
-    
-    # Chemistry (disimpan sebagai JSON)
-    chemistry_score: float = 50.0
-    chemistry_history: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Waktu
-    created_at: float = Field(default_factory=time.time)
-    last_interaction: float = Field(default_factory=time.time)
-    total_minutes: float = 0.0  # Total waktu aktif (exclude pause)
-    paused_total: float = 0.0    # Total waktu di-pause
-    
-    # Interaksi
-    total_chats: int = 0
-    total_intim: int = 0
-    total_climax: int = 0
-    
-    # Milestones
-    milestones: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Inner thoughts (pikiran dalam hati bot)
-    inner_thoughts: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Metadata
-    ended_at: Optional[float] = None
-    end_reason: Optional[str] = None
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary for DB insertion"""
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'bot_name': self.bot_name,
-            'role': self.role,
-            'status': self.status.value,
-            'is_paused': 1 if self.is_paused else 0,
-            'paused_at': self.paused_at,
-            'direction': self.direction.value,
-            'stage': self.stage.value,
-            'level': self.level,
-            'chemistry_score': self.chemistry_score,
-            'chemistry_history': json.dumps(self.chemistry_history),
-            'created_at': self.created_at,
-            'last_interaction': self.last_interaction,
-            'total_minutes': self.total_minutes,
-            'paused_total': self.paused_total,
-            'total_chats': self.total_chats,
-            'total_intim': self.total_intim,
-            'total_climax': self.total_climax,
-            'milestones': json.dumps(self.milestones),
-            'inner_thoughts': json.dumps(self.inner_thoughts),
-            'ended_at': self.ended_at,
-            'end_reason': self.end_reason
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict) -> 'PDKT':
-        """Create PDKT instance from database row"""
-        return cls(
-            id=data['id'],
-            user_id=data['user_id'],
-            bot_name=data['bot_name'],
-            role=data.get('role', 'pdkt'),
-            status=PDKTStatus(data.get('status', 'active')),
-            is_paused=bool(data.get('is_paused', 0)),
-            paused_at=data.get('paused_at'),
-            direction=PDKTDirection(data.get('direction', 'user_to_bot')),
-            stage=PDKTStage(data.get('stage', 'mengenal')),
-            level=data.get('level', 1),
-            chemistry_score=data.get('chemistry_score', 50.0),
-            chemistry_history=json.loads(data.get('chemistry_history', '[]')),
-            created_at=data.get('created_at', time.time()),
-            last_interaction=data.get('last_interaction', time.time()),
-            total_minutes=data.get('total_minutes', 0.0),
-            paused_total=data.get('paused_total', 0.0),
-            total_chats=data.get('total_chats', 0),
-            total_intim=data.get('total_intim', 0),
-            total_climax=data.get('total_climax', 0),
-            milestones=json.loads(data.get('milestones', '[]')),
-            inner_thoughts=json.loads(data.get('inner_thoughts', '[]')),
-            ended_at=data.get('ended_at'),
-            end_reason=data.get('end_reason')
-        )
-    
-    def get_chemistry_vibe(self) -> str:
-        """Dapatkan vibe chemistry"""
-        if self.chemistry_score >= 80:
-            return "Soulmate ✨"
-        elif self.chemistry_score >= 60:
-            return "Sangat Cocok 💞"
-        elif self.chemistry_score >= 40:
-            return "Cocok 💕"
-        elif self.chemistry_score >= 20:
-            return "Biasa 😐"
-        else:
-            return "Dingin ❄️"
-    
-    def get_direction_text(self) -> str:
-        """Dapatkan teks arah hubungan"""
-        texts = {
-            PDKTDirection.USER_TO_BOT: "Kamu yang ngejar",
-            PDKTDirection.BOT_TO_USER: "Dia yang ngejar",
-            PDKTDirection.MUTUAL: "Saling suka",
-            PDKTDirection.CONFUSED: "Masih bingung",
-        }
-        return texts.get(self.direction, "?")
-    
-    def get_stage_text(self) -> str:
-        """Dapatkan teks tahapan"""
-        texts = {
-            PDKTStage.MENGENAL: "Mengenal",
-            PDKTStage.DEKAT: "Mulai Dekat",
-            PDKTStage.AKRAB: "Akrab",
-            PDKTStage.SPESIAL: "Spesial",
-            PDKTStage.JATUH_CINTA: "Jatuh Cinta",
-            PDKTStage.PACAR: "PACAR!",
-        }
-        return texts.get(self.stage, self.stage.value)
 
 
 # =============================================================================
@@ -850,7 +700,9 @@ class ThreesomeParticipant(BaseModel):
     id: Optional[int] = None
     threesome_session_id: str
     user_id: int
-    bot_name: str
+    # ===== TAMBAHAN MYLOVE V2 =====
+    bot_name: str  # Nama bot
+    # ===== END TAMBAHAN =====
     role: str
     instance_id: Optional[str] = None
     participant_type: str  # 'hts' or 'fwb'
@@ -863,7 +715,9 @@ class ThreesomeParticipant(BaseModel):
         return {
             'threesome_session_id': self.threesome_session_id,
             'user_id': self.user_id,
+            # ===== TAMBAHAN MYLOVE V2 =====
             'bot_name': self.bot_name,
+            # ===== END TAMBAHAN =====
             'role': self.role,
             'instance_id': self.instance_id,
             'participant_type': self.participant_type,
@@ -879,7 +733,9 @@ class ThreesomeParticipant(BaseModel):
             id=data.get('id'),
             threesome_session_id=data['threesome_session_id'],
             user_id=data['user_id'],
+            # ===== TAMBAHAN MYLOVE V2 =====
             bot_name=data.get('bot_name', 'Aurora'),
+            # ===== END TAMBAHAN =====
             role=data['role'],
             instance_id=data.get('instance_id'),
             participant_type=data['participant_type'],
@@ -891,10 +747,10 @@ class ThreesomeParticipant(BaseModel):
 
 class ThreesomeSession(BaseModel):
     """Model untuk session threesome"""
-    id: str
+    id: str  # 3some_user_timestamp_random
     user_id: int
-    type: str
-    status: str = "active"
+    type: str  # hts_hts, fwb_fwb, hts_fwb, same_role
+    status: str = "active"  # pending, active, paused, completed, cancelled
     created_at: float = Field(default_factory=time.time)
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
@@ -920,11 +776,11 @@ class ThreesomeSession(BaseModel):
             'last_activity': self.last_activity,
             'total_messages': self.total_messages,
             'climax_count': self.climax_count,
-            'aftercare_needed': 1 if self.aftercare_needed else 0,
+            'aftercare_needed': self.aftercare_needed,
             'current_focus': self.current_focus,
             'last_pattern': self.last_pattern,
             'participants': json.dumps(self.participants),
-            'interactions': json.dumps(self.interactions[-50:])
+            'interactions': json.dumps(self.interactions[-50:])  # Last 50 only
         }
     
     @classmethod
@@ -941,12 +797,52 @@ class ThreesomeSession(BaseModel):
             last_activity=data.get('last_activity', time.time()),
             total_messages=data.get('total_messages', 0),
             climax_count=data.get('climax_count', 0),
-            aftercare_needed=bool(data.get('aftercare_needed', 0)),
+            aftercare_needed=data.get('aftercare_needed', False),
             current_focus=data.get('current_focus'),
             last_pattern=data.get('last_pattern'),
             participants=json.loads(data.get('participants', '[]')),
             interactions=json.loads(data.get('interactions', '[]'))
         )
+    
+    def add_interaction(self, user_message: str, speaker_index: int, speaker_name: str):
+        """Add interaction to session"""
+        self.interactions.append({
+            'timestamp': time.time(),
+            'user_message': user_message[:100],
+            'speaker_index': speaker_index,
+            'speaker': speaker_name
+        })
+        self.total_messages += 1
+        self.last_activity = time.time()
+    
+    def record_climax(self, participant_indices: List[int]):
+        """Record climax"""
+        self.climax_count += len(participant_indices)
+        if self.climax_count >= len(self.participants):
+            self.aftercare_needed = True
+    
+    def start(self):
+        """Start session"""
+        self.status = 'active'
+        self.started_at = time.time()
+    
+    def pause(self):
+        """Pause session"""
+        self.status = 'paused'
+    
+    def resume(self):
+        """Resume session"""
+        self.status = 'active'
+    
+    def complete(self):
+        """Complete session"""
+        self.status = 'completed'
+        self.completed_at = time.time()
+    
+    def cancel(self):
+        """Cancel session"""
+        self.status = 'cancelled'
+        self.completed_at = time.time()
 
 
 # =============================================================================
@@ -962,9 +858,6 @@ __all__ = [
     
     # Enums
     'RelationshipStatus',
-    'PDKTStatus',
-    'PDKTDirection',
-    'PDKTStage',
     'MemoryType',
     'MilestoneType',
     'BackupType',
@@ -978,7 +871,6 @@ __all__ = [
     'Conversation',
     'Memory',
     'Relationship',
-    'PDKT',  # BARU
     'Preference',
     'Milestone',
     'Backup',
