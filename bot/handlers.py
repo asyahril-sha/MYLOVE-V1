@@ -43,6 +43,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     """Handle /start command - memulai bot dan memilih role"""
     user = update.effective_user
     logger.info(f"User {user.id} (@{user.username}) started the bot")
+    logger.info(f"Update: {update}")
     
     # Keyboard untuk memilih role
     keyboard = [
