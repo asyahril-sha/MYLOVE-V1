@@ -1,0 +1,43 @@
+# =============================================================================
+# MYLOVE ULTIMATE VERSI 1 - DEPENDENCIES
+# =============================================================================
+# Telegram Bot
+python-telegram-bot[job-queue]==20.7
+
+# AI & DeepSeek
+openai>=1.0.0  # DeepSeek compatible
+
+# Configuration
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Database
+aiosqlite==0.19.0
+sqlalchemy==2.0.23
+
+# Vector Database untuk Memory
+chromadb==0.4.22
+
+# Web Framework (untuk webhook)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Utilities
+aiofiles==23.2.0
+python-dateutil==2.8.2
+emoji==2.8.0
+
+# Monitoring (optional)
+prometheus-client==0.19.0
+
+# Performance
+orjson==3.9.10  # Fast JSON
+ujson==5.8.0    # Alternative JSON
+
+# Security
+cryptography==41.0.7
+
+# =============================================================================
+# Instalasi: pip install -r requirements.txt
+# =============================================================================
