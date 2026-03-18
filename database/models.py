@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - DATABASE MODELS (FIX FULL)
+MYLOVE ULTIMATE VERSI 1 - DATABASE MODELS (FIX FULL with CONSTANTS)
 =============================================================================
 - Data models untuk semua entitas
 - Pydantic models untuk validasi
 - SQLAlchemy Base class untuk import
 - Semua model lengkap dengan method to_dict/from_dict
+- PLUS Constants class untuk PTB ConversationHandler
 """
 
 import time
@@ -27,6 +28,90 @@ class Base:
     Memungkinkan import 'Base' dari database.models
     """
     pass
+
+
+# =============================================================================
+# CONSTANTS UNTUK PTB CONVERSATION HANDLER
+# =============================================================================
+class Constants:
+    """
+    Constants untuk PTB ConversationHandler
+    Class ini yang di-import oleh bot.application.py
+    """
+    
+    # Conversation States
+    SELECTING_ROLE = 1
+    SELECTING_BOT_NAME = 2
+    SELECTING_BOT_ROLE = 3
+    SELECTING_DOMINANCE = 4
+    SELECTING_PERSONALITY = 5
+    SELECTING_APPEARANCE = 6
+    CONFIRMATION = 7
+    CHATTING = 8
+    SELECTING_ACTION = 9
+    SELECTING_LOCATION = 10
+    SELECTING_CLOTHING = 11
+    SELECTING_ACTIVITY = 12
+    AWAITING_RESPONSE = 13
+    CONFIRM_END = 14
+    CONFIRM_CLOSE = 15
+    CONFIRM_BROADCAST = 16
+    
+    # Roles
+    ROLE_IPAR = "ipar"
+    ROLE_TEMAN_KANTOR = "teman_kantor"
+    ROLE_JANDA = "janda"
+    ROLE_PELAKOR = "pelakor"
+    ROLE_ISTRI_ORANG = "istri_orang"
+    ROLE_PDKT = "pdkt"
+    ROLE_SEPUPU = "sepupu"
+    ROLE_TEMAN_SMA = "teman_sma"
+    ROLE_MANTAN = "mantan"
+    
+    # User roles
+    ROLE_USER = "user"
+    ROLE_BOT = "bot"
+    
+    # Callback data patterns
+    AGREE_18 = "agree_18"
+    UNPAUSE = "unpause"
+    NEW = "new"
+    
+    # Relationship stages
+    STAGE_STRANGER = "stranger"
+    STAGE_FRIEND = "friend"
+    STAGE_CLOSE_FRIEND = "close_friend"
+    STAGE_LOVER = "lover"
+    STAGE_PARTNER = "partner"
+    STAGE_MARRIED = "married"
+    
+    # Relationship statuses
+    STATUS_PDKT = "pdkt"
+    STATUS_SINGLE = "single"
+    STATUS_COMPLICATED = "complicated"
+    STATUS_EXCLUSIVE = "exclusive"
+    
+    # Dominance types
+    DOM_NORMAL = "normal"
+    DOM_DOMINANT = "dominant"
+    DOM_SUBMISSIVE = "submissive"
+    DOM_SWITCH = "switch"
+    
+    # Relationship types
+    TYPE_HTS = "hts"
+    TYPE_FWB = "fwb"
+    TYPE_ONS = "ons"
+    
+    # Moods
+    MOOD_HAPPY = "happy"
+    MOOD_SAD = "sad"
+    MOOD_ANGRY = "angry"
+    MOOD_EXCITED = "excited"
+    MOOD_AROUSED = "aroused"
+    MOOD_TIRED = "tired"
+    MOOD_ROMANTIC = "romantic"
+    MOOD_PLAYFUL = "playful"
+    MOOD_BORED = "bored"
 
 
 # =============================================================================
@@ -736,6 +821,9 @@ class ThreesomeSession(BaseModel):
 __all__ = [
     # Base
     'Base',
+    
+    # Constants (PENTING: ini yang di-import oleh bot.application)
+    'Constants',
     
     # Enums
     'RelationshipStatus',
