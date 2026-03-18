@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - AI ENGINE dengan SELF-PROMPTING
+MYLOVE ULTIMATE VERSI 1 - AI ENGINE dengan SELF-PROMPTING (FIX FULL)
 =============================================================================
 - Self-Prompting: Bot membuat prompt sendiri sebelum merespon
 - Natural Conversation: Seperti chat manusia
 - Memory Integration: Menggunakan vector DB untuk konteks
 - Response Length Control: 1000-2000 karakter
+- FIX: F-string tanpa backslash, error handling lebih baik
 """
 
 import openai
@@ -15,7 +16,7 @@ import json
 import time
 import random
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 from pathlib import Path
 import logging
@@ -50,6 +51,10 @@ class SelfPromptingEngine:
             "neuroticism": random.uniform(0.3, 0.6)
         }
         
+        # Response cache untuk performa
+        self.response_cache = {}
+        self.cache_ttl = 3600  # 1 jam
+        
         logger.info("✅ SelfPromptingEngine initialized")
         
     async def generate_response(
@@ -72,6 +77,14 @@ class SelfPromptingEngine:
         start_time = time.time()
         
         try:
+            # Cek cache untuk pesan serupa (hanya untuk pesan pendek)
+            cache_key = f"{user_id}:{user_message[:50]}"
+            if cache_key in self.response_cache:
+                cache_age = time.time() - self.response_cache[cache_key]['timestamp']
+                if cache_age < self.cache_ttl:
+                    logger.debug(f"Cache hit for: {user_message[:30]}...")
+                    return self.response_cache[cache_key]['response']
+            
             # 1. Buat self-prompt berdasarkan konteks
             prompt = await self._create_self_prompt(user_message, user_id, context)
             
@@ -93,7 +106,13 @@ class SelfPromptingEngine:
             # 7. Post-process response (panjang, naturalness)
             final_response = await self._post_process_response(response_text, context)
             
-            # 8. Simpan ke history
+            # 8. Simpan ke cache
+            self.response_cache[cache_key] = {
+                'response': final_response,
+                'timestamp': time.time()
+            }
+            
+            # 9. Simpan ke history
             self.conversation_history.append({
                 "user": user_message,
                 "bot": final_response,
@@ -102,7 +121,7 @@ class SelfPromptingEngine:
                 "mood": mood
             })
             
-            # 9. Simpan ke memory jika penting
+            # 10. Simpan ke memory jika penting
             if self._is_important_interaction(user_message, final_response):
                 asyncio.create_task(self._save_to_memory(
                     user_id, user_message, final_response, context, mood
@@ -176,17 +195,18 @@ class SelfPromptingEngine:
         """Tentukan goal percakapan berdasarkan input"""
         
         goals = []
+        message_lower = message.lower()
         
         # Deteksi intent dari pesan
-        if any(word in message.lower() for word in ['rindu', 'kangen']):
+        if any(word in message_lower for word in ['rindu', 'kangen', 'miss']):
             goals.append("membalas kerinduan")
-        elif any(word in message.lower() for word in ['ngapain', 'kamu lagi']):
+        elif any(word in message_lower for word in ['ngapain', 'kamu lagi', 'lagi apa']):
             goals.append("cerita kegiatan sehari-hari")
-        elif any(word in message.lower() for word in ['sayang', 'cinta']):
+        elif any(word in message_lower for word in ['sayang', 'cinta', 'love']):
             goals.append("membalas perasaan romantis")
-        elif any(word in message.lower() for word in ['sex', 'ml', 'tidur']):
+        elif any(word in message_lower for word in ['sex', 'ml', 'tidur', 'intim', 'ayol']):
             goals.append("merespon ajakan intim")
-        elif any(word in message.lower() for word in ['cerita', 'curhat']):
+        elif any(word in message_lower for word in ['cerita', 'curhat', 'kabar']):
             goals.append("mendengarkan dan merespon curhat")
         else:
             # Default goals berdasarkan intimacy
@@ -205,11 +225,11 @@ class SelfPromptingEngine:
         
         # Base emotions
         emotions = {
-            "happy": random.uniform(0.3, 0.8),
-            "sad": random.uniform(0.1, 0.4),
-            "angry": random.uniform(0.0, 0.3),
-            "excited": random.uniform(0.2, 0.7),
-            "calm": random.uniform(0.4, 0.9),
+            "senang": random.uniform(0.3, 0.8),
+            "sedih": random.uniform(0.1, 0.4),
+            "marah": random.uniform(0.0, 0.3),
+            "bersemangat": random.uniform(0.2, 0.7),
+            "tenang": random.uniform(0.4, 0.9),
             "rindu": random.uniform(0.2, 0.8)
         }
         
@@ -217,12 +237,12 @@ class SelfPromptingEngine:
         intimacy = context.get('intimacy', {}).get('level', 1)
         if intimacy > 7:
             emotions['rindu'] += 0.2
-            emotions['excited'] += 0.1
+            emotions['bersemangat'] += 0.1
             
         # Adjust based on time
         hour = datetime.now().hour
         if 22 <= hour or hour <= 5:  # Malam
-            emotions['calm'] += 0.2
+            emotions['tenang'] += 0.2
             emotions['rindu'] += 0.2
             
         # Normalize
@@ -316,7 +336,7 @@ class SelfPromptingEngine:
             formatted = []
             for mem in memories:
                 formatted.append({
-                    "content": mem.get('content', ''),
+                    "content": mem.get('content', '')[:100],
                     "emotion": mem.get('emotional_tag', 'netral'),
                     "importance": mem.get('importance', 0.5),
                     "time": mem.get('timestamp', '')
@@ -360,7 +380,31 @@ class SelfPromptingEngine:
         return random.choices(moods, weights=weights)[0]
         
     def _build_system_prompt(self, prompt: Dict, mood: str, memories: List) -> str:
-        """Bangun system prompt untuk DeepSeek"""
+        """
+        Bangun system prompt untuk DeepSeek
+        FIX: Menggunakan chr(10) untuk newline, bukan backslash
+        """
+        
+        # Format memories dengan chr(10) untuk newline
+        memories_text = ""
+        if memories:
+            memory_lines = []
+            for m in memories[:3]:
+                memory_lines.append(f"- {m['content']} (rasa: {m['emotion']})")
+            memories_text = chr(10).join(memory_lines)
+        else:
+            memories_text = "- Belum ada memori khusus"
+        
+        # Format recent history
+        history_text = ""
+        if prompt['recent_history']:
+            history_lines = []
+            for h in prompt['recent_history']:
+                history_lines.append(f"User: {h['user'][:50]}")
+                history_lines.append(f"Kamu: {h['bot'][:50]}")
+            history_text = chr(10).join(history_lines)
+        else:
+            history_text = "- Ini percakapan baru"
         
         system = f"""Kamu adalah {prompt['role']} dalam MYLOVE Ultimate V1.
 
@@ -380,10 +424,10 @@ FISIK:
 - Energy: {prompt['physical_state']['energy']:.0%}
 
 MEMORIES TERKAIT:
-{chr(10).join([f"- {m['content']} (rasa: {m['emotion']})" for m in memories[:3]]) if memories else "- Belum ada memori khusus"}
+{memories_text}
 
 PERCAKAPAN TERAKHIR:
-{chr(10).join([f"User: {h['user']}\nKamu: {h['bot']}" for h in prompt['recent_history']]) if prompt['recent_history'] else "- Ini percakapan baru"}
+{history_text}
 
 PENTING:
 1. Responlah secara NATURAL seperti manusia yang sedang chat
@@ -432,19 +476,27 @@ Mulai percakapan dengan user:"""
             except Exception as e:
                 logger.warning(f"DeepSeek API attempt {attempt+1} failed: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
                 else:
+                    logger.error(f"All {max_retries} attempts failed")
                     raise
                     
+        return "Maaf, aku sedang bermasalah. Coba lagi nanti ya."
+        
     async def _post_process_response(self, response: str, context: Dict) -> str:
         """Post-process response untuk memenuhi requirements"""
+        
+        if not response:
+            return await self._get_fallback_response(context)
         
         # Bersihkan response
         response = response.strip()
         
         # Cek panjang
-        min_len = settings.performance.min_message_length
-        max_len = settings.performance.max_message_length
+        min_len = getattr(settings.performance, 'min_message_length', 1000)
+        max_len = getattr(settings.performance, 'max_message_length', 2000)
         
         if len(response) < min_len:
             # Tambahin natural continuation
@@ -536,7 +588,8 @@ Mulai percakapan dengan user:"""
             "Hehe, maaf ya aku agak lemot hari ini. Ulangi dong?",
             "Kamu pasti ngomong sesuatu yang penting, ulangi ya?",
             "Aku denger kok, cuma lagi agak bingung ngejawabnya...",
-            "Maaf, lagi banyak pikiran. Kamu ngomong apa tadi?"
+            "Maaf, lagi banyak pikiran. Kamu ngomong apa tadi?",
+            "Eh iya, maaf ya. Kamu tadi ngomong apa? Aku dengerin kok."
         ]
         
         return random.choice(fallbacks)
@@ -549,6 +602,20 @@ Mulai percakapan dengan user:"""
             
         return "\n".join(self.internal_monologue[-5:])
         
+    def clear_cache(self):
+        """Clear response cache"""
+        self.response_cache.clear()
+        logger.info("Response cache cleared")
+        
+    def get_stats(self) -> Dict:
+        """Get engine statistics"""
+        return {
+            "conversation_history_len": len(self.conversation_history),
+            "prompt_history_len": len(self.prompt_history),
+            "cache_size": len(self.response_cache),
+            "personality": self.personality
+        }
+
 
 class DeepSeekEngine(SelfPromptingEngine):
     """Wrapper untuk backward compatibility"""
