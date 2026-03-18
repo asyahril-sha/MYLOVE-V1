@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - EXPRESSION ENGINE (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - EXPRESSION ENGINE
 =============================================================================
 Generate ekspresi wajah dan gerakan tubuh menggunakan AI
 - Ekspresi berbeda untuk setiap level (1-12)
@@ -15,7 +15,6 @@ Generate ekspresi wajah dan gerakan tubuh menggunakan AI
 import asyncio
 import logging
 import random
-import time
 from typing import Dict, Optional, Any
 
 from core.prompt_builder import PromptBuilder
@@ -67,7 +66,7 @@ class ExpressionEngine:
         cache_key = self._get_cache_key(context)
         if cache_key in self.cache:
             cache_time, expression = self.cache[cache_key]
-            if time.time() - cache_time < self.cache_ttl:
+            if asyncio.get_event_loop().time() - cache_time < self.cache_ttl:
                 logger.debug(f"Expression cache hit for {cache_key}")
                 return expression
         
@@ -77,9 +76,10 @@ class ExpressionEngine:
                 prompt = self.prompt_builder.build_expression_prompt(context)
                 
                 # Call AI
-                expression = await self.ai._call_deepseek_with_retry(
+                expression = await self.ai._call_deepseek(
                     messages=[{"role": "user", "content": prompt}],
-                    max_retries=2
+                    temperature=0.9,
+                    max_tokens=100
                 )
                 
                 # Bersihkan hasil
@@ -90,7 +90,7 @@ class ExpressionEngine:
                     expression = f"{expression}*"
                 
                 # Simpan ke cache
-                self.cache[cache_key] = (time.time(), expression)
+                self.cache[cache_key] = (asyncio.get_event_loop().time(), expression)
                 
                 logger.debug(f"Generated expression: {expression}")
                 return expression
@@ -155,9 +155,10 @@ Gerakan:"""
             prompt = self.prompt_builder.build_expression_prompt(context)
         
         try:
-            movement = await self.ai._call_deepseek_with_retry(
+            movement = await self.ai._call_deepseek(
                 messages=[{"role": "user", "content": prompt}],
-                max_retries=2
+                temperature=0.9,
+                max_tokens=100
             )
             
             movement = movement.strip()
@@ -291,8 +292,7 @@ Gerakan:"""
         return expr
     
     # =========================================================================
-    # UTILITY
-    # =========================================================================
+    =========================================================================
     
     def clear_cache(self):
         """Bersihkan cache"""
