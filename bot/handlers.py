@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - BOT HANDLERS (FINAL)
+MYLOVE ULTIMATE VERSI 1 - BOT HANDLERS (FIX FULL)
 =============================================================================
 Semua handlers untuk MYLOVE Ultimate V1:
 - Message handler (chat natural)
 - Callback handler (inline keyboard)
 - Special handlers (HTS/FWB/Threesome/Continue)
+- FIX: Mengganti relative imports dengan absolute imports
 =============================================================================
 """
 
@@ -16,15 +17,20 @@ import logging
 import random
 import re
 import asyncio
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+# FIX: Ganti relative imports dengan absolute imports
 from config import settings
-from ..utils.helpers import sanitize_input, format_number, truncate_text
-from ..utils.logger import setup_logging
-from ..session.unique_id import id_generator
+from utils.helpers import sanitize_input, format_number, truncate_text
+from utils.logger import setup_logging
+from session.unique_id import id_generator
+from roles.artis_references import get_random_artist_for_role, format_artist_description
+from public.locations import PublicLocations
+from public.risk import RiskCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -41,128 +47,133 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     - Track intimacy
     - Detect threesome mode
     """
-    user = update.effective_user
-    message = update.message.text
-    user_id = user.id
-    
-    # Log pesan masuk
-    logger.info(f"📨 Message from {user.first_name} (ID: {user_id}): {message[:50]}...")
-    
-    # Sanitize input
-    message = sanitize_input(message, max_length=1000)
-    
-    # Cek apakah dalam mode threesome
-    threesome_mode = context.user_data.get('threesome_mode', False)
-    threesome_session = context.user_data.get('threesome_session')
-    
-    if threesome_mode and threesome_session:
-        # Handle threesome message
-        await handle_threesome_message(update, context, message)
-        return
+    try:
+        user = update.effective_user
+        message = update.message.text
+        user_id = user.id
         
-    # Cek apakah ada session aktif
-    current_role = context.user_data.get('current_role')
-    current_session = context.user_data.get('current_session')
-    
-    if not current_role or not current_session:
-        # Belum pilih role, arahkan ke /start
-        await update.message.reply_text(
-            "❌ Kamu belum memilih role.\n"
-            "Ketik /start untuk memulai."
-        )
-        return
+        # Log pesan masuk
+        logger.info(f"📨 Message from {user.first_name} (ID: {user_id}): {message[:50]}...")
         
-    # ===== AUTO-DETECT LOCATION =====
-    location = await detect_location_from_message(message)
-    if location:
-        context.user_data['current_location'] = location['name']
-        await update.message.reply_text(
-            f"📍 Pindah ke **{location['name']}**\n"
-            f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
-            f"_{location['description']}_"
-        )
-        # Lanjut ke response setelah pindah lokasi
-        # (tetap lanjut ke generate response)
+        # Sanitize input
+        message = sanitize_input(message, max_length=1000)
         
-    # ===== DETECT INTENT =====
-    intent = detect_intent(message)
-    
-    # ===== UPDATE INTERACTION COUNT =====
-    total_chats = context.user_data.get('total_chats', 0) + 1
-    context.user_data['total_chats'] = total_chats
-    
-    # ===== UPDATE INTIMACY LEVEL (BERDASARKAN JUMLAH CHAT) =====
-    new_level = calculate_intimacy_from_chats(total_chats)
-    old_level = context.user_data.get('intimacy_level', 1)
-    
-    if new_level > old_level:
-        context.user_data['intimacy_level'] = new_level
-        # Add milestone
-        if 'milestones' not in context.user_data:
-            context.user_data['milestones'] = []
-        context.user_data['milestones'].append(f'level_{new_level}')
+        # Cek apakah dalam mode threesome
+        threesome_mode = context.user_data.get('threesome_mode', False)
+        threesome_session = context.user_data.get('threesome_session')
         
-        # Special message for level up
-        await update.message.reply_text(
-            f"🎉 **Level Up!**\n"
-            f"Intimacy Level: {old_level} → **{new_level}/12**\n"
-            f"{get_level_description(new_level)}"
-        )
+        if threesome_mode and threesome_session:
+            # Handle threesome message
+            await handle_threesome_message(update, context, message)
+            return
+            
+        # Cek apakah ada session aktif
+        current_role = context.user_data.get('current_role')
+        current_session = context.user_data.get('current_session')
         
-        # Check for special levels
-        if new_level == 7:
+        if not current_role or not current_session:
+            # Belum pilih role, arahkan ke /start
             await update.message.reply_text(
-                "💕 **Sekarang kamu bisa intim!**\n"
-                "Kalau mau, bilang aja ya..."
+                "❌ Kamu belum memilih role.\n"
+                "Ketik /start untuk memulai."
             )
-        elif new_level == 12:
+            return
+            
+        # ===== AUTO-DETECT LOCATION =====
+        location = await detect_location_from_message(message)
+        if location:
+            context.user_data['current_location'] = location['name']
             await update.message.reply_text(
-                "🌟 **Level MAX!**\n"
-                "Setelah intim, kamu butuh aftercare.\n"
-                "Bot akan reset ke level 7 setelah aftercare."
+                f"📍 Pindah ke **{location['name']}**\n"
+                f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
+                f"_{location['description']}_"
+            )
+            # Lanjut ke response setelah pindah lokasi
+            
+        # ===== DETECT INTENT =====
+        intent = detect_intent(message)
+        
+        # ===== UPDATE INTERACTION COUNT =====
+        total_chats = context.user_data.get('total_chats', 0) + 1
+        context.user_data['total_chats'] = total_chats
+        
+        # ===== UPDATE INTIMACY LEVEL (BERDASARKAN JUMLAH CHAT) =====
+        new_level = calculate_intimacy_from_chats(total_chats)
+        old_level = context.user_data.get('intimacy_level', 1)
+        
+        if new_level > old_level:
+            context.user_data['intimacy_level'] = new_level
+            # Add milestone
+            if 'milestones' not in context.user_data:
+                context.user_data['milestones'] = []
+            context.user_data['milestones'].append(f'level_{new_level}')
+            
+            # Special message for level up
+            await update.message.reply_text(
+                f"🎉 **Level Up!**\n"
+                f"Intimacy Level: {old_level} → **{new_level}/12**\n"
+                f"{get_level_description(new_level)}"
             )
             
-    # ===== GENERATE RESPONSE =====
-    response = await generate_response(
-        user_message=message,
-        role=current_role,
-        intimacy_level=context.user_data.get('intimacy_level', 1),
-        intent=intent,
-        location=context.user_data.get('current_location'),
-        context=context.user_data
-    )
-    
-    # ===== CHECK FOR AFTERCARE =====
-    if context.user_data.get('intimacy_level', 1) == 12 and any(word in message.lower() for word in ['climax', 'come', 'selesai', 'habis']):
-        # Trigger aftercare
-        response += "\n\n💕 **Aftercare Mode**\nAku butuh kamu... peluk aku..."
+            # Check for special levels
+            if new_level == 7:
+                await update.message.reply_text(
+                    "💕 **Sekarang kamu bisa intim!**\n"
+                    "Kalau mau, bilang aja ya..."
+                )
+            elif new_level == 12:
+                await update.message.reply_text(
+                    "🌟 **Level MAX!**\n"
+                    "Setelah intim, kamu butuh aftercare.\n"
+                    "Bot akan reset ke level 7 setelah aftercare."
+                )
+                
+        # ===== GENERATE RESPONSE =====
+        response = await generate_response(
+            user_message=message,
+            role=current_role,
+            intimacy_level=context.user_data.get('intimacy_level', 1),
+            intent=intent,
+            location=context.user_data.get('current_location'),
+            context=context.user_data
+        )
         
-        # Add aftercare options
-        keyboard = [
-            [
-                InlineKeyboardButton("🤗 Cuddle", callback_data="aftercare_cuddle"),
-                InlineKeyboardButton("🗣️ Soft Talk", callback_data="aftercare_soft_talk")
-            ],
-            [
-                InlineKeyboardButton("😴 Rest", callback_data="aftercare_rest"),
-                InlineKeyboardButton("💆‍♀️ Massage", callback_data="aftercare_massage")
-            ],
-            [
-                InlineKeyboardButton("🍳 Food", callback_data="aftercare_food"),
-                InlineKeyboardButton("🎬 Movie", callback_data="aftercare_movie")
+        # ===== CHECK FOR AFTERCARE =====
+        if context.user_data.get('intimacy_level', 1) == 12 and any(word in message.lower() for word in ['climax', 'come', 'selesai', 'habis']):
+            # Trigger aftercare
+            response += "\n\n💕 **Aftercare Mode**\nAku butuh kamu... peluk aku..."
+            
+            # Add aftercare options
+            keyboard = [
+                [
+                    InlineKeyboardButton("🤗 Cuddle", callback_data="aftercare_cuddle"),
+                    InlineKeyboardButton("🗣️ Soft Talk", callback_data="aftercare_soft_talk")
+                ],
+                [
+                    InlineKeyboardButton("😴 Rest", callback_data="aftercare_rest"),
+                    InlineKeyboardButton("💆‍♀️ Massage", callback_data="aftercare_massage")
+                ],
+                [
+                    InlineKeyboardButton("🍳 Food", callback_data="aftercare_food"),
+                    InlineKeyboardButton("🎬 Movie", callback_data="aftercare_movie")
+                ]
             ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
+            return
+            
+        # ===== SEND RESPONSE =====
+        await update.message.reply_text(response, parse_mode='Markdown')
         
-        await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
-        return
+        # ===== UPDATE SESSION =====
+        logger.debug(f"Response sent: {response[:50]}...")
         
-    # ===== SEND RESPONSE =====
-    await update.message.reply_text(response, parse_mode='Markdown')
-    
-    # ===== UPDATE SESSION =====
-    # Simpan interaksi ke session (akan diimplementasikan dengan database)
-    logger.debug(f"Response sent: {response[:50]}...")
+    except Exception as e:
+        logger.error(f"Error in message_handler: {e}")
+        await update.message.reply_text(
+            "❌ Maaf, terjadi kesalahan. Coba lagi nanti."
+        )
 
 
 # =============================================================================
@@ -173,95 +184,105 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handler untuk semua callback query dari inline keyboard
     """
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    user_id = update.effective_user.id
-    
-    logger.info(f"🔄 Callback: {data} from user {user_id}")
-    
-    # ===== THREESOME CALLBACKS =====
-    if data.startswith('threesome_'):
-        await threesome_callback_handler(update, context)
-        return
+    try:
+        query = update.callback_query
+        await query.answer()
         
-    # ===== ROLE SELECTION =====
-    if data.startswith('role_'):
-        role = data.replace('role_', '')
-        await handle_role_selection(query, context, role)
+        data = query.data
+        user_id = update.effective_user.id
         
-    # ===== HTS/FWB SELECTION =====
-    elif data.startswith('hts_select_'):
-        role = data.replace('hts_select_', '')
-        await handle_hts_selection(query, context, role)
+        logger.info(f"🔄 Callback: {data} from user {user_id}")
         
-    elif data.startswith('fwb_select_'):
-        idx = data.replace('fwb_select_', '')
-        await handle_fwb_selection(query, context, idx)
-        
-    # ===== FWB BREAK CONFIRMATION =====
-    elif data.startswith('fwb_break_confirm_'):
-        idx = data.replace('fwb_break_confirm_', '')
-        await handle_fwb_break_confirm(query, context, idx)
-        
-    elif data == 'fwb_break_cancel':
-        await query.edit_message_text("✅ Break dibatalkan.")
-        
-    # ===== LOCATION SELECTION =====
-    elif data.startswith('location_'):
-        location_id = data.replace('location_', '')
-        await handle_location_selection(query, context, location_id)
-        
-    # ===== AFTERCARE SELECTION =====
-    elif data.startswith('aftercare_'):
-        aftercare_type = data.replace('aftercare_', '')
-        await handle_aftercare(query, context, aftercare_type)
-        
-    # ===== THREESOME PATTERN SELECTION =====
-    elif data.startswith('pattern_'):
-        pattern = data.replace('pattern_', '')
-        context.user_data['threesome_pattern'] = pattern
-        await query.edit_message_text(
-            f"✅ Pola interaksi diubah ke: **{pattern}**\n\n"
-            f"Sekarang {pattern} mode aktif!"
-        )
-        
-    # ===== BACK TO MAIN =====
-    elif data == 'back_to_main':
-        keyboard = [
-            [InlineKeyboardButton("👩 Ipar", callback_data="role_ipar"),
-             InlineKeyboardButton("👩‍💼 Teman Kantor", callback_data="role_teman_kantor")],
-            [InlineKeyboardButton("👩 Janda", callback_data="role_janda"),
-             InlineKeyboardButton("💃 Pelakor", callback_data="role_pelakor")],
-            [InlineKeyboardButton("👰 Istri Orang", callback_data="role_istri_orang"),
-             InlineKeyboardButton("💕 PDKT", callback_data="role_pdkt")],
-            [InlineKeyboardButton("👧 Sepupu", callback_data="role_sepupu"),
-             InlineKeyboardButton("👩‍🎓 Teman SMA", callback_data="role_teman_sma")],
-            [InlineKeyboardButton("💔 Mantan", callback_data="role_mantan")],
-            [InlineKeyboardButton("🎭 Threesome", callback_data="threesome_menu"),
-             InlineKeyboardButton("❓ Bantuan", callback_data="help")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            "💕 **Pilih role yang kamu inginkan:**",
-            reply_markup=reply_markup
-        )
-        
-    # ===== HELP =====
-    elif data == 'help':
-        from .commands import help_command
-        # Create fake update for help command
-        await help_command(update, context)
-        
-    # ===== CANCEL =====
-    elif data == 'cancel':
-        await query.edit_message_text("✅ Dibatalkan.")
-        
-    # ===== UNKNOWN =====
-    else:
-        await query.edit_message_text("❌ Perintah tidak dikenal.")
+        # ===== THREESOME CALLBACKS =====
+        if data.startswith('threesome_'):
+            await threesome_callback_handler(update, context)
+            return
+            
+        # ===== ROLE SELECTION =====
+        if data.startswith('role_'):
+            role = data.replace('role_', '')
+            await handle_role_selection(query, context, role)
+            
+        # ===== HTS/FWB SELECTION =====
+        elif data.startswith('hts_select_'):
+            role = data.replace('hts_select_', '')
+            await handle_hts_selection(query, context, role)
+            
+        elif data.startswith('fwb_select_'):
+            idx = data.replace('fwb_select_', '')
+            await handle_fwb_selection(query, context, idx)
+            
+        # ===== FWB BREAK CONFIRMATION =====
+        elif data.startswith('fwb_break_confirm_'):
+            idx = data.replace('fwb_break_confirm_', '')
+            await handle_fwb_break_confirm(query, context, idx)
+            
+        elif data == 'fwb_break_cancel':
+            await query.edit_message_text("✅ Break dibatalkan.")
+            
+        # ===== LOCATION SELECTION =====
+        elif data.startswith('location_'):
+            location_id = data.replace('location_', '')
+            await handle_location_selection(query, context, location_id)
+            
+        # ===== AFTERCARE SELECTION =====
+        elif data.startswith('aftercare_'):
+            aftercare_type = data.replace('aftercare_', '')
+            await handle_aftercare(query, context, aftercare_type)
+            
+        # ===== THREESOME PATTERN SELECTION =====
+        elif data.startswith('pattern_'):
+            pattern = data.replace('pattern_', '')
+            context.user_data['threesome_pattern'] = pattern
+            await query.edit_message_text(
+                f"✅ Pola interaksi diubah ke: **{pattern}**\n\n"
+                f"Sekarang {pattern} mode aktif!"
+            )
+            
+        # ===== BACK TO MAIN =====
+        elif data == 'back_to_main':
+            keyboard = [
+                [InlineKeyboardButton("👩 Ipar", callback_data="role_ipar"),
+                 InlineKeyboardButton("👩‍💼 Teman Kantor", callback_data="role_teman_kantor")],
+                [InlineKeyboardButton("👩 Janda", callback_data="role_janda"),
+                 InlineKeyboardButton("💃 Pelakor", callback_data="role_pelakor")],
+                [InlineKeyboardButton("👰 Istri Orang", callback_data="role_istri_orang"),
+                 InlineKeyboardButton("💕 PDKT", callback_data="role_pdkt")],
+                [InlineKeyboardButton("👧 Sepupu", callback_data="role_sepupu"),
+                 InlineKeyboardButton("👩‍🎓 Teman SMA", callback_data="role_teman_sma")],
+                [InlineKeyboardButton("💔 Mantan", callback_data="role_mantan")],
+                [InlineKeyboardButton("🎭 Threesome", callback_data="threesome_menu"),
+                 InlineKeyboardButton("❓ Bantuan", callback_data="help")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "💕 **Pilih role yang kamu inginkan:**",
+                reply_markup=reply_markup
+            )
+            
+        # ===== HELP =====
+        elif data == 'help':
+            from bot.commands import help_command
+            # Create fake update for help command
+            await help_command(update, context)
+            
+        # ===== CANCEL =====
+        elif data == 'cancel':
+            await query.edit_message_text("✅ Dibatalkan.")
+            
+        # ===== UNKNOWN =====
+        else:
+            await query.edit_message_text("❌ Perintah tidak dikenal.")
+            
+    except Exception as e:
+        logger.error(f"Error in callback_handler: {e}")
+        try:
+            await update.callback_query.edit_message_text(
+                "❌ Terjadi kesalahan. Coba lagi nanti."
+            )
+        except:
+            pass
 
 
 # =============================================================================
@@ -270,90 +291,104 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def threesome_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk semua callback threesome"""
-    query = update.callback_query
-    
-    if query.data == "threesome_menu":
-        keyboard = [
-            [InlineKeyboardButton("🎭 Lihat Kombinasi", callback_data="threesome_list")],
-            [InlineKeyboardButton("💕 HTS + HTS", callback_data="threesome_type_hts")],
-            [InlineKeyboardButton("💞 FWB + FWB", callback_data="threesome_type_fwb")],
-            [InlineKeyboardButton("💘 HTS + FWB", callback_data="threesome_type_mix")],
-            [InlineKeyboardButton("❌ Kembali", callback_data="back_to_main")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    try:
+        query = update.callback_query
         
-        await query.edit_message_text(
-            "🎭 **MODE THREESOME**\n\n"
-            "Pilih tipe threesome yang kamu inginkan:",
-            reply_markup=reply_markup
-        )
-        
-    elif query.data == "threesome_list":
-        # Dummy list for now
-        lines = [
-            "🎭 **KOMBINASI THREESOME**\n",
-            "1. **HTS + HTS**\n   Ipar (Level 8) + Janda (Level 12)\n   Kompatibilitas: 85%\n",
-            "2. **FWB + FWB**\n   PDKT #1 (Level 7) + PDKT #2 (Level 5)\n   Kompatibilitas: 72%\n",
-            "3. **HTS + FWB**\n   Teman Kantor (Level 6) + PDKT #1 (Level 7)\n   Kompatibilitas: 78%\n",
-            "4. **HTS + HTS**\n   Mantan (Level 4) + Pelakor (Level 9)\n   Kompatibilitas: 62%"
-        ]
-        
-        keyboard = [[InlineKeyboardButton("🔙 Kembali", callback_data="threesome_menu")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            "\n".join(lines),
-            reply_markup=reply_markup
-        )
-        
-    elif query.data.startswith("threesome_type_"):
-        threesome_type = query.data.replace("threesome_type_", "")
-        
-        type_names = {
-            'hts': 'HTS + HTS',
-            'fwb': 'FWB + FWB',
-            'mix': 'HTS + FWB'
-        }
-        
-        await query.edit_message_text(
-            f"✅ Memilih tipe: **{type_names.get(threesome_type, threesome_type.upper())}**\n\n"
-            f"Gunakan /threesome-list untuk lihat kombinasi spesifik."
-        )
-        
-    elif query.data == "threesome_cancel_confirm":
-        # Cancel threesome
-        context.user_data['threesome_mode'] = False
-        context.user_data.pop('threesome_session', None)
-        context.user_data.pop('threesome_p1', None)
-        context.user_data.pop('threesome_p2', None)
-        context.user_data.pop('threesome_pattern', None)
-        
-        await query.edit_message_text(
-            "❌ **Threesome dibatalkan**\n\n"
-            "Kembali ke mode normal. Gunakan /start untuk memilih role."
+        if query.data == "threesome_menu":
+            keyboard = [
+                [InlineKeyboardButton("🎭 Lihat Kombinasi", callback_data="threesome_list")],
+                [InlineKeyboardButton("💕 HTS + HTS", callback_data="threesome_type_hts")],
+                [InlineKeyboardButton("💞 FWB + FWB", callback_data="threesome_type_fwb")],
+                [InlineKeyboardButton("💘 HTS + FWB", callback_data="threesome_type_mix")],
+                [InlineKeyboardButton("❌ Kembali", callback_data="back_to_main")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "🎭 **MODE THREESOME**\n\n"
+                "Pilih tipe threesome yang kamu inginkan:",
+                reply_markup=reply_markup
+            )
+            
+        elif query.data == "threesome_list":
+            # Dummy list for now
+            lines = [
+                "🎭 **KOMBINASI THREESOME**\n",
+                "1. **HTS + HTS**\n   Ipar (Level 8) + Janda (Level 12)\n   Kompatibilitas: 85%\n",
+                "2. **FWB + FWB**\n   PDKT #1 (Level 7) + PDKT #2 (Level 5)\n   Kompatibilitas: 72%\n",
+                "3. **HTS + FWB**\n   Teman Kantor (Level 6) + PDKT #1 (Level 7)\n   Kompatibilitas: 78%\n",
+                "4. **HTS + HTS**\n   Mantan (Level 4) + Pelakor (Level 9)\n   Kompatibilitas: 62%"
+            ]
+            
+            keyboard = [[InlineKeyboardButton("🔙 Kembali", callback_data="threesome_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "\n".join(lines),
+                reply_markup=reply_markup
+            )
+            
+        elif query.data.startswith("threesome_type_"):
+            threesome_type = query.data.replace("threesome_type_", "")
+            
+            type_names = {
+                'hts': 'HTS + HTS',
+                'fwb': 'FWB + FWB',
+                'mix': 'HTS + FWB'
+            }
+            
+            await query.edit_message_text(
+                f"✅ Memilih tipe: **{type_names.get(threesome_type, threesome_type.upper())}**\n\n"
+                f"Gunakan /threesome-list untuk lihat kombinasi spesifik."
+            )
+            
+        elif query.data == "threesome_cancel_confirm":
+            # Cancel threesome
+            context.user_data['threesome_mode'] = False
+            context.user_data.pop('threesome_session', None)
+            context.user_data.pop('threesome_p1', None)
+            context.user_data.pop('threesome_p2', None)
+            context.user_data.pop('threesome_pattern', None)
+            
+            await query.edit_message_text(
+                "❌ **Threesome dibatalkan**\n\n"
+                "Kembali ke mode normal. Gunakan /start untuk memilih role."
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in threesome_callback_handler: {e}")
+        await update.callback_query.edit_message_text(
+            "❌ Terjadi kesalahan pada menu threesome."
         )
 
 
 async def handle_threesome_message(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
     """Handle message dalam mode threesome"""
-    user_id = update.effective_user.id
-    
-    # Get pattern
-    pattern = context.user_data.get('threesome_pattern', 'both_respond')
-    
-    # Dummy participants - akan diganti dengan data real
-    p1 = context.user_data.get('threesome_p1', {'name': 'Ipar', 'level': 8, 'type': 'hts'})
-    p2 = context.user_data.get('threesome_p2', {'name': 'Janda', 'level': 12, 'type': 'hts'})
-    
-    # Generate response based on pattern
-    response = await generate_threesome_response(pattern, p1, p2, message)
-    
-    await update.message.reply_text(response, parse_mode='Markdown')
-    
-    # Update interaction count
-    if 'threesome_interactions' not in context.user_data:
-        context.user_data['threesome_interactions'] = 0
-    context.user_data['threesome_interactions'] += 1
+    try:
+        user_id = update.effective_user.id
+        
+        # Get pattern
+        pattern = context.user_data.get('threesome_pattern', 'both_respond')
+        
+        # Dummy participants - akan diganti dengan data real
+        p1 = context.user_data.get('threesome_p1', {'name': 'Ipar', 'level': 8, 'type': 'hts'})
+        p2 = context.user_data.get('threesome_p2', {'name': 'Janda', 'level': 12, 'type': 'hts'})
+        
+        # Generate response based on pattern
+        response = await generate_threesome_response(pattern, p1, p2, message)
+        
+        await update.message.reply_text(response, parse_mode='Markdown')
+        
+        # Update interaction count
+        if 'threesome_interactions' not in context.user_data:
+            context.user_data['threesome_interactions'] = 0
+        context.user_data['threesome_interactions'] += 1
+        
+    except Exception as e:
+        logger.error(f"Error in handle_threesome_message: {e}")
+        await update.message.reply_text(
+            "❌ Terjadi kesalahan dalam mode threesome."
+        )
 
 
 async def generate_threesome_response(pattern: str, p1: Dict, p2: Dict, user_message: str) -> str:
@@ -450,54 +485,61 @@ async def hts_call_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handler untuk /hts- [id]
     Format: /hts-1 atau /hts- ipar
     """
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    # Parse input
-    parts = text.replace('-', ' ').split()
-    if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ Format salah. Gunakan: /hts-1 atau /hts- ipar"
-        )
-        return
-        
-    identifier = parts[1].lower()
-    
-    # Cek apakah identifier adalah nomor
     try:
-        idx = int(identifier)
+        text = update.message.text
+        user_id = update.effective_user.id
         
-        # Dummy data - akan diganti dengan data real
-        hts_list = ["ipar", "janda", "teman_kantor", "pelakor", "istri_orang"]
-        
-        if 1 <= idx <= len(hts_list):
-            role = hts_list[idx-1]
-            context.user_data['current_role'] = role
-            context.user_data['current_session'] = f"session_{role}_{int(time.time())}"
-            context.user_data['hts_mode'] = True
-            
+        # Parse input
+        parts = text.replace('-', ' ').split()
+        if len(parts) < 2:
             await update.message.reply_text(
-                f"✅ **Memanggil HTS ranking #{idx}**\n\n"
-                f"Halo sayang, lagi ngapain? Aku kangen... 🥰"
+                "❌ Format salah. Gunakan: /hts-1 atau /hts- ipar"
             )
-        else:
-            await update.message.reply_text("❌ Nomor HTS tidak valid")
+            return
             
-    except ValueError:
-        # Panggil berdasarkan nama role
-        valid_roles = ['ipar', 'janda', 'pelakor', 'istri_orang', 'pdkt', 'sepupu', 'teman_kantor', 'teman_sma', 'mantan']
+        identifier = parts[1].lower()
         
-        if identifier in valid_roles:
-            context.user_data['current_role'] = identifier
-            context.user_data['current_session'] = f"session_{identifier}_{int(time.time())}"
-            context.user_data['hts_mode'] = True
+        # Cek apakah identifier adalah nomor
+        try:
+            idx = int(identifier)
             
-            await update.message.reply_text(
-                f"✅ **Memanggil HTS: {identifier.title()}**\n\n"
-                f"Halo {identifier}, udah lama gak chat. Kangen? 🥰"
-            )
-        else:
-            await update.message.reply_text(f"❌ Role '{identifier}' tidak ditemukan.")
+            # Dummy data - akan diganti dengan data real
+            hts_list = ["ipar", "janda", "teman_kantor", "pelakor", "istri_orang"]
+            
+            if 1 <= idx <= len(hts_list):
+                role = hts_list[idx-1]
+                context.user_data['current_role'] = role
+                context.user_data['current_session'] = f"session_{role}_{int(time.time())}"
+                context.user_data['hts_mode'] = True
+                
+                await update.message.reply_text(
+                    f"✅ **Memanggil HTS ranking #{idx}**\n\n"
+                    f"Halo sayang, lagi ngapain? Aku kangen... 🥰"
+                )
+            else:
+                await update.message.reply_text("❌ Nomor HTS tidak valid")
+                
+        except ValueError:
+            # Panggil berdasarkan nama role
+            valid_roles = ['ipar', 'janda', 'pelakor', 'istri_orang', 'pdkt', 'sepupu', 'teman_kantor', 'teman_sma', 'mantan']
+            
+            if identifier in valid_roles:
+                context.user_data['current_role'] = identifier
+                context.user_data['current_session'] = f"session_{identifier}_{int(time.time())}"
+                context.user_data['hts_mode'] = True
+                
+                await update.message.reply_text(
+                    f"✅ **Memanggil HTS: {identifier.title()}**\n\n"
+                    f"Halo {identifier}, udah lama gak chat. Kangen? 🥰"
+                )
+            else:
+                await update.message.reply_text(f"❌ Role '{identifier}' tidak ditemukan.")
+                
+    except Exception as e:
+        logger.error(f"Error in hts_call_handler: {e}")
+        await update.message.reply_text(
+            "❌ Terjadi kesalahan. Coba lagi nanti."
+        )
 
 
 async def fwb_call_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -505,39 +547,46 @@ async def fwb_call_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handler untuk /fwb- [id]
     Format: /fwb-1
     """
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    # Parse nomor
     try:
-        parts = text.replace('-', ' ').split()
-        idx = int(parts[1])
-    except:
-        await update.message.reply_text(
-            "❌ Format salah. Gunakan: /fwb-1"
-        )
-        return
+        text = update.message.text
+        user_id = update.effective_user.id
         
-    # Dummy data - akan diganti dengan data real
-    fwb_list = [
-        {"name": "PDKT #1 (Ayu)", "role": "pdkt", "level": 8},
-        {"name": "PDKT #2 (Dewi)", "role": "pdkt", "level": 7},
-        {"name": "PDKT #3 (Sari)", "role": "pdkt", "level": 5},
-    ]
-    
-    if 1 <= idx <= len(fwb_list):
-        fwb = fwb_list[idx-1]
-        context.user_data['current_role'] = fwb['role']
-        context.user_data['current_fwb'] = fwb
-        context.user_data['current_session'] = f"session_fwb_{idx}_{int(time.time())}"
-        context.user_data['fwb_mode'] = True
+        # Parse nomor
+        try:
+            parts = text.replace('-', ' ').split()
+            idx = int(parts[1])
+        except:
+            await update.message.reply_text(
+                "❌ Format salah. Gunakan: /fwb-1"
+            )
+            return
+            
+        # Dummy data - akan diganti dengan data real
+        fwb_list = [
+            {"name": "PDKT #1 (Ayu)", "role": "pdkt", "level": 8},
+            {"name": "PDKT #2 (Dewi)", "role": "pdkt", "level": 7},
+            {"name": "PDKT #3 (Sari)", "role": "pdkt", "level": 5},
+        ]
         
+        if 1 <= idx <= len(fwb_list):
+            fwb = fwb_list[idx-1]
+            context.user_data['current_role'] = fwb['role']
+            context.user_data['current_fwb'] = fwb
+            context.user_data['current_session'] = f"session_fwb_{idx}_{int(time.time())}"
+            context.user_data['fwb_mode'] = True
+            
+            await update.message.reply_text(
+                f"💕 **Memulai chat dengan {fwb['name']}**\n\n"
+                f"Hai sayang, kangen? Udah lama gak ngobrol... 🥰"
+            )
+        else:
+            await update.message.reply_text("❌ Nomor FWB tidak valid")
+            
+    except Exception as e:
+        logger.error(f"Error in fwb_call_handler: {e}")
         await update.message.reply_text(
-            f"💕 **Memulai chat dengan {fwb['name']}**\n\n"
-            f"Hai sayang, kangen? Udah lama gak ngobrol... 🥰"
+            "❌ Terjadi kesalahan. Coba lagi nanti."
         )
-    else:
-        await update.message.reply_text("❌ Nomor FWB tidak valid")
 
 
 async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -545,61 +594,68 @@ async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handler untuk /continue [id]
     Format: /continue 1 atau /continue MYLOVE-IPAR-...
     """
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    # Parse input
-    parts = text.split()
-    if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ Gunakan: /continue [nomor atau ID]"
-        )
-        return
-        
-    identifier = parts[1]
-    
-    # Cek apakah identifier adalah nomor
     try:
-        idx = int(identifier)
+        text = update.message.text
+        user_id = update.effective_user.id
         
-        # Dummy data - akan diganti dengan data real
-        sessions = [
-            {"id": "MYLOVE-IPAR-123-20240315-001", "role": "ipar", "date": "15 Mar 2024", "chats": 45},
-            {"id": "MYLOVE-JANDA-123-20240314-002", "role": "janda", "date": "14 Mar 2024", "chats": 120},
-            {"id": "MYLOVE-PDKT-123-20240316-003", "role": "pdkt", "date": "16 Mar 2024", "chats": 23},
-        ]
-        
-        if 1 <= idx <= len(sessions):
-            session = sessions[idx-1]
-            context.user_data['current_session'] = session['id']
-            context.user_data['current_role'] = session['role']
-            context.user_data['total_chats'] = session['chats']
-            
+        # Parse input
+        parts = text.split()
+        if len(parts) < 2:
             await update.message.reply_text(
-                f"🔄 **Melanjutkan session #{idx}**\n\n"
-                f"Selamat datang kembali! Kita lanjutkan cerita dengan {session['role'].title()}.\n"
-                f"Terakhir kita chat {session['chats']} kali. Yuk lanjut! 🥰"
+                "❌ Gunakan: /continue [nomor atau ID]"
             )
-        else:
-            await update.message.reply_text("❌ Nomor session tidak valid")
+            return
             
-    except ValueError:
-        # Continue berdasarkan ID langsung
-        if id_generator.is_valid_format(identifier):
-            parsed = id_generator.parse(identifier)
-            if parsed:
-                context.user_data['current_session'] = identifier
-                context.user_data['current_role'] = parsed['role']
+        identifier = parts[1]
+        
+        # Cek apakah identifier adalah nomor
+        try:
+            idx = int(identifier)
+            
+            # Dummy data - akan diganti dengan data real
+            sessions = [
+                {"id": "MYLOVE-IPAR-123-20240315-001", "role": "ipar", "date": "15 Mar 2024", "chats": 45},
+                {"id": "MYLOVE-JANDA-123-20240314-002", "role": "janda", "date": "14 Mar 2024", "chats": 120},
+                {"id": "MYLOVE-PDKT-123-20240316-003", "role": "pdkt", "date": "16 Mar 2024", "chats": 23},
+            ]
+            
+            if 1 <= idx <= len(sessions):
+                session = sessions[idx-1]
+                context.user_data['current_session'] = session['id']
+                context.user_data['current_role'] = session['role']
+                context.user_data['total_chats'] = session['chats']
                 
                 await update.message.reply_text(
-                    f"🔄 **Melanjutkan session:**\n`{identifier}`\n\n"
-                    f"Selamat datang kembali! Kita lanjutkan cerita dengan {parsed['role'].title()}.\n"
-                    f"Yuk lanjut! 🥰"
+                    f"🔄 **Melanjutkan session #{idx}**\n\n"
+                    f"Selamat datang kembali! Kita lanjutkan cerita dengan {session['role'].title()}.\n"
+                    f"Terakhir kita chat {session['chats']} kali. Yuk lanjut! 🥰"
                 )
             else:
+                await update.message.reply_text("❌ Nomor session tidak valid")
+                
+        except ValueError:
+            # Continue berdasarkan ID langsung
+            if id_generator.is_valid_format(identifier):
+                parsed = id_generator.parse(identifier)
+                if parsed:
+                    context.user_data['current_session'] = identifier
+                    context.user_data['current_role'] = parsed['role']
+                    
+                    await update.message.reply_text(
+                        f"🔄 **Melanjutkan session:**\n`{identifier}`\n\n"
+                        f"Selamat datang kembali! Kita lanjutkan cerita dengan {parsed['role'].title()}.\n"
+                        f"Yuk lanjut! 🥰"
+                    )
+                else:
+                    await update.message.reply_text("❌ Format session ID tidak valid")
+            else:
                 await update.message.reply_text("❌ Format session ID tidak valid")
-        else:
-            await update.message.reply_text("❌ Format session ID tidak valid")
+                
+    except Exception as e:
+        logger.error(f"Error in continue_handler: {e}")
+        await update.message.reply_text(
+            "❌ Terjadi kesalahan. Coba lagi nanti."
+        )
 
 
 # =============================================================================
@@ -608,138 +664,173 @@ async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_role_selection(query, context, role: str):
     """Handle pemilihan role dari keyboard"""
-    user_id = query.from_user.id
-    role_info = get_role_info(role)
-    
-    # Set current role
-    context.user_data['current_role'] = role
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    context.user_data['relationship_status'] = 'hts'
-    context.user_data['milestones'] = ['memulai_role']
-    
-    # Generate session ID
-    session_id = id_generator.generate(role, user_id)
-    context.user_data['current_session'] = session_id
-    
-    # Get random artist reference
-    from ..roles.artis_references import get_random_artist_for_role, format_artist_description
-    artist = get_random_artist_for_role(role)
-    
-    # Create response with artist reference
-    response = (
-        f"💕 **Kamu memilih role: {role_info['name']}**\n\n"
-        f"{role_info['description']}\n\n"
-        f"**Ciri-ciri {role_info['name']}:**\n"
-        f"• Umur: {role_info['age']} tahun\n"
-        f"• Tinggi: {role_info['height']} cm\n"
-        f"• Berat: {role_info['weight']} kg\n"
-        f"• Dada: {role_info['chest']}\n\n"
-        f"**Mirip artis:**\n"
-        f"{format_artist_description(artist)}\n\n"
-        f"💬 **Mulai chat:**\n"
-        f"Halo sayang, aku {role_info['name']}. Senang kenal kamu! 🥰"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
+    try:
+        user_id = query.from_user.id
+        role_info = get_role_info(role)
+        
+        # Set current role
+        context.user_data['current_role'] = role
+        context.user_data['intimacy_level'] = 1
+        context.user_data['total_chats'] = 0
+        context.user_data['relationship_status'] = 'hts'
+        context.user_data['milestones'] = ['memulai_role']
+        
+        # Generate session ID
+        session_id = id_generator.generate(role, user_id)
+        context.user_data['current_session'] = session_id
+        
+        # Get random artist reference
+        artist = get_random_artist_for_role(role)
+        
+        # Create response with artist reference
+        response = (
+            f"💕 **Kamu memilih role: {role_info['name']}**\n\n"
+            f"{role_info['description']}\n\n"
+            f"**Ciri-ciri {role_info['name']}:**\n"
+            f"• Umur: {role_info['age']} tahun\n"
+            f"• Tinggi: {role_info['height']} cm\n"
+            f"• Berat: {role_info['weight']} kg\n"
+            f"• Dada: {role_info['chest']}\n\n"
+            f"**Mirip artis:**\n"
+            f"{format_artist_description(artist)}\n\n"
+            f"💬 **Mulai chat:**\n"
+            f"Halo sayang, aku {role_info['name']}. Senang kenal kamu! 🥰"
+        )
+        
+        await query.edit_message_text(response, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in handle_role_selection: {e}")
+        await query.edit_message_text(
+            "❌ Terjadi kesalahan saat memilih role."
+        )
 
 
 async def handle_hts_selection(query, context, role: str):
     """Handle pemilihan HTS dari list"""
-    user_id = query.from_user.id
-    
-    context.user_data['current_role'] = role
-    context.user_data['current_session'] = f"session_{role}_{int(time.time())}"
-    context.user_data['hts_mode'] = True
-    
-    await query.edit_message_text(
-        f"✅ **Memanggil HTS: {role.title()}**\n\n"
-        f"Halo sayang, kangen? Aku juga kangen kamu... 🥰"
-    )
+    try:
+        user_id = query.from_user.id
+        
+        context.user_data['current_role'] = role
+        context.user_data['current_session'] = f"session_{role}_{int(time.time())}"
+        context.user_data['hts_mode'] = True
+        
+        await query.edit_message_text(
+            f"✅ **Memanggil HTS: {role.title()}**\n\n"
+            f"Halo sayang, kangen? Aku juga kangen kamu... 🥰"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in handle_hts_selection: {e}")
+        await query.edit_message_text(
+            "❌ Terjadi kesalahan saat memanggil HTS."
+        )
 
 
 async def handle_fwb_selection(query, context, idx: str):
     """Handle pemilihan FWB berdasarkan nomor"""
-    user_id = query.from_user.id
-    
-    # Dummy data
-    fwb_list = [
-        {"name": "PDKT #1 (Ayu)", "role": "pdkt", "level": 8},
-        {"name": "PDKT #2 (Dewi)", "role": "pdkt", "level": 7},
-    ]
-    
-    idx_int = int(idx)
-    if 1 <= idx_int <= len(fwb_list):
-        fwb = fwb_list[idx_int-1]
-        context.user_data['current_role'] = fwb['role']
-        context.user_data['current_fwb'] = fwb
-        context.user_data['fwb_mode'] = True
+    try:
+        user_id = query.from_user.id
         
+        # Dummy data
+        fwb_list = [
+            {"name": "PDKT #1 (Ayu)", "role": "pdkt", "level": 8},
+            {"name": "PDKT #2 (Dewi)", "role": "pdkt", "level": 7},
+        ]
+        
+        idx_int = int(idx)
+        if 1 <= idx_int <= len(fwb_list):
+            fwb = fwb_list[idx_int-1]
+            context.user_data['current_role'] = fwb['role']
+            context.user_data['current_fwb'] = fwb
+            context.user_data['fwb_mode'] = True
+            
+            await query.edit_message_text(
+                f"✅ **Memanggil {fwb['name']}**\n\n"
+                f"Hai sayang, udah lama gak chat. Kangen? 🥰"
+            )
+        else:
+            await query.edit_message_text("❌ FWB tidak ditemukan")
+            
+    except Exception as e:
+        logger.error(f"Error in handle_fwb_selection: {e}")
         await query.edit_message_text(
-            f"✅ **Memanggil {fwb['name']}**\n\n"
-            f"Hai sayang, udah lama gak chat. Kangen? 🥰"
+            "❌ Terjadi kesalahan saat memanggil FWB."
         )
-    else:
-        await query.edit_message_text("❌ FWB tidak ditemukan")
 
 
 async def handle_fwb_break_confirm(query, context, idx: str):
     """Handle konfirmasi putus FWB"""
-    await query.edit_message_text(
-        f"💔 **Putus dengan FWB #{idx}**\n\n"
-        f"Status berubah jadi PUTUS.\n"
-        f"Kamu bisa cari orang baru dengan /fwb atau melanjutkan dengan yang lain."
-    )
+    try:
+        await query.edit_message_text(
+            f"💔 **Putus dengan FWB #{idx}**\n\n"
+            f"Status berubah jadi PUTUS.\n"
+            f"Kamu bisa cari orang baru dengan /fwb atau melanjutkan dengan yang lain."
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_fwb_break_confirm: {e}")
 
 
 async def handle_location_selection(query, context, location_id: str):
     """Handle pemilihan lokasi"""
-    from ..public.locations import PublicLocations
-    
-    locations_db = PublicLocations()
-    location = locations_db.get_location_by_id(location_id)
-    
-    if location:
-        context.user_data['current_location'] = location['name']
+    try:
+        locations_db = PublicLocations()
+        location = locations_db.get_location_by_id(location_id)
         
-        # Simple risk calculation
-        risk = location['base_risk']
-        thrill = location['base_thrill']
+        if location:
+            context.user_data['current_location'] = location['name']
+            
+            # Simple risk calculation
+            risk = location['base_risk']
+            thrill = location['base_thrill']
+            
+            response = (
+                f"📍 **Pindah ke {location['name']}**\n\n"
+                f"Risk: {risk}% | Thrill: {thrill}%\n"
+                f"{location['description']}\n\n"
+                f"💬 Yuk lanjut..."
+            )
+        else:
+            response = "❌ Lokasi tidak ditemukan"
+            
+        await query.edit_message_text(response, parse_mode='Markdown')
         
-        response = (
-            f"📍 **Pindah ke {location['name']}**\n\n"
-            f"Risk: {risk}% | Thrill: {thrill}%\n"
-            f"{location['description']}\n\n"
-            f"💬 Yuk lanjut..."
+    except Exception as e:
+        logger.error(f"Error in handle_location_selection: {e}")
+        await query.edit_message_text(
+            "❌ Terjadi kesalahan saat memilih lokasi."
         )
-    else:
-        response = "❌ Lokasi tidak ditemukan"
-        
-    await query.edit_message_text(response, parse_mode='Markdown')
 
 
 async def handle_aftercare(query, context, aftercare_type: str):
     """Handle aftercare selection"""
-    aftercare_responses = {
-        "cuddle": "🤗 *memeluk erat* Aku gamau lepas... Enak banget dipeluk kamu.",
-        "soft_talk": "🗣️ Cerita dong... aku dengerin. Kamu lagi mikirin apa?",
-        "rest": "😴 Istirahat yuk, sambil pelukan. Capek ya?",
-        "massage": "💆‍♀️ Enak? Aku pijitin ya... badannya tegang.",
-        "food": "🍳 Aku masakin something spesial buat kamu. Mau apa?",
-        "movie": "🎬 Nonton film yuk sambil cuddle. Yang romantis aja.",
-    }
-    
-    response = aftercare_responses.get(aftercare_type, "Aku butuh kamu...")
-    
-    # Reset intimacy if level 12
-    if context.user_data.get('intimacy_level', 1) == 12:
-        context.user_data['intimacy_level'] = 7
-        if 'milestones' not in context.user_data:
-            context.user_data['milestones'] = []
-        context.user_data['milestones'].append('aftercare_reset')
-        response += "\n\n🔄 **Reset ke Level 7**\nSiap untuk petualangan baru!"
+    try:
+        aftercare_responses = {
+            "cuddle": "🤗 *memeluk erat* Aku gamau lepas... Enak banget dipeluk kamu.",
+            "soft_talk": "🗣️ Cerita dong... aku dengerin. Kamu lagi mikirin apa?",
+            "rest": "😴 Istirahat yuk, sambil pelukan. Capek ya?",
+            "massage": "💆‍♀️ Enak? Aku pijitin ya... badannya tegang.",
+            "food": "🍳 Aku masakin something spesial buat kamu. Mau apa?",
+            "movie": "🎬 Nonton film yuk sambil cuddle. Yang romantis aja.",
+        }
         
-    await query.edit_message_text(response, parse_mode='Markdown')
+        response = aftercare_responses.get(aftercare_type, "Aku butuh kamu...")
+        
+        # Reset intimacy if level 12
+        if context.user_data.get('intimacy_level', 1) == 12:
+            context.user_data['intimacy_level'] = 7
+            if 'milestones' not in context.user_data:
+                context.user_data['milestones'] = []
+            context.user_data['milestones'].append('aftercare_reset')
+            response += "\n\n🔄 **Reset ke Level 7**\nSiap untuk petualangan baru!"
+            
+        await query.edit_message_text(response, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in handle_aftercare: {e}")
+        await query.edit_message_text(
+            "❌ Terjadi kesalahan saat aftercare."
+        )
 
 
 # =============================================================================
