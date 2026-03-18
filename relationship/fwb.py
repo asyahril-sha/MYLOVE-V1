@@ -8,6 +8,7 @@ MYLOVE ULTIMATE VERSI 1 - FWB SYSTEM (ENHANCED)
 - List FWB seperti HTS
 - Track history putus-nyambung
 - PDKT bisa pacaran lagi dengan orang baru setelah break up
+- **Support untuk multiple FWB (untuk threesome)**
 """
 
 import time
@@ -98,6 +99,10 @@ class FWBSystem:
         
         return instance
         
+    # =========================================================================
+    # GET FWB INSTANCES
+    # =========================================================================
+    
     async def get_fwb_instances(self, user_id: int, role: Optional[str] = None) -> List[Dict]:
         """
         Get all FWB instances for user
@@ -149,6 +154,79 @@ class FWBSystem:
             FWB instance or None
         """
         instances = await self.get_fwb_instances(user_id)
+        
+        if 1 <= index <= len(instances):
+            return instances[index - 1]
+            
+        return None
+        
+    # =========================================================================
+    # GET FWB FOR THREESOME
+    # =========================================================================
+    
+    async def get_fwb_for_threesome(self, user_id: int, min_level: int = 1) -> List[Dict]:
+        """
+        Get FWB instances yang eligible untuk threesome
+        
+        Args:
+            user_id: ID user
+            min_level: Minimal intimacy level
+            
+        Returns:
+            List of FWB instances with selection info
+        """
+        instances = await self.get_fwb_instances(user_id)
+        
+        # Filter active FWB only (not putus)
+        active = [i for i in instances if i['status'] in ['fwb', 'pacar']]
+        
+        # Filter by level
+        eligible = [
+            i for i in active 
+            if i.get('intimacy_level', 1) >= min_level
+        ]
+        
+        # Add selection info
+        for i, inst in enumerate(eligible, 1):
+            inst['select_id'] = i
+            inst['select_name'] = f"{i}. {inst['name']} (Level {inst.get('intimacy_level', 1)})"
+            inst['type'] = 'fwb'
+            
+        return eligible
+        
+    async def get_fwb_by_indices(self, user_id: int, indices: List[int]) -> List[Dict]:
+        """
+        Get multiple FWB instances by indices (untuk threesome)
+        
+        Args:
+            user_id: ID user
+            indices: List of indices from get_fwb_for_threesome
+            
+        Returns:
+            List of FWB instances
+        """
+        eligible = await self.get_fwb_for_threesome(user_id)
+        
+        selected = []
+        for idx in indices:
+            if 1 <= idx <= len(eligible):
+                selected.append(eligible[idx - 1])
+                
+        return selected
+        
+    async def get_fwb_by_role_and_index(self, user_id: int, role: str, index: int) -> Optional[Dict]:
+        """
+        Get FWB instance by role and index (untuk role yang sama)
+        
+        Args:
+            user_id: ID user
+            role: Role name
+            index: 1-based index dalam role tersebut
+            
+        Returns:
+            FWB instance or None
+        """
+        instances = await self.get_fwb_instances(user_id, role)
         
         if 1 <= index <= len(instances):
             return instances[index - 1]
@@ -295,6 +373,65 @@ class FWBSystem:
         }
         
     # =========================================================================
+    # FWB INTERACTIONS
+    # =========================================================================
+    
+    async def interact_with_fwb(self, user_id: int, instance_id: str, message: str) -> Dict:
+        """
+        Interact with specific FWB instance
+        
+        Args:
+            user_id: ID user
+            instance_id: Instance ID
+            message: User message
+            
+        Returns:
+            Interaction result
+        """
+        instance = await self.get_fwb_instance(user_id, instance_id)
+        
+        if not instance:
+            return {'success': False, 'reason': 'Instance tidak ditemukan'}
+            
+        # Update interaction count
+        instance['total_interactions'] += 1
+        instance['last_interaction'] = time.time()
+        
+        # Increase intimacy gradually
+        if instance['total_interactions'] % 10 == 0:
+            instance['intimacy_level'] = min(12, instance['intimacy_level'] + 1)
+            
+        return {
+            'success': True,
+            'instance': instance,
+            'context': {
+                'name': instance['name'],
+                'status': instance['status'],
+                'intimacy': instance['intimacy_level']
+            }
+        }
+        
+    async def record_intim(self, user_id: int, instance_id: str, climax: bool = False):
+        """Record intimacy session with FWB"""
+        instance = await self.get_fwb_instance(user_id, instance_id)
+        
+        if not instance:
+            return
+            
+        instance['total_intim_sessions'] += 1
+        
+        if climax:
+            instance['total_climax'] += 1
+            instance['history'].append({
+                'event': 'climax',
+                'timestamp': time.time()
+            })
+            
+        # Check for aftercare
+        if instance['intimacy_level'] == 12:
+            instance['needs_aftercare'] = True
+            
+    # =========================================================================
     # FWB LIST FORMATTING
     # =========================================================================
     
@@ -369,72 +506,35 @@ class FWBSystem:
         
         return "\n".join(lines)
         
-    # =========================================================================
-    # FWB INTERACTIONS
-    # =========================================================================
-    
-    async def interact_with_fwb(self, user_id: int, instance_id: str, message: str) -> Dict:
+    async def format_fwb_for_threesome(self, user_id: int) -> str:
         """
-        Interact with specific FWB instance
-        
-        Args:
-            user_id: ID user
-            instance_id: Instance ID
-            message: User message
-            
-        Returns:
-            Interaction result
+        Format daftar FWB untuk selection threesome
         """
-        instance = await self.get_fwb_instance(user_id, instance_id)
+        eligible = await self.get_fwb_for_threesome(user_id)
         
-        if not instance:
-            return {'success': False, 'reason': 'Instance tidak ditemukan'}
+        if not eligible:
+            return "Tidak ada FWB yang memenuhi syarat untuk threesome. Minimal level 1."
             
-        # Update interaction count
-        instance['total_interactions'] += 1
-        instance['last_interaction'] = time.time()
+        lines = ["💞 **DAFTAR FWB UNTUK THREESOME**"]
+        lines.append("_(pilih dengan nomor)_")
+        lines.append("")
         
-        # Increase intimacy gradually
-        if instance['total_interactions'] % 10 == 0:
-            instance['intimacy_level'] = min(12, instance['intimacy_level'] + 1)
+        for fwb in eligible:
+            lines.append(
+                f"{fwb['select_id']}. **{fwb['name']}**\n"
+                f"   Level {fwb.get('intimacy_level', 1)}/12 | "
+                f"{fwb.get('total_intim_sessions', 0)} intim"
+            )
             
-        return {
-            'success': True,
-            'instance': instance,
-            'context': {
-                'name': instance['name'],
-                'status': instance['status'],
-                'intimacy': instance['intimacy_level']
-            }
-        }
+        return "\n".join(lines)
         
-    async def record_intim(self, user_id: int, instance_id: str, climax: bool = False):
-        """Record intimacy session with FWB"""
-        instance = await self.get_fwb_instance(user_id, instance_id)
-        
-        if not instance:
-            return
-            
-        instance['total_intim_sessions'] += 1
-        
-        if climax:
-            instance['total_climax'] += 1
-            instance['history'].append({
-                'event': 'climax',
-                'timestamp': time.time()
-            })
-            
-        # Check for aftercare
-        if instance['intimacy_level'] == 12:
-            instance['needs_aftercare'] = True
-            
     # =========================================================================
     # FWB STATISTICS
     # =========================================================================
     
     async def get_fwb_stats(self, user_id: int) -> Dict:
         """Get FWB statistics"""
-        instances = await self.get_fwb_instances(user_id, include_putus=True)
+        instances = await self.get_fwb_instances(user_id)
         
         stats = {
             "total_fwb": len([i for i in instances if i['status'] == 'fwb']),
