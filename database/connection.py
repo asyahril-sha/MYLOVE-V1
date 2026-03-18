@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - DATABASE CONNECTION (FIX FULL + PDKT)
+MYLOVE ULTIMATE VERSI 2 - DATABASE CONNECTION (ENHANCED)
 =============================================================================
 - Koneksi SQLite untuk single user
 - Connection pooling
 - Async support dengan aiosqlite
-- **AUTO MIGRATION untuk tabel PDKT**
+- **TAMBAHAN: Auto migration untuk kolom bot_name**
 =============================================================================
 """
 
@@ -79,20 +79,17 @@ class DatabaseConnection:
     
     # ===== TAMBAHAN MYLOVE V2 =====
     async def _run_migrations(self):
-        """Jalankan migrasi database untuk versi 2 dan PDKT"""
+        """Jalankan migrasi database untuk versi 2"""
         logger.info("🔄 Running database migrations...")
         
-        # Migrasi untuk tabel sessions
+        # Cek dan tambah kolom bot_name ke tabel sessions
         await self._add_column_if_not_exists('sessions', 'bot_name', 'TEXT DEFAULT "Aurora"')
         
-        # Migrasi untuk tabel relationships
+        # Cek dan tambah kolom bot_name ke tabel relationships
         await self._add_column_if_not_exists('relationships', 'bot_name', 'TEXT DEFAULT "Aurora"')
         
-        # ===== TABEL PDKT BARU =====
-        await self._create_pdkt_table()
-        
-        # ===== INDEXES untuk PDKT =====
-        await self._create_pdkt_indexes()
+        # Cek dan tambah kolom bot_name ke tabel threesome_participants (jika ada)
+        await self._add_column_if_not_exists('threesome_participants', 'bot_name', 'TEXT DEFAULT "Aurora"')
         
         logger.info("✅ Database migrations completed")
     
@@ -116,51 +113,6 @@ class DatabaseConnection:
                 
         except Exception as e:
             logger.warning(f"  ⚠️ Could not add column '{column}' to '{table}': {e}")
-    
-    async def _create_pdkt_table(self):
-        """Create PDKT table for super spesial PDKT"""
-        await self._connection.execute('''
-            CREATE TABLE IF NOT EXISTS pdkt (
-                id TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                bot_name TEXT NOT NULL,
-                role TEXT DEFAULT 'pdkt',
-                status TEXT DEFAULT 'active',
-                is_paused INTEGER DEFAULT 0,
-                paused_at REAL,
-                direction TEXT DEFAULT 'user_to_bot',
-                stage TEXT DEFAULT 'mengenal',
-                level INTEGER DEFAULT 1,
-                chemistry_score REAL DEFAULT 50.0,
-                chemistry_history TEXT,  -- JSON
-                created_at REAL NOT NULL,
-                last_interaction REAL NOT NULL,
-                total_minutes REAL DEFAULT 0.0,
-                paused_total REAL DEFAULT 0.0,
-                total_chats INTEGER DEFAULT 0,
-                total_intim INTEGER DEFAULT 0,
-                total_climax INTEGER DEFAULT 0,
-                milestones TEXT,  -- JSON
-                inner_thoughts TEXT,  -- JSON
-                ended_at REAL,
-                end_reason TEXT,
-                FOREIGN KEY (user_id) REFERENCES users (telegram_id)
-            )
-        ''')
-        logger.info("  ✅ Created pdkt table")
-    
-    async def _create_pdkt_indexes(self):
-        """Create indexes for PDKT table"""
-        await self._connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pdkt_user ON pdkt(user_id, status)"
-        )
-        await self._connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pdkt_last ON pdkt(last_interaction)"
-        )
-        await self._connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pdkt_level ON pdkt(level)"
-        )
-        logger.info("  ✅ Created pdkt indexes")
     # ===== END TAMBAHAN =====
     
     async def _create_tables(self):
@@ -185,9 +137,9 @@ class DatabaseConnection:
         # ===== SESSIONS TABLE =====
         await self._connection.execute('''
             CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,  -- MYLOVE-NAMA-ROLE-USER-DATE-SEQ
+                id TEXT PRIMARY KEY,  -- MYLOVE-NAMA_BOT-ROLE-USER-DATE-SEQ
                 user_id INTEGER NOT NULL,
-                bot_name TEXT DEFAULT 'Aurora',
+                bot_name TEXT DEFAULT 'Aurora',  -- Nama bot (tambah di V2)
                 role TEXT NOT NULL,
                 status TEXT DEFAULT 'active',  -- active, closed, expired
                 start_time REAL NOT NULL,
@@ -237,7 +189,7 @@ class DatabaseConnection:
             CREATE TABLE IF NOT EXISTS relationships (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                bot_name TEXT DEFAULT 'Aurora',
+                bot_name TEXT DEFAULT 'Aurora',  -- Nama bot (tambah di V2)
                 role TEXT NOT NULL,
                 instance_id TEXT,  -- Untuk multiple FWB
                 status TEXT DEFAULT 'hts',  -- hts, fwb, pacar, putus
@@ -260,7 +212,7 @@ class DatabaseConnection:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 threesome_session_id TEXT NOT NULL,
                 user_id INTEGER NOT NULL,
-                bot_name TEXT DEFAULT 'Aurora',
+                bot_name TEXT DEFAULT 'Aurora',  -- Nama bot (tambah di V2)
                 role TEXT NOT NULL,
                 instance_id TEXT,
                 participant_type TEXT NOT NULL,
@@ -358,7 +310,7 @@ class DatabaseConnection:
         
         await self._connection.commit()
         logger.info("✅ Database tables created/indexed")
-    
+        
     @asynccontextmanager
     async def get_connection(self):
         """Get database connection from pool"""
@@ -431,8 +383,7 @@ class DatabaseConnection:
         tables = [
             'users', 'sessions', 'conversations', 'memories',
             'relationships', 'preferences', 'milestones', 'backups',
-            'threesome_sessions', 'threesome_participants',
-            'pdkt'  # Tabel PDKT baru
+            'threesome_sessions', 'threesome_participants'
         ]
         
         for table in tables:
