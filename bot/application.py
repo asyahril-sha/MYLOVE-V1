@@ -2,211 +2,246 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - BOT APPLICATION
+PTB APPLICATION FACTORY
 =============================================================================
-- Setup Telegram bot application
-- Register all handlers
-- Error handling
 """
 
-import logging
 from telegram.ext import (
     Application,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
-    filters
+    filters,
+    ConversationHandler,
+    CallbackQueryHandler
 )
-from telegram.error import TelegramError, NetworkError, TimedOut
+from telegram.request import HTTPXRequest
 
 from config import settings
-from .commands import (
-    start_command, help_command, status_command, cancel_command,
-    jadipacar_command, break_command, unbreak_command, breakup_command, fwb_command,
-    htslist_command, fwblist_command,
-    close_command, continue_command, sessions_command,
-    explore_command, locations_command, risk_command,
-    tophts_command, myclimax_command, climaxhistory_command,
-    stats_command, db_stats_command, backup_command, recover_command,
-    debug_command
-)
-from .handlers import message_handler, callback_handler, hts_call_handler
-from ..utils.logger import setup_logging
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
+from database.models import Constants
+from bot.handlers import *
+from bot.callbacks import *
+from bot.commands import *
 
 
-class BotApplication:
-    """Telegram Bot Application Setup"""
+# ===== FALLBACK STATES (jika Constants belum punya) =====
+class BotStates:
+    """States for conversation handlers"""
+    SELECTING_ROLE = 1
+    SELECTING_BOT_NAME = 2
+    SELECTING_BOT_ROLE = 3
+    SELECTING_DOMINANCE = 4
+    SELECTING_PERSONALITY = 5
+    SELECTING_APPEARANCE = 6
+    CONFIRMATION = 7
+    CHATTING = 8
+    SELECTING_ACTION = 9
+    SELECTING_LOCATION = 10
+    SELECTING_CLOTHING = 11
+    SELECTING_ACTIVITY = 12
+    AWAITING_RESPONSE = 13
+    CONFIRM_END = 14
+    CONFIRM_CLOSE = 15
+    CONFIRM_BROADCAST = 16
+
+
+def create_application() -> Application:
+    """
+    Create and configure telegram application
+    """
     
-    def __init__(self):
-        self.app = None
-        self.initialized = False
-        
-    async def initialize(self):
-        """Initialize bot application"""
-        try:
-            # Create application
-            self.app = Application.builder()\
-                .token(settings.telegram_token)\
-                .concurrent_updates(True)\
-                .build()
-                
-            # Register all handlers
-            await self._register_handlers()
-            
-            # Set error handler
-            self.app.add_error_handler(self.error_handler)
-            
-            self.initialized = True
-            logger.info("✅ BotApplication initialized")
-            
-            return self.app
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize BotApplication: {e}")
-            raise
-            
-    async def _register_handlers(self):
-        """Register all command and message handlers"""
-        
-        # ===== BASIC COMMANDS =====
-        basic_commands = [
-            ("start", start_command),
-            ("help", help_command),
-            ("status", status_command),
-            ("cancel", cancel_command),
-        ]
-        
-        for cmd, handler in basic_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # ===== RELATIONSHIP COMMANDS =====
-        relationship_commands = [
-            ("jadipacar", jadipacar_command),
-            ("break", break_command),
-            ("unbreak", unbreak_command),
-            ("breakup", breakup_command),
-            ("fwb", fwb_command),
-        ]
-        
-        for cmd, handler in relationship_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # ===== HTS/FWB COMMANDS =====
-        hts_commands = [
-            ("htslist", htslist_command),
-            ("fwblist", fwblist_command),
-        ]
-        
-        for cmd, handler in hts_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # Special handler for /hts- [id]
-        self.app.add_handler(MessageHandler(
-            filters.Regex(r'^/hts-'), 
-            hts_call_handler
-        ))
-        
-        # ===== SESSION COMMANDS =====
-        session_commands = [
-            ("close", close_command),
-            ("sessions", sessions_command),
-        ]
-        
-        for cmd, handler in session_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # Special handler for /continue
-        self.app.add_handler(MessageHandler(
-            filters.Regex(r'^/continue\s+'), 
-            continue_command
-        ))
-        
-        # ===== PUBLIC AREA COMMANDS =====
-        public_commands = [
-            ("explore", explore_command),
-            ("locations", locations_command),
-            ("risk", risk_command),
-        ]
-        
-        for cmd, handler in public_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # ===== RANKING COMMANDS =====
-        ranking_commands = [
-            ("tophts", tophts_command),
-            ("myclimax", myclimax_command),
-            ("climaxhistory", climaxhistory_command),
-        ]
-        
-        for cmd, handler in ranking_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # ===== ADMIN COMMANDS =====
-        admin_commands = [
-            ("stats", stats_command),
-            ("db_stats", db_stats_command),
-            ("backup", backup_command),
-            ("recover", recover_command),
-            ("debug", debug_command),
-        ]
-        
-        for cmd, handler in admin_commands:
-            self.app.add_handler(CommandHandler(cmd, handler))
-            logger.debug(f"Registered command: /{cmd}")
-            
-        # ===== MESSAGE HANDLER =====
-        self.app.add_handler(MessageHandler(
-            filters.TEXT & ~filters.COMMAND, 
-            message_handler
-        ))
-        
-        # ===== CALLBACK HANDLER =====
-        self.app.add_handler(CallbackQueryHandler(callback_handler))
-        
-        logger.info(f"✅ Registered {len(basic_commands) + len(relationship_commands) + len(hts_commands) + len(session_commands) + len(public_commands) + len(ranking_commands) + len(admin_commands)} commands")
-        
-    async def error_handler(self, update, context):
-        """Global error handler"""
-        logger.error(f"Update {update} caused error {context.error}")
-        
-        try:
-            if update and update.effective_message:
-                await update.effective_message.reply_text(
-                    "❌ Maaf, terjadi kesalahan. Tim MYLOVE sudah mencatat error ini."
-                )
-        except:
-            pass
-            
-    async def start_polling(self):
-        """Start bot in polling mode"""
-        if not self.initialized:
-            await self.initialize()
-            
-        await self.app.initialize()
-        await self.app.start()
-        
-        logger.info("📡 Starting polling...")
-        await self.app.updater.start_polling(
-            allowed_updates=['message', 'callback_query'],
-            drop_pending_updates=True,
-            poll_interval=1.0,
-            timeout=30
-        )
-        
-    async def stop(self):
-        """Stop bot"""
-        if self.app:
-            await self.app.stop()
-            await self.app.shutdown()
-            logger.info("Bot stopped")
-
-
-__all__ = ['BotApplication']
+    logger.info("🔧 Creating PTB application...")
+    
+    # Custom request dengan timeout besar
+    request = HTTPXRequest(
+        connection_pool_size=50,
+        connect_timeout=60,
+        read_timeout=60,
+        write_timeout=60,
+        pool_timeout=60,
+    )
+    
+    # Build application
+    app = ApplicationBuilder() \
+        .token(settings.telegram_token) \
+        .request(request) \
+        .concurrent_updates(True) \
+        .build()
+    
+    # ===== AMBIL STATE DARI CONSTANTS ATAU FALLBACK =====
+    SELECTING_ROLE = getattr(Constants, 'SELECTING_ROLE', BotStates.SELECTING_ROLE)
+    SELECTING_BOT_NAME = getattr(Constants, 'SELECTING_BOT_NAME', BotStates.SELECTING_BOT_NAME)
+    SELECTING_BOT_ROLE = getattr(Constants, 'SELECTING_BOT_ROLE', BotStates.SELECTING_BOT_ROLE)
+    SELECTING_DOMINANCE = getattr(Constants, 'SELECTING_DOMINANCE', BotStates.SELECTING_DOMINANCE)
+    SELECTING_PERSONALITY = getattr(Constants, 'SELECTING_PERSONALITY', BotStates.SELECTING_PERSONALITY)
+    SELECTING_APPEARANCE = getattr(Constants, 'SELECTING_APPEARANCE', BotStates.SELECTING_APPEARANCE)
+    CONFIRMATION = getattr(Constants, 'CONFIRMATION', BotStates.CONFIRMATION)
+    CHATTING = getattr(Constants, 'CHATTING', BotStates.CHATTING)
+    SELECTING_ACTION = getattr(Constants, 'SELECTING_ACTION', BotStates.SELECTING_ACTION)
+    SELECTING_LOCATION = getattr(Constants, 'SELECTING_LOCATION', BotStates.SELECTING_LOCATION)
+    SELECTING_CLOTHING = getattr(Constants, 'SELECTING_CLOTHING', BotStates.SELECTING_CLOTHING)
+    SELECTING_ACTIVITY = getattr(Constants, 'SELECTING_ACTIVITY', BotStates.SELECTING_ACTIVITY)
+    AWAITING_RESPONSE = getattr(Constants, 'AWAITING_RESPONSE', BotStates.AWAITING_RESPONSE)
+    CONFIRM_END = getattr(Constants, 'CONFIRM_END', BotStates.CONFIRM_END)
+    CONFIRM_CLOSE = getattr(Constants, 'CONFIRM_CLOSE', BotStates.CONFIRM_CLOSE)
+    CONFIRM_BROADCAST = getattr(Constants, 'CONFIRM_BROADCAST', BotStates.CONFIRM_BROADCAST)
+    
+    # ===== CONVERSATION HANDLERS =====
+    logger.info("  • Setting up conversation handlers...")
+    
+    # Start conversation
+    start_conv = ConversationHandler(
+        entry_points=[CommandHandler('start', start_command)],
+        states={
+            SELECTING_ROLE: [
+                CallbackQueryHandler(agree_18_callback, pattern='^agree_18$'),
+                CallbackQueryHandler(start_pause_callback, pattern='^(unpause|new)$'),
+                CallbackQueryHandler(role_ipar_callback, pattern='^role_ipar$'),
+                CallbackQueryHandler(role_teman_kantor_callback, pattern='^role_teman_kantor$'),
+                CallbackQueryHandler(role_janda_callback, pattern='^role_janda$'),
+                CallbackQueryHandler(role_pelakor_callback, pattern='^role_pelakor$'),
+                CallbackQueryHandler(role_istri_orang_callback, pattern='^role_istri_orang$'),
+                CallbackQueryHandler(role_pdkt_callback, pattern='^role_pdkt$'),
+                CallbackQueryHandler(role_sepupu_callback, pattern='^role_sepupu$'),
+                CallbackQueryHandler(role_teman_sma_callback, pattern='^role_teman_sma$'),
+                CallbackQueryHandler(role_mantan_callback, pattern='^role_mantan$'),
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel_command)],
+        name="start_conversation",
+        persistent=False,
+        per_user=True,
+        per_chat=True,
+        per_message=False
+    )
+    
+    # End conversation
+    end_conv = ConversationHandler(
+        entry_points=[CommandHandler('end', end_command)],
+        states={
+            CONFIRM_END: [CallbackQueryHandler(end_callback, pattern='^end_')],
+        },
+        fallbacks=[CommandHandler('cancel', cancel_command)],
+        name="end_conversation",
+        persistent=False,
+        per_user=True,
+        per_chat=True,
+        per_message=False
+    )
+    
+    # Close conversation
+    close_conv = ConversationHandler(
+        entry_points=[CommandHandler('close', close_command)],
+        states={
+            CONFIRM_CLOSE: [CallbackQueryHandler(close_callback, pattern='^close_')],
+        },
+        fallbacks=[CommandHandler('cancel', cancel_command)],
+        name="close_conversation",
+        persistent=False,
+        per_user=True,
+        per_chat=True,
+        per_message=False
+    )
+    
+    # Relationship conversations
+    rel_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler('jadipacar', jadipacar_command),
+            CommandHandler('break', break_command),
+            CommandHandler('breakup', breakup_command),
+            CommandHandler('fwb', fwb_command)
+        ],
+        states={
+            CONFIRM_BROADCAST: [
+                CallbackQueryHandler(jadipacar_callback, pattern='^jadipacar_'),
+                CallbackQueryHandler(break_callback, pattern='^break_'),
+                CallbackQueryHandler(breakup_callback, pattern='^breakup_'),
+                CallbackQueryHandler(fwb_callback, pattern='^fwb_'),
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel_command)],
+        name="relationship_conversation",
+        persistent=False,
+        per_user=True,
+        per_chat=True,
+        per_message=False
+    )
+    
+    # ===== ADD ALL HANDLERS =====
+    logger.info("  • Registering command handlers...")
+    
+    # Conversation handlers
+    app.add_handler(start_conv)
+    app.add_handler(end_conv)
+    app.add_handler(close_conv)
+    app.add_handler(rel_conv)
+    
+    # Basic commands
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("cancel", cancel_command))
+    
+    # Dominance commands
+    app.add_handler(CommandHandler("dominant", dominant_command))
+    
+    # Session commands
+    app.add_handler(CommandHandler("pause", pause_command))
+    app.add_handler(CommandHandler("unpause", unpause_command))
+    app.add_handler(CommandHandler("close", close_command))
+    app.add_handler(CommandHandler("end", end_command))
+    
+    # Relationship commands
+    app.add_handler(CommandHandler("jadipacar", jadipacar_command))
+    app.add_handler(CommandHandler("break", break_command))
+    app.add_handler(CommandHandler("unbreak", unbreak_command))
+    app.add_handler(CommandHandler("breakup", breakup_command))
+    app.add_handler(CommandHandler("fwb", fwb_command))
+    
+    # HTS/FWB commands
+    app.add_handler(CommandHandler("htslist", htslist_command))
+    app.add_handler(CommandHandler("fwblist", fwblist_command))
+    
+    # HTS/FWB call commands (pattern matching)
+    app.add_handler(MessageHandler(filters.Regex(r'^/hts-'), hts_call_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/fwb-'), fwb_call_command))
+    
+    # Ranking commands
+    app.add_handler(CommandHandler("tophts", tophts_command))
+    app.add_handler(CommandHandler("myclimax", myclimax_command))
+    app.add_handler(CommandHandler("climaxrank", climaxrank_command))
+    app.add_handler(CommandHandler("climaxhistory", climaxhistory_command))
+    
+    # Public area commands (V81)
+    app.add_handler(CommandHandler("explore", explore_command))
+    app.add_handler(CommandHandler("go", go_command))
+    app.add_handler(CommandHandler("positions", positions_command))
+    app.add_handler(CommandHandler("risk", risk_command))
+    app.add_handler(CommandHandler("mood", mood_command))
+    
+    # Admin commands
+    app.add_handler(CommandHandler("admin", admin_command))
+    app.add_handler(CommandHandler("stats", stats_command))
+    app.add_handler(CommandHandler("db_stats", db_stats_command))
+    app.add_handler(CommandHandler("list_users", list_users_command))
+    app.add_handler(CommandHandler("get_user", get_user_command))
+    app.add_handler(CommandHandler("force_reset", force_reset_command))
+    app.add_handler(CommandHandler("backup_db", backup_db_command))
+    app.add_handler(CommandHandler("vacuum", vacuum_command))
+    app.add_handler(CommandHandler("memory_stats", memory_stats_command))
+    app.add_handler(CommandHandler("reload", reload_command))
+    
+    # Hidden commands
+    app.add_handler(CommandHandler("reset", force_reset_command))
+    
+    # Message handler (must be last)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    
+    # ===== ERROR HANDLER =====
+    app.add_error_handler(error_handler)
+    
+    # Log jumlah handlers
+    handler_count = sum(len(h) for h in app.handlers.values())
+    logger.info(f"✅ All handlers registered: {handler_count} handlers")
+    
+    return app
