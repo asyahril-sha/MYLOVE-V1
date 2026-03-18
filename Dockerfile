@@ -26,5 +26,5 @@ COPY . .
 RUN useradd -m -u 1000 mylove && chown -R mylove:mylove /app
 USER mylove
 
-# Run the application
-CMD ["uvicorn", "main:bot_instance.fastapi_app", "--host", "0.0.0.0", "--port", "${PORT:-8080}"]
+# Run the application (FLASK)
+CMD ["python", "main.py"]
