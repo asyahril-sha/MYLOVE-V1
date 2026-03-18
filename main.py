@@ -80,7 +80,7 @@ def run_health_server():
     
     try:
         port = int(os.getenv('PORT', 8080))
-        logger.info(f"🚀 Starting healthcheck server on port {port}")
+        logger.info(f"🚀 Healthcheck server starting on port {port}")
         
         # Set flag bahwa server akan start
         health_server_started = True
@@ -198,13 +198,13 @@ async def init_components():
         logger.error(f"❌ Database initialization failed: {e}")
         raise
 
-    # Redis (mock)
+    # Redis (mock) - Opsional
     try:
         from cache.redis_client import init_redis
         await init_redis()
         logger.info("✅ Redis initialized")
     except ImportError:
-        logger.warning("⚠️ Redis module not found, skipping...")
+        logger.info("ℹ️ Redis module not found - using mock mode")
     except Exception as e:
         logger.error(f"❌ Redis initialization failed: {e}")
 
@@ -220,15 +220,15 @@ async def init_components():
         logger.error(f"❌ Bot application creation failed: {e}")
         raise
 
-    # Webhook setup
+    # Webhook setup - Opsional, fallback ke polling
     try:
         from bot.webhook import setup_webhook_sync
         mode = setup_webhook_sync(app)
-        logger.info(f"✅ Webhook URL: {mode}")
+        logger.info(f"✅ Webhook setup: {mode}")
     except ImportError:
-        logger.warning("⚠️ Webhook module not found, continuing with polling")
+        logger.info("ℹ️ Webhook module not found - using polling mode")
     except Exception as e:
-        logger.error(f"❌ Webhook setup failed: {e}")
+        logger.error(f"❌ Webhook setup failed (using polling): {e}")
 
     logger.info("🚀 GADIS V81 is ready!")
     return app
@@ -253,15 +253,15 @@ def main():
     if HEALTH_SERVER_AVAILABLE:
         # Start health server di thread terpisah
         health_thread = threading.Thread(target=run_health_server)
-        health_thread.daemon = False  # Jangan daemon!
+        health_thread.daemon = True  # Daemon thread akan mati saat main thread mati
         health_thread.start()
         
         port = os.getenv('PORT', '8080')
         logger.info(f"✅ Healthcheck server thread started on port {port}")
         
-        # Beri waktu Flask untuk start (3 detik)
-        logger.info("⏳ Waiting 3 seconds for healthcheck server to initialize...")
-        time.sleep(3)
+        # Beri waktu Flask untuk start (2 detik)
+        logger.info("⏳ Waiting 2 seconds for healthcheck server to initialize...")
+        time.sleep(2)
         logger.info("✅ Healthcheck server should be ready")
     else:
         logger.warning("⚠️ Healthcheck server disabled - Railway may fail deployment")
@@ -287,13 +287,6 @@ def main():
         sys.exit(1)
     finally:
         logger.info("👋 Goodbye!")
-        
-        # Force exit after 5 seconds if still running
-        def force_exit():
-            logger.warning("Force exiting after timeout")
-            os._exit(1)
-        
-        threading.Timer(5.0, force_exit).start()
 
 
 if __name__ == "__main__":
