@@ -16,8 +16,12 @@ WORKDIR /app
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+
+# ===== FORCE INSTALL AIOHTTP =====
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir aiohttp==3.9.5
+RUN pip install --no-cache-dir -r requirements.txt
+# ================================
 
 # Copy application
 COPY . .
@@ -26,5 +30,5 @@ COPY . .
 RUN useradd -m -u 1000 mylove && chown -R mylove:mylove /app
 USER mylove
 
-# Run the application (FLASK)
+# Run the application
 CMD ["python", "main.py"]
