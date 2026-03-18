@@ -6,6 +6,7 @@ MYLOVE ULTIMATE VERSI 1 - CUSTOM EXCEPTIONS
 =============================================================================
 - Exception hierarchy untuk error handling
 - Kategori error spesifik untuk debugging
+- Backward compatibility dengan GadisBaseException
 """
 
 from typing import Optional, Any
@@ -24,6 +25,12 @@ class MyLoveError(Exception):
         if self.code:
             return f"[{self.code}] {self.message}"
         return self.message
+
+
+# =============================================================================
+# BACKWARD COMPATIBILITY - Untuk kode lama yang masih import GadisBaseException
+# =============================================================================
+GadisBaseException = MyLoveError  # Alias untuk backward compatibility
 
 
 # =============================================================================
@@ -364,34 +371,78 @@ class InvalidCommandError(ValidationError):
         )
 
 
+# =============================================================================
+# GLOBAL EXCEPTION HANDLER (untuk Python)
+# =============================================================================
+import sys
+import traceback
+from loguru import logger
+
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    """Handle uncaught exceptions"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    logger.opt(exception=(exc_type, exc_value, exc_traceback)).critical("🔥 Uncaught exception")
+
+
+sys.excepthook = global_exception_handler
+
+
+# =============================================================================
+# EXPORT
+# =============================================================================
 __all__ = [
+    # Base
     'MyLoveError',
+    'GadisBaseException',  # Alias untuk backward compatibility
+    
+    # Configuration
     'ConfigurationError',
     'MissingAPIKeyError',
     'InvalidTokenError',
+    
+    # Database
     'DatabaseError',
     'ConnectionError',
     'QueryError',
     'IntegrityError',
+    
+    # AI
     'AINotAvailableError',
     'AIRateLimitError',
     'AITimeoutError',
+    
+    # Session
     'SessionNotFoundError',
     'SessionExpiredError',
     'SessionNotActiveError',
+    
+    # Role
     'RoleNotFoundError',
     'RoleNotEligibleError',
+    
+    # Intimacy
     'IntimacyLevelError',
     'IntimacyTooLowError',
     'IntimacyTooHighError',
+    
+    # Relationship
     'RelationshipNotFoundError',
     'RelationshipExistsError',
+    
+    # Webhook
     'WebhookError',
     'WebhookSetupError',
     'WebhookTimeoutError',
+    
+    # Backup
     'BackupError',
     'BackupNotFoundError',
     'BackupCorruptedError',
+    
+    # Validation
     'ValidationError',
     'InvalidCommandError',
 ]
