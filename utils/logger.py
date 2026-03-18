@@ -15,11 +15,7 @@ from loguru import logger as loguru_logger
 try:
     from config import settings
 except ImportError:
-    class DummySettings:
-        log_dir = Path("logs")
-    settings = DummySettings()
-    settings.log_dir.mkdir(exist_ok=True)
-
+    settings = None
 
 # Setup logger instance yang akan diekspor
 logger = loguru_logger
@@ -34,8 +30,15 @@ def setup_logging(module_name: str = "gadis_v81"):
     - Error tracking
     """
     
+    # Tentukan direktori log dengan fallback
+    if settings and hasattr(settings, 'log_dir'):
+        log_dir = Path(settings.log_dir)
+    else:
+        # Fallback ke direktori logs lokal
+        log_dir = Path("logs")
+    
     # Pastikan direktori log ada
-    settings.log_dir.mkdir(exist_ok=True)
+    log_dir.mkdir(exist_ok=True, parents=True)
     
     # Remove default handler
     logger.remove()
@@ -52,7 +55,7 @@ def setup_logging(module_name: str = "gadis_v81"):
     )
     
     # File handler dengan rotation (semua level)
-    log_file = settings.log_dir / f"{module_name}.log"
+    log_file = log_dir / f"{module_name}.log"
     logger.add(
         log_file,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
@@ -66,7 +69,7 @@ def setup_logging(module_name: str = "gadis_v81"):
     )
     
     # Error file handler (khusus error)
-    error_file = settings.log_dir / f"{module_name}_error.log"
+    error_file = log_dir / f"{module_name}_error.log"
     logger.add(
         error_file,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
@@ -80,7 +83,7 @@ def setup_logging(module_name: str = "gadis_v81"):
     )
     
     # JSON handler untuk monitoring
-    json_log = settings.log_dir / f"{module_name}_json.log"
+    json_log = log_dir / f"{module_name}_json.log"
     logger.add(
         json_log,
         format="{time} | {level} | {name} | {message}",
