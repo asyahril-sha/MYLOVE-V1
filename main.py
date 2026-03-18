@@ -2,19 +2,23 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE-V1 - MAIN ENTRY POINT (SINGLE FLASK SERVER)
+MYLOVE-V1 - MAIN ENTRY POINT (AIOHTTP VERSION)
 =============================================================================
-Satu Flask server untuk healthcheck DAN webhook
+Menggunakan aiohttp untuk webhook server - STABIL untuk Railway
 """
 
-import asyncio
-import sys
-import traceback
-import threading
-import time
 import os
+import sys
+import asyncio
+import logging
 import signal
+from datetime import datetime
 from pathlib import Path
+
+from aiohttp import web
+from telegram import Update
+from telegram.ext import Application, ContextTypes
+from telegram.request import HTTPXRequest
 
 # Tambahkan path ke root project
 sys.path.insert(0, str(Path(__file__).parent))
@@ -25,352 +29,332 @@ from utils.logger import setup_logging
 # Setup logging
 logger = setup_logging("MYLOVE-V1")
 
-# =============================================================================
-# GLOBAL VARIABLES
-# =============================================================================
-_bot_app = None  # Untuk menyimpan bot application
 
-# =============================================================================
-# FLASK SERVER (untuk healthcheck DAN webhook)
-# =============================================================================
-HEALTH_SERVER_AVAILABLE = False
-health_server_started = False
+class MYLOVEBot:
+    """Main bot class dengan aiohttp server"""
+    
+    def __init__(self):
+        self.start_time = datetime.now()
+        self.application = None
+        self.is_ready = False
+        self._shutdown_flag = False
+        
+        logger.info("📦 MYLOVE-V1 Initializing...")
+        
+    async def init_components(self):
+        """Initialize all components asynchronously"""
+        logger.info("🚀 Starting MYLOVE-v1...")
 
-try:
-    from flask import Flask, jsonify, request
-    from telegram import Update
+        # Database
+        try:
+            from database.connection import init_db
+            await init_db()
+            logger.info("✅ Database initialized")
+        except ImportError as e:
+            logger.error(f"❌ Database module error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Database initialization failed: {e}")
+            raise
 
-    app_flask = Flask(__name__)
+        # Redis (mock) - Opsional
+        try:
+            from cache.redis_client import init_redis
+            await init_redis()
+            logger.info("✅ Redis initialized")
+        except ImportError:
+            logger.info("ℹ️ Redis module not found - using mock mode")
+        except Exception as e:
+            logger.error(f"❌ Redis initialization failed: {e}")
 
-    @app_flask.route('/health')
-    def health():
+        # Bot application
+        try:
+            from bot.application import create_application
+            self.application = create_application()
+            
+            # Initialize bot
+            await self.application.initialize()
+            logger.info("✅ Bot application created and initialized")
+        except ImportError as e:
+            logger.error(f"❌ Bot application module error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Bot application creation failed: {e}")
+            raise
+
+        # Register error handler
+        self.application.add_error_handler(self.error_handler)
+        
+        logger.info("🚀 MYLOVE-v1 is ready!")
+        return self.application
+
+    async def error_handler(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Global error handler"""
+        logger.error(f"❌ Error: {context.error}", exc_info=True)
+        try:
+            if update and update.effective_message:
+                await update.effective_message.reply_text(
+                    "❌ Terjadi error internal. Silakan coba lagi."
+                )
+        except:
+            pass
+
+    async def setup_webhook(self):
+        """Setup webhook untuk Telegram"""
+        try:
+            # Dapatkan webhook URL
+            railway_url = os.getenv('RAILWAY_PUBLIC_DOMAIN') or os.getenv('RAILWAY_STATIC_URL')
+            if not railway_url:
+                logger.error("❌ RAILWAY_PUBLIC_DOMAIN not set")
+                return False
+            
+            webhook_url = f"https://{railway_url}/webhook"
+            logger.info(f"🔗 Setting webhook to: {webhook_url}")
+
+            # Delete old webhook first
+            await self.application.bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Old webhook deleted")
+
+            # Set new webhook
+            result = await self.application.bot.set_webhook(
+                url=webhook_url,
+                allowed_updates=['message', 'callback_query'],
+                drop_pending_updates=True,
+                max_connections=40
+            )
+            logger.info(f"✅ Webhook set result: {result}")
+
+            # Verify
+            webhook_info = await self.application.bot.get_webhook_info()
+            if webhook_info.url == webhook_url:
+                logger.info(f"✅ Webhook verified: {webhook_info.url}")
+                logger.info(f"   Pending updates: {webhook_info.pending_update_count}")
+                return True
+            else:
+                logger.error(f"Webhook verification failed: {webhook_info.url}")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Webhook setup failed: {e}")
+            return False
+
+    async def webhook_handler(self, request):
+        """AIOHTTP webhook handler"""
+        if not self.application:
+            logger.error("Bot not ready")
+            return web.Response(status=503, text='Bot not ready')
+
+        try:
+            # Parse update dari Telegram
+            update_data = await request.json()
+            if not update_data:
+                return web.Response(status=400, text='No data')
+
+            # Convert ke Update object
+            update = Update.de_json(update_data, self.application.bot)
+            
+            # Process update di background
+            asyncio.create_task(self.application.process_update(update))
+            
+            logger.debug(f"✅ Processed update: {update.update_id}")
+            return web.Response(text='OK')
+
+        except Exception as e:
+            logger.error(f"❌ Webhook error: {e}")
+            return web.Response(status=500, text=str(e))
+
+    async def health_handler(self, request):
         """Health check endpoint untuk Railway"""
-        return jsonify({
+        return web.json_response({
             "status": "healthy",
-            "timestamp": time.time(),
+            "timestamp": datetime.now().isoformat(),
             "bot": "running",
-            "server_started": health_server_started,
-            "bot_ready": _bot_app is not None
-        }), 200
+            "bot_ready": self.application is not None,
+            "uptime": str(datetime.now() - self.start_time)
+        })
 
-    @app_flask.route('/')
-    def root():
+    async def root_handler(self, request):
         """Root endpoint - info bot"""
-        return jsonify({
+        return web.json_response({
             "name": "MYLOV-V1",
             "version": "1.0.0",
             "status": "running",
-            "admin_id": str(settings.admin_id)
-        }), 200
+            "admin_id": str(settings.admin_id),
+            "uptime": str(datetime.now() - self.start_time)
+        })
 
-    @app_flask.route('/debug')
-    def debug():
+    async def debug_handler(self, request):
         """Debug endpoint"""
-        return jsonify({
+        import sys
+        return web.json_response({
             "python_version": sys.version,
             "cwd": os.getcwd(),
             "port": os.getenv('PORT', '8080'),
-            "health_server_started": health_server_started,
-            "bot_ready": _bot_app is not None
-        }), 200
+            "bot_ready": self.application is not None,
+            "uptime": str(datetime.now() - self.start_time)
+        })
 
-    # ===== WEBHOOK ENDPOINT =====
-    @app_flask.route('/webhook', methods=['POST'])
-    def webhook():
-        """Webhook endpoint untuk Telegram"""
-        global _bot_app
-        
-        if not _bot_app:
-            logger.error("Bot not ready")
-            return jsonify({"error": "Bot not ready"}), 503
-        
+    async def start(self):
+        """Start bot and aiohttp server"""
         try:
-            # Parse update dari Telegram
-            data = request.get_json()
-            if not data:
-                return jsonify({"error": "No data"}), 400
+            # Print banner
+            self.print_banner()
             
-            update = Update.de_json(data, _bot_app.bot)
+            # Initialize components
+            await self.init_components()
 
-            async def process_update():
-                # Pastikan bot sudah di-initialize
-                if not hasattr(_bot_app, '_initialized') or not _bot_app._initialized:
-                    await _bot_app.initialize()
-                    _bot_app._initialized = True
-                
-                await _bot_app.process_update(update)
-                
-            # Process update di background
-            asyncio.run(_bot_app.process_update(update))
+            # Setup webhook
+            webhook_success = await self.setup_webhook()
             
-            logger.debug(f"Processed update: {update.update_id}")
-            return "OK", 200
+            if webhook_success:
+                logger.info("✅ Webhook mode activated!")
+            else:
+                logger.warning("⚠️ Webhook failed - check your configuration")
+
+            # Start aiohttp server
+            port = int(os.getenv('PORT', 8080))
             
+            app = web.Application()
+            app.router.add_post('/webhook', self.webhook_handler)
+            app.router.add_get('/health', self.health_handler)
+            app.router.add_get('/', self.root_handler)
+            app.router.add_get('/debug', self.debug_handler)
+
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, '0.0.0.0', port)
+            await site.start()
+
+            logger.info(f"✅ AIOHTTP server running on port {port}")
+            logger.info(f"   • Healthcheck: /health")
+            logger.info(f"   • Webhook: /webhook")
+            logger.info("✅ Bot is running. Press Ctrl+C to stop.")
+            
+            self.is_ready = True
+
+            # Keep running
+            while not self._shutdown_flag:
+                await asyncio.sleep(1)
+
+        except asyncio.CancelledError:
+            logger.info("👋 Bot stopped by user")
         except Exception as e:
-            logger.error(f"Webhook error: {e}")
-            return jsonify({"error": str(e)}), 500
+            logger.error(f"❌ Fatal error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+        finally:
+            await self.shutdown()
 
-    HEALTH_SERVER_AVAILABLE = True
-    logger.info("✅ Flask server ready (healthcheck + webhook)")
-
-except ImportError as e:
-    logger.warning(f"⚠️ Flask not installed: {e}")
-    HEALTH_SERVER_AVAILABLE = False
-
-
-def run_flask_server():
-    """Run Flask server - standalone thread"""
-    global health_server_started
-    
-    try:
-        port = int(os.getenv('PORT', 8080))
-        logger.info(f"🚀 Flask server starting on port {port}")
+    async def shutdown(self):
+        """Graceful shutdown"""
+        logger.info("🛑 Shutting down...")
+        self._shutdown_flag = True
         
-        # Set flag bahwa server akan start
-        health_server_started = True
+        if self.application:
+            try:
+                await self.application.stop()
+                await self.application.shutdown()
+                logger.info("✅ Application stopped")
+            except Exception as e:
+                logger.error(f"Error stopping application: {e}")
+
+    def print_banner(self):
+        """Print startup banner"""
+        print("="*70)
+        print("    MYLOVE-v1 - ULTIMATE AI BOT")
+        print("    Premium Edition - All Features")
+        print("="*70)
         
-        # Jalankan Flask (blocking)
-        app_flask.run(
-            host='0.0.0.0',
-            port=port,
-            debug=False,
-            use_reloader=False,
-            threaded=True
-        )
-    except Exception as e:
-        logger.error(f"❌ Flask server failed: {e}")
-        health_server_started = False
+        # Database info
+        try:
+            if hasattr(settings, 'db'):
+                db_info = f"{settings.db.name} @ {settings.db.host}"
+            else:
+                db_info = "SQLite (gadis_v81.db)"
+        except AttributeError:
+            db_info = "SQLite (gadis_v81.db)"
+        print(f"📊 Database: {db_info}")
+        
+        # AI Model
+        try:
+            if hasattr(settings, 'ai'):
+                ai_model = getattr(settings.ai, 'primary_model', 'deepseek')
+            else:
+                ai_model = "deepseek"
+        except AttributeError:
+            ai_model = "deepseek"
+        print(f"🤖 AI Model: {ai_model}")
+        
+        # Admin ID
+        print(f"👑 Admin ID: {settings.admin_id}")
+        
+        # Sexual features
+        try:
+            if hasattr(settings, 'sexual'):
+                sexual_enabled = "ENABLED" if getattr(settings.sexual, 'enabled', True) else "DISABLED"
+            else:
+                sexual_enabled = "ENABLED"
+        except AttributeError:
+            sexual_enabled = "ENABLED"
+        print(f"🔞 Sexual Features: {sexual_enabled}")
+        
+        # Public areas
+        try:
+            if hasattr(settings, 'sexual'):
+                max_positions = getattr(settings.sexual, 'max_positions', 50)
+            else:
+                max_positions = 50
+        except AttributeError:
+            max_positions = 50
+        print(f"🌍 Public Areas: {max_positions} positions")
+        
+        # Bot initiative
+        try:
+            if hasattr(settings, 'sexual'):
+                bot_initiative = "ON" if getattr(settings.sexual, 'bot_initiative_enabled', True) else "OFF"
+            else:
+                bot_initiative = "ON"
+        except AttributeError:
+            bot_initiative = "ON"
+        print(f"🎯 Bot Initiative: {bot_initiative}")
+        
+        print("="*70)
 
 
 # =============================================================================
 # SIGNAL HANDLERS
 # =============================================================================
-def signal_handler(sig, frame):
+def signal_handler():
     """Handle shutdown signals"""
-    logger.info(f"Received signal {sig}, shutting down...")
-    sys.exit(0)
+    logger.info("Received signal, shutting down...")
+    for task in asyncio.all_tasks():
+        task.cancel()
 
 
 # =============================================================================
-# BANNER
+# MAIN
 # =============================================================================
-def print_banner():
-    """Print startup banner"""
-    print("="*70)
-    print("    MYLOVE-v1 - ULTIMATE AI BOT")
-    print("    Premium Edition - All Features")
-    print("="*70)
-    
-    # Database info
-    try:
-        if hasattr(settings, 'db'):
-            db_info = f"{settings.db.name} @ {settings.db.host}"
-        else:
-            db_info = "SQLite (gadis_v81.db)"
-    except AttributeError:
-        db_info = "SQLite (gadis_v81.db)"
-    print(f"📊 Database: {db_info}")
-    
-    # AI Model
-    try:
-        if hasattr(settings, 'ai'):
-            ai_model = getattr(settings.ai, 'primary_model', 'deepseek')
-        else:
-            ai_model = "deepseek"
-    except AttributeError:
-        ai_model = "deepseek"
-    print(f"🤖 AI Model: {ai_model}")
-    
-    # Admin ID
-    print(f"👑 Admin ID: {settings.admin_id}")
-    
-    # Sexual features
-    try:
-        if hasattr(settings, 'sexual'):
-            sexual_enabled = "ENABLED" if getattr(settings.sexual, 'enabled', True) else "DISABLED"
-        else:
-            sexual_enabled = "ENABLED"
-    except AttributeError:
-        sexual_enabled = "ENABLED"
-    print(f"🔞 Sexual Features: {sexual_enabled}")
-    
-    # Public areas
-    try:
-        if hasattr(settings, 'sexual'):
-            max_positions = getattr(settings.sexual, 'max_positions', 50)
-        else:
-            max_positions = 50
-    except AttributeError:
-        max_positions = 50
-    print(f"🌍 Public Areas: {max_positions} positions")
-    
-    # Bot initiative
-    try:
-        if hasattr(settings, 'sexual'):
-            bot_initiative = "ON" if getattr(settings.sexual, 'bot_initiative_enabled', True) else "OFF"
-        else:
-            bot_initiative = "ON"
-    except AttributeError:
-        bot_initiative = "ON"
-    print(f"🎯 Bot Initiative: {bot_initiative}")
-    
-    # Server status
-    if HEALTH_SERVER_AVAILABLE:
-        print(f"✅ Flask server: ENABLED on port {os.getenv('PORT', '8080')}")
-        print(f"   • Healthcheck: /health")
-        print(f"   • Webhook: /webhook")
-    else:
-        print(f"⚠️ Flask server: DISABLED (Flask not installed)")
-    
-    print("="*70)
-
-
-# =============================================================================
-# COMPONENT INITIALIZATION
-# =============================================================================
-async def init_components():
-    """Initialize all components asynchronously"""
-    global _bot_app
-    logger.info("🚀 Starting MYLOVE-v1...")
-
-    # Database
-    try:
-        from database.connection import init_db
-        await init_db()
-        logger.info("✅ Database initialized")
-    except ImportError as e:
-        logger.error(f"❌ Database module error: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
-        raise
-
-    # Redis (mock) - Opsional
-    try:
-        from cache.redis_client import init_redis
-        await init_redis()
-        logger.info("✅ Redis initialized")
-    except ImportError:
-        logger.info("ℹ️ Redis module not found - using mock mode")
-    except Exception as e:
-        logger.error(f"❌ Redis initialization failed: {e}")
-
-    # Bot application
-    try:
-        from bot.application import create_application
-        _bot_app = create_application()
-        await _bot_app.initialize()
-        logger.info("✅ Bot application created")
-    except ImportError as e:
-        logger.error(f"❌ Bot application module error: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"❌ Bot application creation failed: {e}")
-        raise
-
-    logger.info("🚀 MYLOVE-v1 is ready!")
-    return _bot_app
-
-
-# =============================================================================
-# SETUP WEBHOOK
-# =============================================================================
-async def setup_webhook(app):
-    """Setup webhook untuk bot"""
-    try:
-        # Dapatkan webhook URL
-        railway_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
-        if railway_url:
-            webhook_url = f"https://{railway_url}/webhook"
-        else:
-            webhook_url = os.getenv('WEBHOOK_URL')
-            if not webhook_url:
-                webhook_url = f"http://localhost:{os.getenv('PORT', 8080)}/webhook"
-                logger.warning(f"No public domain, using local URL: {webhook_url}")
-        
-        logger.info(f"🔗 Setting webhook to: {webhook_url}")
-
-        # Set webhook
-        await app.bot.set_webhook(
-            url=webhook_url,
-            allowed_updates=['message', 'callback_query'],
-            drop_pending_updates=True,
-            max_connections=40
-        )
-        
-        # Verify
-        webhook_info = await app.bot.get_webhook_info()
-        if webhook_info.url == webhook_url:
-            logger.info(f"✅ Webhook set successfully: {webhook_info.url}")
-            logger.info(f"   Pending updates: {webhook_info.pending_update_count}")
-            return True
-        else:
-            logger.error(f"Webhook verification failed: {webhook_info.url}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"❌ Webhook setup failed: {e}")
-        return False
-
-
-# =============================================================================
-# MAIN FUNCTION
-# =============================================================================
-def main():
+async def main():
     """Main entry point"""
-    
-    # Print banner
-    print_banner()
+    bot = MYLOVEBot()
     
     # Register signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, signal_handler)
     
-    # ===== START FLASK SERVER (di thread) =====
-    if HEALTH_SERVER_AVAILABLE:
-        flask_thread = threading.Thread(target=run_flask_server)
-        flask_thread.daemon = True
-        flask_thread.start()
-        
-        port = os.getenv('PORT', '8080')
-        logger.info(f"✅ Flask server thread started on port {port}")
-        
-        # Beri waktu Flask untuk start (2 detik)
-        logger.info("⏳ Waiting 2 seconds for Flask server to initialize...")
-        time.sleep(2)
-        logger.info("✅ Flask server should be ready")
-    else:
-        logger.warning("⚠️ Flask server disabled - Railway may fail deployment")
-        logger.warning("   Install Flask with: pip install flask")
-
     try:
-        # Initialize components
-        app = asyncio.run(init_components())
-
-        # Setup webhook
-        logger.info("🚀 Setting up webhook...")
-        webhook_success = asyncio.run(setup_webhook(app))
-        
-        if webhook_success:
-            logger.info("✅ Webhook mode activated!")
-            logger.info(f"📡 Bot will receive updates at /webhook")
-        else:
-            logger.warning("⚠️ Webhook failed - check your configuration")
-
-        # Keep main thread alive
-        logger.info("✅ Bot is running. Press Ctrl+C to stop.")
-        while True:
-            time.sleep(1)
-
-    except KeyboardInterrupt:
+        await bot.start()
+    except asyncio.CancelledError:
         logger.info("👋 Bot stopped by user")
     except Exception as e:
         logger.error(f"❌ Fatal error: {e}")
+        import traceback
         traceback.print_exc()
-        sys.exit(1)
     finally:
         logger.info("👋 Goodbye!")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
