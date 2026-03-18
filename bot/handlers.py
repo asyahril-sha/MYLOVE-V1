@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (FIX FULL + PDKT)
 =============================================================================
 Semua handlers untuk MYLOVE Ultimate V2 dengan integrasi:
 - Context Analyzer (konteks super lengkap)
 - Expression & Sound Engine (AI generated)
 - Nickname System (panggilan based on level)
-- Leveling System (60 menit ke level 7)
+- Leveling System (dual: real time untuk PDKT, chat untuk lainnya)
 - Environment Dynamics (lokasi, posisi, pakaian)
+- **PDKT SUPER SPESIAL dengan chemistry natural**
 =============================================================================
 """
 
@@ -52,6 +53,11 @@ from core.expression_engine import ExpressionEngine
 from core.sound_engine import SoundEngine
 from dynamics.nickname import NicknameSystem
 
+# ===== PDKT IMPORTS =====
+from pdkt.natural_engine import NaturalPDKTEngine, PDKTStage
+from pdkt.chemistry import ChemistryLevel
+from pdkt.direction import PDKTDirection
+
 # =============================================================================
 # 1. INITIALIZATION
 # =============================================================================
@@ -64,14 +70,21 @@ nickname_system = NicknameSystem()
 # These will be initialized with ai_engine later
 expression_engine = None
 sound_engine = None
+pdkt_engine = None
+leveling_system = None
 
 
 async def initialize_engines(ai_engine):
     """Initialize expression and sound engines with AI engine"""
-    global expression_engine, sound_engine
+    global expression_engine, sound_engine, pdkt_engine, leveling_system
+    
     expression_engine = ExpressionEngine(ai_engine, prompt_builder)
     sound_engine = SoundEngine(ai_engine, prompt_builder)
+    pdkt_engine = ai_engine.pdkt_engine
+    leveling_system = ai_engine._get_leveling_system
+    
     logger.info("✅ Expression & Sound Engines initialized")
+    logger.info("✅ PDKT Engine initialized")
 
 
 # =============================================================================
@@ -115,7 +128,7 @@ def get_role_info(role: str) -> Dict:
         },
         "pdkt": {
             "name": "PDKT",
-            "description": "Pendekatan, bisa jadi pacar/FWB, umur 21 tahun",
+            "description": "Pendekatan super spesial, chemistry menentukan segalanya",
             "age": "21",
             "height": "160",
             "weight": "48",
@@ -234,7 +247,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         f"💕 **Halo {user.first_name}!**\n\n"
         "Selamat datang di **MYLOVE ULTIMATE VERSI 2**\n"
         "Virtual Girlfriend AI dengan:\n"
-        "• Leveling berbasis durasi (60 menit ke Level 7)\n"
+        "• **PDKT SUPER SPESIAL** - Chemistry alami, waktu bisa di-pause\n"
+        "• Leveling dual system (real time untuk PDKT, chat untuk lainnya)\n"
         "• Ekspresi & Suara AI Generated\n"
         "• Panggilan intim di Level 7+\n"
         "• Environment dinamis (lokasi, posisi, pakaian)\n"
@@ -263,9 +277,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Cek status session\n"
         "/cancel - Batalkan sesi\n\n"
         
+        "**PDKT SUPER SPESIAL:**\n"
+        "/pdkt - Menu PDKT\n"
+        "/pdkt list - Lihat semua PDKT\n"
+        "/pdkt start [nama] - Mulai PDKT baru\n"
+        "/pdkt pause [id] - Hentikan waktu\n"
+        "/pdkt resume [id] - Lanjutkan\n"
+        "/pdkt stop [id] - Akhiri PDKT\n"
+        "/pdkt info [id] - Detail PDKT\n"
+        "/pdkt timeline [id] - Timeline hubungan\n\n"
+        
         "**Perintah Hubungan:**\n"
         "/jadipacar - Ubah PDKT jadi pacar\n"
-        "/break - Break dari pacar\n"
+        "/break - Jeda pacaran\n"
         "/unbreak - Unbreak\n"
         "/breakup - Putus\n"
         "/fwb - Masuk mode FWB\n\n"
@@ -319,13 +343,12 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_minutes = leveling_data.get('total_minutes', 0)
     boosted_minutes = leveling_data.get('boosted_minutes', 0)
     
-    # Hitung level berdasarkan durasi
-    if total_minutes >= 120:
-        level_progress = f"✅ Level 11+ ({total_minutes:.0f} menit)"
-    elif total_minutes >= 60:
-        level_progress = f"✅ Level 7+ ({total_minutes:.0f} menit)"
+    is_pdkt = (current_role == 'pdkt')
+    
+    if is_pdkt:
+        level_info = "⏱️ **Mode:** REAL TIME (bisa pause)"
     else:
-        level_progress = f"⏳ {60 - total_minutes:.0f} menit ke Level 7"
+        level_info = "💬 **Mode:** BERDASARKAN CHAT"
     
     status_text = (
         f"📊 **STATUS HUBUNGAN**\n\n"
@@ -336,12 +359,17 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📍 **Lokasi:** {current_location}\n"
         f"🧍 **Posisi:** {current_position}\n"
         f"👗 **Pakaian:** {current_clothing}\n\n"
-        f"⏱️ **Progress Leveling:**\n"
-        f"{level_progress}\n"
-        f"Boosted: {boosted_minutes:.0f} menit\n\n"
+        f"{level_info}\n"
     )
     
-    # Progress bar (opsional)
+    if is_pdkt:
+        # Cek apakah sedang di-pause
+        if context.user_data.get('pdkt_paused', False):
+            status_text += "⏸️ **Status PDKT:** Di-pause\n"
+        else:
+            status_text += f"⏱️ **Total Waktu:** {total_minutes:.0f} menit\n"
+    
+    # Progress bar
     if intimacy_level < 12:
         next_level = intimacy_level + 1
         progress = (total_chats % 50) / 50 * 100
@@ -410,7 +438,7 @@ async def handle_role_selection(query, context, role: str):
         context.user_data['intimacy_level'] = 1
         context.user_data['total_chats'] = 0
         context.user_data['total_duration'] = 0.0
-        context.user_data['relationship_status'] = 'hts'
+        context.user_data['relationship_status'] = 'hts' if role != 'pdkt' else 'pdkt'
         context.user_data['milestones'] = ['memulai_role']
         context.user_data['current_location'] = location_system.get_current().value
         context.user_data['current_position'] = position_system.get_current().value
@@ -460,11 +488,25 @@ async def handle_role_selection(query, context, role: str):
             f"👗 Aku pakai {initial_clothing}. {clothing_system.get_clothing_description(initial_clothing)}\n\n"
             
             f"**Progress leveling:**\n"
-            f"📊 Level 1 → Level 7 dalam 60 menit\n"
-            f"• Level 4+: Panggil kamu 'kak/mas/mbak'\n"
-            f"• Level 7+: Panggil kamu 'sayang/cinta/baby'\n"
-            f"• Setiap aktivitas intim mempercepat progress!\n\n"
-            
+        )
+        
+        if role == 'pdkt':
+            response += (
+                f"📊 **MODE PDKT SUPER SPESIAL**\n"
+                f"• Level naik berdasarkan **WAKTU NYATA**\n"
+                f"• Kamu bisa **PAUSE** kapan saja\n"
+                f"• Chemistry alami menentukan arah hubungan\n"
+                f"• Bisa cepat, bisa lambat, semua natural\n\n"
+            )
+        else:
+            response += (
+                f"📊 Level 1 → Level 7 dalam 60 chat\n"
+                f"• Level 4+: Panggil kamu 'kak/mas/mbak'\n"
+                f"• Level 7+: Panggil kamu 'sayang/cinta/baby'\n"
+                f"• Setiap aktivitas intim mempercepat progress!\n\n"
+            )
+        
+        response += (
             f"**ID Session kamu:**\n"
             f"`{session_id}`\n\n"
             
@@ -490,7 +532,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handler untuk semua pesan teks dengan AI Generator
     - Generate ekspresi, suara, konten dengan AI
     - Environment changes random
-    - Leveling based on duration
+    - Leveling based on role (real time untuk PDKT, chat untuk lainnya)
     - Response minimal 500 karakter
     """
     try:
@@ -521,7 +563,18 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Sanitize input
         message = sanitize_input(message, max_length=1000)
         
-        # ===== 1. UPDATE LEVELING (BERDASARKAN DURASI) =====
+        # ===== 1. CEK APAKAH PDKT DAN SEDANG DI-PAUSE =====
+        is_pdkt = (current_role == 'pdkt')
+        pdkt_paused = context.user_data.get('pdkt_paused', False)
+        
+        if is_pdkt and pdkt_paused:
+            await update.message.reply_text(
+                "⏸️ **PDKT sedang di-pause**\n\n"
+                "Waktu tidak berjalan. Gunakan `/pdkt resume` untuk melanjutkan."
+            )
+            return
+        
+        # ===== 2. UPDATE LEVELING (BERDASARKAN ROLE) =====
         now = time.time()
         leveling_data = context.user_data.get('leveling', {
             'start_time': now,
@@ -531,51 +584,67 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'activities': []
         })
         
-        # Hitung durasi sejak last update
-        elapsed = (now - leveling_data['last_update']) / 60.0  # menit
-        leveling_data['total_minutes'] += elapsed
+        if is_pdkt:
+            # PDKT: Update berdasarkan waktu (jika tidak di-pause)
+            elapsed = (now - leveling_data['last_update']) / 60.0
+            if not pdkt_paused:
+                leveling_data['total_minutes'] += elapsed
+        else:
+            # Non-PDKT: Update chat count
+            leveling_data['total_chats'] = leveling_data.get('total_chats', 0) + 1
+        
         leveling_data['last_update'] = now
         context.user_data['leveling'] = leveling_data
         
-        # Hitung level berdasarkan durasi
-        total_minutes = leveling_data['total_minutes']
-        if total_minutes >= 120:
-            new_level = 11
-        elif total_minutes >= 60:
-            new_level = 7
+        # Hitung level
+        if is_pdkt:
+            # PDKT: berdasarkan waktu
+            total_minutes = leveling_data['total_minutes']
+            new_level = 1 + int(total_minutes / 10)  # 10 menit per level
+            new_level = min(12, max(1, new_level))
         else:
-            new_level = 1 + int(total_minutes / 10)
+            # Non-PDKT: berdasarkan chat
+            total_chats = leveling_data.get('total_chats', 0)
+            new_level = 1 + int(total_chats / 10)  # 10 chat per level
+            new_level = min(12, max(1, new_level))
         
         old_level = context.user_data.get('intimacy_level', 1)
         if new_level > old_level:
             context.user_data['intimacy_level'] = new_level
-            await update.message.reply_text(
+            level_up_msg = (
                 f"🎉 **Level Up!**\n"
                 f"{old_level} → **{new_level}/12**\n"
-                f"Total waktu: {total_minutes:.0f} menit\n"
-                f"{'🔥 Sekarang bisa panggil sayang!' if new_level >= 7 else ''}"
             )
+            if is_pdkt:
+                level_up_msg += f"Total waktu: {total_minutes:.0f} menit"
+            else:
+                level_up_msg += f"Total chat: {total_chats} chat"
+            
+            if new_level >= 7:
+                level_up_msg += "\n🔥 Sekarang bisa panggil sayang!"
+            
+            await update.message.reply_text(level_up_msg)
         
-        # ===== 2. DETECT ACTIVITIES UNTUK BOOST =====
+        # ===== 3. DETECT ACTIVITIES UNTUK BOOST =====
         message_lower = message.lower()
         
         if any(word in message_lower for word in ['cium', 'kiss', 'bibir']):
-            leveling_data['boosted_minutes'] += elapsed * 0.5
+            leveling_data['boosted_minutes'] += 0.5
             context.user_data['milestones'].append('kiss')
             context.user_data['arousal'] = min(1.0, context.user_data.get('arousal', 0) + 0.1)
         elif any(word in message_lower for word in ['sentuh', 'pegang', 'raba']):
-            leveling_data['boosted_minutes'] += elapsed * 0.3
+            leveling_data['boosted_minutes'] += 0.3
             context.user_data['arousal'] = min(1.0, context.user_data.get('arousal', 0) + 0.1)
         elif any(word in message_lower for word in ['masuk', 'dalam', 'intim']):
-            leveling_data['boosted_minutes'] += elapsed * 1.0
+            leveling_data['boosted_minutes'] += 1.0
             context.user_data['milestones'].append('intimacy')
             context.user_data['arousal'] = min(1.0, context.user_data.get('arousal', 0) + 0.2)
         elif any(word in message_lower for word in ['climax', 'keluar', 'come']):
-            leveling_data['boosted_minutes'] += elapsed * 2.0
+            leveling_data['boosted_minutes'] += 2.0
             context.user_data['milestones'].append('climax')
             context.user_data['arousal'] = 1.0
         
-        # ===== 3. ENVIRONMENT CHANGES (RANDOM) =====
+        # ===== 4. ENVIRONMENT CHANGES (RANDOM) =====
         env_messages = []
         
         # 5% chance pindah lokasi
@@ -603,7 +672,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data['current_clothing'] = new_clothing
         
-        # ===== 4. BANGUN KONTEKS SUPER LENGKAP =====
+        # ===== 5. BANGUN KONTEKS SUPER LENGKAP =====
         env_data = {
             'location': context.user_data.get('current_location', 'ruang tamu'),
             'position': context.user_data.get('current_position', 'duduk'),
@@ -619,6 +688,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['user_call'] = user_call
         
         # Build full context
+        from core.ai_engine import get_ai_engine
+        ai_engine = get_ai_engine()
+        
         full_context = await context_analyzer.build_full_context(
             user_id=user_id,
             user_message=message,
@@ -630,10 +702,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if env_messages:
             await update.message.reply_text("\n".join(env_messages))
         
-        # ===== 5. AI GENERATOR =====
-        from core.ai_engine import get_ai_engine
-        ai_engine = get_ai_engine()
-        
+        # ===== 6. AI GENERATOR =====
         # Generate ekspresi
         expression = await expression_engine.generate_expression(full_context)
         
@@ -671,7 +740,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"{bot_call} kangen {user_call}..."
             ])
         
-        # ===== 6. SEND RESPONSE =====
+        # ===== 7. SEND RESPONSE =====
         await update.message.reply_text(response, parse_mode='Markdown')
         
         # Update arousal (decay)
@@ -718,6 +787,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         elif data == "cancel":
             await query.edit_message_text("✅ Dibatalkan.")
+        
+        # PDKT callbacks
+        elif data.startswith('pdkt_'):
+            from bot.commands import pdkt_callback_handler
+            await pdkt_callback_handler(update, context)
         
         else:
             await query.edit_message_text("❌ Perintah tidak dikenal.")
