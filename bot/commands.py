@@ -32,6 +32,20 @@ from threesome.manager import ThreesomeManager, ThreesomeType, ThreesomeStatus
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# ERROR HANDLER (PASTIKAN INI ADA)
+# =============================================================================
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle errors"""
+    logger.error(f"Update {update} caused error {context.error}")
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "❌ Terjadi error. Silakan coba lagi nanti."
+            )
+    except:
+        pass
 
 # =============================================================================
 # 1. BASIC COMMANDS (4 commands)
