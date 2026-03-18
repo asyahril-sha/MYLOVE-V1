@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Telegram Bot
-python-telegram-bot[job-queue]==20.7
+python-telegram-bot==20.7
 
 # AI & DeepSeek
 openai>=1.0.0
