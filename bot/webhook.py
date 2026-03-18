@@ -329,11 +329,36 @@ async def reset_webhook(app: Application, url: Optional[str] = None):
             
     except Exception as e:
         logger.error(f"Error resetting webhook: {e}")
-        
+
+# =============================================================================
+# SYNC WRAPPER FOR MAIN.PY
+# =============================================================================
+
+def setup_webhook_sync(app: Application) -> str:
+    """
+    Synchronous wrapper untuk setup webhook
+    Digunakan di main.py yang synchronous
+    """
+    import asyncio
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        # Buat instance WebhookManager
+        manager = WebhookManager(app)
+        # Jalankan setup webhook async
+        result = loop.run_until_complete(manager.setup_webhook(retry=True))
+        return "webhook" if result else "polling"
+    except Exception as e:
+        logger.error(f"Error in setup_webhook_sync: {e}")
+        return "polling"
+    finally:
+        loop.close()        
 
 __all__ = [
     'WebhookManager',
     'setup_webhook_with_fallback',
     'check_webhook_status',
-    'reset_webhook'
+    'reset_webhook',
+    'setup_webhook_sync',
 ]
