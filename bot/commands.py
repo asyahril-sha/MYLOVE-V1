@@ -1189,9 +1189,23 @@ async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(debug_info, parse_mode='Markdown')
 
+# =============================================================================
+# 9. ERROR HANDLER
+# =============================================================================
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle errors"""
+    logger.error(f"Update {update} caused error {context.error}")
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "❌ Terjadi error. Silakan coba lagi nanti."
+            )
+    except:
+        pass
 
 # =============================================================================
-# 9. EXPORT ALL COMMANDS
+# 10. EXPORT ALL COMMANDS
 # =============================================================================
 
 __all__ = [
