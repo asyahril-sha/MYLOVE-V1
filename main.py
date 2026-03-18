@@ -275,6 +275,7 @@ class MyLoveUltimate:
             self.debug.log_component_error("MEMORY_SYSTEM", e)
             self.error_count += 1
             
+            
         try:
             # Initialize AI engine
             self.debug.log_component_start("AI_ENGINE")
@@ -302,26 +303,31 @@ class MyLoveUltimate:
             self.error_count += 1
             
         try:
-            # Initialize relationship system
-            self.debug.log_component_start("RELATIONSHIP_SYSTEM")
-            from relationship.intimacy import IntimacySystem
-            from relationship.ranking import RankingSystem
-            self.intimacy = IntimacySystem()
-            self.ranking = RankingSystem(relationship_memory=self.relationship_memory)
-            self.debug.log_component_success("RELATIONSHIP_SYSTEM")
-        except Exception as e:
-            self.debug.log_component_error("RELATIONSHIP_SYSTEM", e)
-            self.error_count += 1
-            
-        try:
-            # Initialize public areas
-            self.debug.log_component_start("PUBLIC_AREAS")
-            from public.auto_select import LocationAutoSelector
-            self.location_selector = LocationAutoSelector()
-            self.debug.log_component_success("PUBLIC_AREAS", f"{len(self.location_selector.locations)} locations")
-        except Exception as e:
-            self.debug.log_component_error("PUBLIC_AREAS", e)
-            self.error_count += 1
+        # Initialize relationship system
+        self.debug.log_component_start("RELATIONSHIP_SYSTEM")
+    
+        # Import yang diperlukan
+        from memory.relationship import RelationshipMemory
+        from relationship.intimacy import IntimacySystem
+        from relationship.ranking import RankingSystem
+    
+        # Inisialisasi relationship memory
+        self.relationship_memory = RelationshipMemory(db_path=settings.database.path)
+        await self.relationship_memory.initialize()
+    
+        # Inisialisasi intimacy system (consolidation bisa None dulu)
+        self.intimacy = IntimacySystem(
+            relationship_memory=self.relationship_memory,
+            consolidation=None
+        )
+    
+        # Inisialisasi ranking system dengan relationship_memory
+        self.ranking = RankingSystem(relationship_memory=self.relationship_memory)
+    
+        self.debug.log_component_success("RELATIONSHIP_SYSTEM")
+    except Exception as e:
+        self.debug.log_component_error("RELATIONSHIP_SYSTEM", e)
+        self.error_count += 1
             
         # Build Telegram application
         try:
