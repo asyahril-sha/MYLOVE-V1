@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-GADIS V81 - MAIN ENTRY POINT (FULL FIX)
+GADIS V81 - MAIN ENTRY POINT (SINGLE FLASK SERVER)
 =============================================================================
-Native python-telegram-bot v20+ dengan polling mode + healthcheck server
+Satu Flask server untuk healthcheck DAN webhook
 """
 
 import asyncio
@@ -23,30 +23,37 @@ from config import settings
 from utils.logger import setup_logging
 
 # Setup logging
-logger = setup_logging("gadis_v81")
+logger = setup_logging("MYLOVE-V1")
 
 # =============================================================================
-# HEALTHCHECK SERVER
+# GLOBAL VARIABLES
+# =============================================================================
+_bot_app = None  # Untuk menyimpan bot application
+
+# =============================================================================
+# FLASK SERVER (untuk healthcheck DAN webhook)
 # =============================================================================
 HEALTH_SERVER_AVAILABLE = False
 health_server_started = False
 
 try:
-    from flask import Flask, jsonify
+    from flask import Flask, jsonify, request
+    from telegram import Update
 
-    health_app = Flask(__name__)
+    app_flask = Flask(__name__)
 
-    @health_app.route('/health')
+    @app_flask.route('/health')
     def health():
         """Health check endpoint untuk Railway"""
         return jsonify({
             "status": "healthy",
             "timestamp": time.time(),
             "bot": "running",
-            "server_started": health_server_started
+            "server_started": health_server_started,
+            "bot_ready": _bot_app is not None
         }), 200
 
-    @health_app.route('/')
+    @app_flask.route('/')
     def root():
         """Root endpoint - info bot"""
         return jsonify({
@@ -56,37 +63,66 @@ try:
             "admin_id": str(settings.admin_id)
         }), 200
 
-    @health_app.route('/debug')
+    @app_flask.route('/debug')
     def debug():
         """Debug endpoint"""
         return jsonify({
             "python_version": sys.version,
             "cwd": os.getcwd(),
             "port": os.getenv('PORT', '8080'),
-            "health_server_started": health_server_started
+            "health_server_started": health_server_started,
+            "bot_ready": _bot_app is not None
         }), 200
 
+    # ===== WEBHOOK ENDPOINT =====
+    @app_flask.route('/webhook', methods=['POST'])
+    def webhook():
+        """Webhook endpoint untuk Telegram"""
+        global _bot_app
+        
+        if not _bot_app:
+            logger.error("Bot not ready")
+            return jsonify({"error": "Bot not ready"}), 503
+        
+        try:
+            # Parse update dari Telegram
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data"}), 400
+            
+            update = Update.de_json(data, _bot_app.bot)
+            
+            # Process update di background
+            asyncio.run(_bot_app.process_update(update))
+            
+            logger.debug(f"Processed update: {update.update_id}")
+            return "OK", 200
+            
+        except Exception as e:
+            logger.error(f"Webhook error: {e}")
+            return jsonify({"error": str(e)}), 500
+
     HEALTH_SERVER_AVAILABLE = True
-    logger.info("✅ Flask imported successfully")
+    logger.info("✅ Flask server ready (healthcheck + webhook)")
 
 except ImportError as e:
     logger.warning(f"⚠️ Flask not installed: {e}")
     HEALTH_SERVER_AVAILABLE = False
 
 
-def run_health_server():
-    """Run Flask healthcheck server - standalone thread"""
+def run_flask_server():
+    """Run Flask server - standalone thread"""
     global health_server_started
     
     try:
         port = int(os.getenv('PORT', 8080))
-        logger.info(f"🚀 Healthcheck server starting on port {port}")
+        logger.info(f"🚀 Flask server starting on port {port}")
         
         # Set flag bahwa server akan start
         health_server_started = True
         
         # Jalankan Flask (blocking)
-        health_app.run(
+        app_flask.run(
             host='0.0.0.0',
             port=port,
             debug=False,
@@ -94,7 +130,7 @@ def run_health_server():
             threaded=True
         )
     except Exception as e:
-        logger.error(f"❌ Healthcheck server failed: {e}")
+        logger.error(f"❌ Flask server failed: {e}")
         health_server_started = False
 
 
@@ -170,11 +206,13 @@ def print_banner():
         bot_initiative = "ON"
     print(f"🎯 Bot Initiative: {bot_initiative}")
     
-    # Healthcheck status
+    # Server status
     if HEALTH_SERVER_AVAILABLE:
-        print(f"✅ Healthcheck: ENABLED on port {os.getenv('PORT', '8080')}")
+        print(f"✅ Flask server: ENABLED on port {os.getenv('PORT', '8080')}")
+        print(f"   • Healthcheck: /health")
+        print(f"   • Webhook: /webhook")
     else:
-        print(f"⚠️ Healthcheck: DISABLED (Flask not installed)")
+        print(f"⚠️ Flask server: DISABLED (Flask not installed)")
     
     print("="*70)
 
@@ -184,6 +222,7 @@ def print_banner():
 # =============================================================================
 async def init_components():
     """Initialize all components asynchronously"""
+    global _bot_app
     logger.info("🚀 Starting GADIS V81...")
 
     # Database
@@ -211,7 +250,7 @@ async def init_components():
     # Bot application
     try:
         from bot.application import create_application
-        app = create_application()
+        _bot_app = create_application()
         logger.info("✅ Bot application created")
     except ImportError as e:
         logger.error(f"❌ Bot application module error: {e}")
@@ -220,18 +259,50 @@ async def init_components():
         logger.error(f"❌ Bot application creation failed: {e}")
         raise
 
-    # Webhook setup - Opsional, fallback ke polling
-    try:
-        from bot.webhook import setup_webhook_sync
-        mode = setup_webhook_sync(app)
-        logger.info(f"✅ Webhook setup: {mode}")
-    except ImportError:
-        logger.info("ℹ️ Webhook module not found - using polling mode")
-    except Exception as e:
-        logger.error(f"❌ Webhook setup failed (using polling): {e}")
-
     logger.info("🚀 GADIS V81 is ready!")
-    return app
+    return _bot_app
+
+
+# =============================================================================
+# SETUP WEBHOOK
+# =============================================================================
+async def setup_webhook(app):
+    """Setup webhook untuk bot"""
+    try:
+        # Dapatkan webhook URL
+        railway_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+        if railway_url:
+            webhook_url = f"https://{railway_url}/webhook"
+        else:
+            webhook_url = os.getenv('WEBHOOK_URL')
+            if not webhook_url:
+                webhook_url = f"http://localhost:{os.getenv('PORT', 8080)}/webhook"
+                logger.warning(f"No public domain, using local URL: {webhook_url}")
+        
+        logger.info(f"🔗 Setting webhook to: {webhook_url}")
+        
+        # Set webhook
+        await app.bot.set_webhook(
+            url=webhook_url,
+            allowed_updates=['message', 'callback_query'],
+            drop_pending_updates=True,
+            max_connections=40,
+            timeout=30
+        )
+        
+        # Verify
+        webhook_info = await app.bot.get_webhook_info()
+        if webhook_info.url == webhook_url:
+            logger.info(f"✅ Webhook set successfully: {webhook_info.url}")
+            logger.info(f"   Pending updates: {webhook_info.pending_update_count}")
+            return True
+        else:
+            logger.error(f"Webhook verification failed: {webhook_info.url}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Webhook setup failed: {e}")
+        return False
 
 
 # =============================================================================
@@ -247,34 +318,41 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    health_thread = None
-    
-    # ===== START HEALTHCHECK SERVER =====
+    # ===== START FLASK SERVER (di thread) =====
     if HEALTH_SERVER_AVAILABLE:
-        # Start health server di thread terpisah
-        health_thread = threading.Thread(target=run_health_server)
-        health_thread.daemon = True  # Daemon thread akan mati saat main thread mati
-        health_thread.start()
+        flask_thread = threading.Thread(target=run_flask_server)
+        flask_thread.daemon = True
+        flask_thread.start()
         
         port = os.getenv('PORT', '8080')
-        logger.info(f"✅ Healthcheck server thread started on port {port}")
+        logger.info(f"✅ Flask server thread started on port {port}")
         
         # Beri waktu Flask untuk start (2 detik)
-        logger.info("⏳ Waiting 2 seconds for healthcheck server to initialize...")
+        logger.info("⏳ Waiting 2 seconds for Flask server to initialize...")
         time.sleep(2)
-        logger.info("✅ Healthcheck server should be ready")
+        logger.info("✅ Flask server should be ready")
     else:
-        logger.warning("⚠️ Healthcheck server disabled - Railway may fail deployment")
+        logger.warning("⚠️ Flask server disabled - Railway may fail deployment")
         logger.warning("   Install Flask with: pip install flask")
 
     try:
         # Initialize components
         app = asyncio.run(init_components())
 
-        from bot.webhook import setup_webhook_with_fallback
+        # Setup webhook
+        logger.info("🚀 Setting up webhook...")
+        webhook_success = asyncio.run(setup_webhook(app))
+        
+        if webhook_success:
+            logger.info("✅ Webhook mode activated!")
+            logger.info(f"📡 Bot will receive updates at /webhook")
+        else:
+            logger.warning("⚠️ Webhook failed - check your configuration")
 
-        logger.info("🚀 Starting webhook mode...")
-        asyncio.run(setup_webhook_with_fallback(app))
+        # Keep main thread alive
+        logger.info("✅ Bot is running. Press Ctrl+C to stop.")
+        while True:
+            time.sleep(1)
 
     except KeyboardInterrupt:
         logger.info("👋 Bot stopped by user")
