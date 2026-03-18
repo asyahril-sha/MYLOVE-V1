@@ -2,9 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - MAIN ENTRY POINT
+MYLOVE ULTIMATE VERSI 1 - MAIN ENTRY POINT (FIX FINAL)
 =============================================================================
 Hybrid Webhook + Polling dengan Debug System Lengkap untuk Railway
+Semua error telah diperbaiki:
+- relationship_memory diinisialisasi sebelum digunakan
+- import hts_call_command dihapus
+- RankingSystem dan IntimacySystem mendapat relationship_memory
+- continue_command diimpor dengan benar
+=============================================================================
 """
 
 import os
@@ -22,6 +28,9 @@ import signal
 
 # Tambahkan path ke sys.path
 sys.path.insert(0, str(Path(__file__).parent))
+
+from config import settings
+from utils.logger import setup_logging
 
 # =============================================================================
 # DEBUG SYSTEM - EARLY INITIALIZATION
@@ -41,10 +50,7 @@ class DebugSystem:
         
     def _setup_logging(self):
         """Setup early logging sebelum konfigurasi penuh"""
-        # Buat directory logs
         Path("data/logs").mkdir(parents=True, exist_ok=True)
-        
-        # Configure basic logging
         logging.basicConfig(
             level=logging.DEBUG,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -56,7 +62,6 @@ class DebugSystem:
         self.logger = logging.getLogger("MYLOVE_DEBUG")
         
     def log_component_start(self, component: str):
-        """Log ketika komponen mulai diinisialisasi"""
         self.component_status[component] = {
             "status": "starting",
             "start_time": time.time(),
@@ -65,7 +70,6 @@ class DebugSystem:
         self.logger.info(f"🚀 Starting component: {component}")
         
     def log_component_success(self, component: str, details: str = ""):
-        """Log ketika komponen berhasil diinisialisasi"""
         if component in self.component_status:
             self.component_status[component]["status"] = "success"
             self.component_status[component]["end_time"] = time.time()
@@ -77,7 +81,6 @@ class DebugSystem:
         self.logger.info(f"✅ Component success: {component} ({details})")
         
     def log_component_error(self, component: str, error: Exception, details: str = ""):
-        """Log ketika komponen gagal diinisialisasi"""
         error_info = {
             "component": component,
             "error": str(error),
@@ -94,12 +97,9 @@ class DebugSystem:
         
         self.logger.error(f"❌ Component error: {component} - {error}")
         self.logger.error(traceback.format_exc())
-        
-        # Simpan ke crash log
         self._save_crash_log(error_info)
         
     def log_warning(self, component: str, warning: str):
-        """Log warning"""
         warning_info = {
             "component": component,
             "warning": warning,
@@ -109,15 +109,12 @@ class DebugSystem:
         self.logger.warning(f"⚠️ Warning: {component} - {warning}")
         
     def log_info(self, component: str, info: str):
-        """Log info"""
         self.logger.info(f"ℹ️ {component}: {info}")
         
     def log_debug(self, component: str, debug_info: Any):
-        """Log debug info"""
         self.logger.debug(f"🐛 {component}: {debug_info}")
         
     def _save_crash_log(self, error_info: Dict):
-        """Simpan crash log untuk analisis"""
         try:
             crash_data = {
                 "timestamp": datetime.now().isoformat(),
@@ -128,7 +125,6 @@ class DebugSystem:
                 "python_version": sys.version,
                 "platform": sys.platform
             }
-            
             with open(self.crash_log, 'a') as f:
                 f.write(json.dumps(crash_data, indent=2))
                 f.write("\n" + "="*50 + "\n")
@@ -136,7 +132,6 @@ class DebugSystem:
             pass
             
     async def health_check(self) -> Dict:
-        """Health check endpoint untuk Railway"""
         return {
             "status": "healthy" if len(self.errors) == 0 else "degraded",
             "uptime": time.time() - self.start_time,
@@ -147,7 +142,6 @@ class DebugSystem:
         }
         
     def print_summary(self):
-        """Print ringkasan debug"""
         print("\n" + "="*70)
         print("🔍 MYLOVE ULTIMATE - DEBUG SUMMARY")
         print("="*70)
@@ -159,17 +153,14 @@ class DebugSystem:
             emoji = "✅" if status["status"] == "success" else "❌" if status["status"] == "error" else "⏳"
             duration = status.get("duration", 0)
             print(f"  {emoji} {comp}: {status['status']} ({duration:.2f}s)")
-            
         if self.errors:
             print("\n❌ Recent Errors:")
-            for i, error in enumerate(self.errors[-3:]):  # Show last 3 errors
+            for i, error in enumerate(self.errors[-3:]):
                 print(f"  {i+1}. {error['component']}: {error['error']}")
-                
         if self.warnings:
             print("\n⚠️ Recent Warnings:")
             for i, warning in enumerate(self.warnings[-3:]):
                 print(f"  {i+1}. {warning['component']}: {warning['warning']}")
-                
         print("="*70 + "\n")
 
 
@@ -198,7 +189,7 @@ try:
     debug.log_component_success("UTILS_LOGGER")
 except Exception as e:
     debug.log_component_error("UTILS_LOGGER", e)
-    logger = debug.logger  # Fallback ke debug logger
+    logger = debug.logger
 
 try:
     debug.log_component_start("TELEGRAM_IMPORT")
@@ -220,16 +211,13 @@ try:
     debug.log_component_success("FASTAPI_IMPORT")
 except Exception as e:
     debug.log_component_error("FASTAPI_IMPORT", e)
-    # Non-fatal, mungkin hanya untuk webhook
 
 try:
     debug.log_component_start("DATABASE_IMPORT")
     from database.connection import init_db, get_db
-    from database.models import Base
     debug.log_component_success("DATABASE_IMPORT")
 except Exception as e:
     debug.log_component_error("DATABASE_IMPORT", e)
-    # Non-fatal, akan dihandle di initialization
 
 
 # =============================================================================
@@ -249,6 +237,15 @@ class MyLoveUltimate:
         self.error_count = 0
         self.webhook_mode = False
         
+        # Komponen yang akan diinisialisasi
+        self.memory = None
+        self.ai_engine = None
+        self.session_storage = None
+        self.relationship_memory = None
+        self.intimacy = None
+        self.ranking = None
+        self.location_selector = None
+        
         debug.log_info("BOT_INIT", "MyLoveUltimate instance created")
         
     async def initialize(self):
@@ -265,7 +262,7 @@ class MyLoveUltimate:
             self.error_count += 1
             
         try:
-            # Initialize memory systems
+            # Initialize memory systems (vector)
             self.debug.log_component_start("MEMORY_SYSTEM")
             from memory.vector_db import VectorMemory
             self.memory = VectorMemory(settings.memory.vector_db_dir)
@@ -274,7 +271,6 @@ class MyLoveUltimate:
         except Exception as e:
             self.debug.log_component_error("MEMORY_SYSTEM", e)
             self.error_count += 1
-            
             
         try:
             # Initialize AI engine
@@ -303,31 +299,48 @@ class MyLoveUltimate:
             self.error_count += 1
             
         try:
-        # Initialize relationship system
-        self.debug.log_component_start("RELATIONSHIP_SYSTEM")
-    
-        # Import yang diperlukan
-        from memory.relationship import RelationshipMemory
-        from relationship.intimacy import IntimacySystem
-        from relationship.ranking import RankingSystem
-    
-        # Inisialisasi relationship memory
-        self.relationship_memory = RelationshipMemory(db_path=settings.database.path)
-        await self.relationship_memory.initialize()
-    
-        # Inisialisasi intimacy system (consolidation bisa None dulu)
-        self.intimacy = IntimacySystem(
-            relationship_memory=self.relationship_memory,
-            consolidation=None
-        )
-    
-        # Inisialisasi ranking system dengan relationship_memory
-        self.ranking = RankingSystem(relationship_memory=self.relationship_memory)
-    
-        self.debug.log_component_success("RELATIONSHIP_SYSTEM")
-    except Exception as e:
-        self.debug.log_component_error("RELATIONSHIP_SYSTEM", e)
-        self.error_count += 1
+            # Initialize relationship system (termasuk relationship memory)
+            self.debug.log_component_start("RELATIONSHIP_SYSTEM")
+            
+            # Import yang diperlukan
+            from memory.relationship import RelationshipMemory
+            from relationship.intimacy import IntimacySystem
+            from relationship.ranking import RankingSystem
+            
+            # Inisialisasi relationship memory
+            self.relationship_memory = RelationshipMemory(db_path=settings.database.path)
+            await self.relationship_memory.initialize()
+            
+            # Inisialisasi intimacy system (consolidation bisa None dulu)
+            from memory.consolidation import MemoryConsolidation
+            consolidation = MemoryConsolidation(
+                db_path=settings.database.path,
+                vector_memory=self.memory,
+                episodic_memory=None,      # jika ada nanti
+                semantic_memory=None
+            )
+            self.intimacy = IntimacySystem(
+                relationship_memory=self.relationship_memory,
+                consolidation=consolidation
+            )
+            
+            # Inisialisasi ranking system dengan relationship_memory
+            self.ranking = RankingSystem(relationship_memory=self.relationship_memory)
+            
+            self.debug.log_component_success("RELATIONSHIP_SYSTEM")
+        except Exception as e:
+            self.debug.log_component_error("RELATIONSHIP_SYSTEM", e)
+            self.error_count += 1
+            
+        try:
+            # Initialize public areas
+            self.debug.log_component_start("PUBLIC_AREAS")
+            from public.auto_select import LocationAutoSelector
+            self.location_selector = LocationAutoSelector()
+            self.debug.log_component_success("PUBLIC_AREAS", f"{len(self.location_selector.locations)} locations")
+        except Exception as e:
+            self.debug.log_component_error("PUBLIC_AREAS", e)
+            self.error_count += 1
             
         # Build Telegram application
         try:
@@ -358,16 +371,21 @@ class MyLoveUltimate:
         self.debug.log_component_start("HANDLER_REGISTRATION")
         
         try:
-            # Import commands
+            # Import commands (PASTIKAN TIDAK ADA hts_call_command)
             from bot.commands import (
-                start_command, help_command, status_command,
-                jadipacar_command, break_command, unbreak_command,
-                breakup_command, fwb_command,
+                start_command, help_command, status_command, cancel_command,
+                jadipacar_command, break_command, unbreak_command, breakup_command, fwb_command,
                 htslist_command, fwblist_command,
                 close_command, continue_command, sessions_command,
                 explore_command, locations_command, risk_command,
                 tophts_command, myclimax_command, climaxhistory_command,
-                stats_command, db_stats_command, backup_command, recover_command
+                stats_command, db_stats_command, backup_command, recover_command,
+                debug_command
+            )
+            
+            # Import handlers untuk special commands
+            from bot.handlers import (
+                hts_call_handler, fwb_call_handler, continue_handler
             )
             
             # Register all commands
@@ -376,7 +394,7 @@ class MyLoveUltimate:
                 ("start", start_command),
                 ("help", help_command),
                 ("status", status_command),
-                ("cancel", self.cancel_command),
+                ("cancel", cancel_command),
                 
                 # Relationship
                 ("jadipacar", jadipacar_command),
@@ -401,30 +419,34 @@ class MyLoveUltimate:
                 # Ranking
                 ("tophts", tophts_command),
                 ("myclimax", myclimax_command),
-                ("climaxhistory", climaxhistory_command),
+                ("climaxhistory", climax_history_command),
                 
                 # Admin
                 ("stats", stats_command),
                 ("db_stats", db_stats_command),
                 ("backup", backup_command),
                 ("recover", recover_command),
-                ("debug", self.debug_command),
+                ("debug", debug_command),
             ]
             
             for command, handler in commands:
                 self.app.add_handler(CommandHandler(command, handler))
                 self.debug.log_debug("HANDLER", f"Registered /{command}")
                 
-            # Register callback for HTS calls (/hts- [id])
+            # Register special handlers untuk pattern
             self.app.add_handler(MessageHandler(
-                filters.Regex(r'^/hts-\s*\w+'), 
-                hts_call_command
+                filters.Regex(r'^/hts-'), 
+                hts_call_handler
             ))
             
-            # Register callback for continue (/continue [id])
+            self.app.add_handler(MessageHandler(
+                filters.Regex(r'^/fwb-'), 
+                fwb_call_handler
+            ))
+            
             self.app.add_handler(MessageHandler(
                 filters.Regex(r'^/continue\s+'), 
-                continue_command
+                continue_handler
             ))
             
             # Register message handler (for natural conversation)
@@ -446,11 +468,9 @@ class MyLoveUltimate:
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Global error handler"""
         self.error_count += 1
-        
         error_msg = f"Error: {context.error}"
         self.debug.log_component_error("RUNTIME_ERROR", context.error, 
             f"Update: {update}")
-        
         try:
             if update and update.effective_message:
                 await update.effective_message.reply_text(
@@ -471,7 +491,7 @@ class MyLoveUltimate:
             self.debug.log_debug("MESSAGE", f"From {user.id}: {message[:50]}...")
             
             # Check if this is a location intent (auto-detect)
-            location = await self.location_selector.detect_location_intent(message)
+            location = await self.location_selector.detect_location(message)
             if location:
                 # Handle location selection
                 response = await self._handle_location(user.id, location)
@@ -519,7 +539,6 @@ class MyLoveUltimate:
             # Handle callback based on data
             if data.startswith("hts_select_"):
                 role_id = data.replace("hts_select_", "")
-                # Handle HTS selection
                 await query.edit_message_text(f"Memilih HTS: {role_id}")
                 
         except Exception as e:
@@ -549,7 +568,6 @@ class MyLoveUltimate:
             
     async def _generate_continuation(self) -> str:
         """Generate continuation for short messages"""
-        # Simple continuation examples
         continuations = [
             "\n\nAku kangen kamu...",
             "\n\nEh kamu lagi ngapain?",
@@ -560,21 +578,23 @@ class MyLoveUltimate:
         import random
         return random.choice(continuations)
         
-    async def _handle_location(self, user_id: int, location: str) -> str:
+    async def _handle_location(self, user_id: int, location: Dict) -> str:
         """Handle location selection"""
         # Get location details
-        location_data = await self.location_selector.get_location_details(location)
+        location_data = location
         
         # Calculate dynamic risk
-        risk = await self.location_selector.calculate_risk(location_data)
+        from public.risk import RiskCalculator
+        risk_calc = RiskCalculator()
+        risk_data = await risk_calc.calculate_risk(location_data['base_risk'])
         
         # Generate response
-        response = f"📍 {location}\n"
-        response += f"⚠️ Risk: {risk}%\n"
+        response = f"📍 {location_data['name']}\n"
+        response += f"⚠️ Risk: {risk_data['final_risk']}%\n"
         
-        if risk > 70:
+        if risk_data['final_risk'] > 70:
             response += "Wah risk tinggi nih... berani? 😈"
-        elif risk > 50:
+        elif risk_data['final_risk'] > 50:
             response += "Risk medium, asal hati-hati aja 🤫"
         else:
             response += "Aman kayaknya, yuk! 🥰"
@@ -671,7 +691,7 @@ class MyLoveUltimate:
         
         # Start polling
         await self.app.updater.start_polling(
-            allowed_updates=[],
+            allowed_updates=['message', 'callback_query'],
             drop_pending_updates=True,
             poll_interval=1.0,
             timeout=30
@@ -711,7 +731,6 @@ class MyLoveUltimate:
             async def debug_info():
                 if not self.app:
                     return {"error": "Bot not initialized"}
-                
                 return {
                     "components": self.debug.component_status,
                     "errors": self.debug.errors[-5:],
@@ -728,17 +747,11 @@ class MyLoveUltimate:
                 """Telegram webhook endpoint"""
                 if not self.app:
                     return Response(status_code=503, content="Bot not ready")
-                    
                 try:
-                    # Parse update
                     data = await request.json()
                     update = Update.de_json(data, self.app.bot)
-                    
-                    # Process in background
                     asyncio.create_task(self.app.process_update(update))
-                    
                     return Response(status_code=200)
-                    
                 except Exception as e:
                     self.debug.log_component_error("WEBHOOK_ENDPOINT", e)
                     return Response(status_code=500)
@@ -763,8 +776,6 @@ class MyLoveUltimate:
                 reload=False
             )
             server = uvicorn.Server(config)
-            
-            # Run server
             await server.serve()
             
         except Exception as e:
@@ -780,13 +791,13 @@ class MyLoveUltimate:
             # Try webhook first
             webhook_success = await self.setup_webhook()
             
+            # Jalankan FastAPI di background jika webhook sukses
             if webhook_success:
-                # Start webhook server
+                # Jalankan server webhook
                 await self.start_webhook_server()
             else:
                 # Fallback to polling
                 await self.start_polling()
-                
                 # Keep running
                 while True:
                     await asyncio.sleep(1)
@@ -807,23 +818,19 @@ class MyLoveUltimate:
                 if self.webhook_mode:
                     await self.app.bot.delete_webhook(drop_pending_updates=True)
                     self.debug.log_info("SHUTDOWN", "Webhook deleted")
-                    
                 await self.app.stop()
                 await self.app.shutdown()
                 self.debug.log_info("SHUTDOWN", "Telegram app stopped")
             except Exception as e:
                 self.debug.log_component_error("SHUTDOWN", e)
                 
-        # Close memory
-        if hasattr(self, 'memory'):
+        if self.memory:
             try:
                 await self.memory.close()
             except:
                 pass
                 
-        # Print final summary
         self.debug.print_summary()
-        
         self.debug.log_info("SHUTDOWN", "Goodbye!")
 
 
@@ -845,7 +852,6 @@ async def main():
     
     # Handle shutdown signals
     loop = asyncio.get_running_loop()
-    
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(
             sig,
