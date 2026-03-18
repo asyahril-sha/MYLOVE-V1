@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - CLOTHING SYSTEM
+MYLOVE ULTIMATE VERSI 2 - CLOTHING SYSTEM (FIX LENGKAP)
 =============================================================================
 Sistem pakaian dinamis
 - Pakaian berubah berdasarkan role, lokasi, mood
 - Auto-change periodik
-- Deskripsi pakaian yang menarik (500+ karakter)
+- Deskripsi pakaian yang menarik
 - Reaksi user terhadap pakaian
 =============================================================================
 """
@@ -29,7 +29,6 @@ class ClothingStyle(str, Enum):
     TOWEL = "towel"            # Handuk (abis mandi)
     SLEEPWEAR = "sleepwear"    # Piyama
     LINGERIE = "lingerie"      # Lingerie
-    NAKED = "naked"            # Telanjang
 
 
 class ClothingSystem:
@@ -62,14 +61,12 @@ class ClothingSystem:
                 "piyama katun motif lucu",
                 "kaos oblong + celana pendek",
                 "nightgown pink tipis",
-                "sleep bra + celana pendek",
-                "oneshot piyama hangat"
+                "sleep bra + celana pendek"
             ],
             ClothingStyle.TOWEL: [
                 "handuk putih melilit di dada",
                 "handuk batik cuma nutup badan",
-                "handuk besar melilit sebatas dada",
-                "handuk kecil nutup seperlunya"
+                "handuk besar melilit sebatas dada"
             ]
         },
         
@@ -101,11 +98,6 @@ class ClothingSystem:
                 "handuk kecil nutup seadanya",
                 "handuk melilit di dada",
                 "basah-basahan pakai handuk"
-            ],
-            ClothingStyle.NAKED: [
-                "telanjang hanya pakai selimut",
-                "bugil ditutup rambut",
-                "telanjang meringkuk"
             ]
         },
         
@@ -131,11 +123,6 @@ class ClothingSystem:
                 "baby doll transparan",
                 "g-string + bra open cup",
                 "stocking + garter belt"
-            ],
-            ClothingStyle.NAKED: [
-                "telanjang bulat",
-                "bugil cuma pakai sepatu hak",
-                "telanjang ditutup tangan"
             ]
         },
         
@@ -205,6 +192,60 @@ class ClothingSystem:
                 "tanktop + rok (after office)",
                 "daster (di rumah)",
                 "kaos kebesaran (weekend)"
+            ]
+        },
+        
+        # ===== SEPUPU =====
+        "sepupu": {
+            ClothingStyle.CASUAL: [
+                "kaos polos + rok panjang",
+                "blouse manis + kulot",
+                "dress bunga-bunga",
+                "sweeter + legging",
+                "t-shirt + jeans"
+            ],
+            ClothingStyle.SLEEPWEAR: [
+                "piyama katun lucu",
+                "kaos tidur panjang",
+                "nightgown sederhana"
+            ]
+        },
+        
+        # ===== TEMAN SMA =====
+        "teman_sma": {
+            ClothingStyle.CASUAL: [
+                "seragam SMA (kenangan)",
+                "kaos + rok pendek",
+                "hoodie kebesaran",
+                "dress santai",
+                "t-shirt + jeans"
+            ],
+            ClothingStyle.SEXY: [
+                "tanktop + rok mini (reuni)",
+                "daster (di rumah)",
+                "kaos kebesaran"
+            ]
+        },
+        
+        # ===== MANTAN =====
+        "mantan": {
+            ClothingStyle.CASUAL: [
+                "dress hitam elegan",
+                "blouse + rok span",
+                "kaos + jeans",
+                "kemeja putih + legging",
+                "sweeter + hotpants"
+            ],
+            ClothingStyle.SEXY: [
+                "tanktop ketat tanpa bra",
+                "daster tipis transparan",
+                "lingerie set hitam",
+                "kaos kebesaran + celana dalam"
+            ],
+            ClothingStyle.LINGERIE: [
+                "lingerie set merah membara",
+                "body suit seksi",
+                "baby doll transparan"
             ]
         }
     }
@@ -280,7 +321,7 @@ class ClothingSystem:
     
     def get_clothing_description(self, clothing: str) -> str:
         """
-        Dapatkan deskripsi panjang tentang pakaian (500+ karakter)
+        Dapatkan deskripsi panjang tentang pakaian
         
         Args:
             clothing: String pakaian
@@ -329,7 +370,7 @@ class ClothingSystem:
             location: Lokasi saat ini
             
         Returns:
-            Pesan panjang (500+ karakter)
+            Pesan panjang
         """
         desc = self.get_clothing_description(clothing)
         
