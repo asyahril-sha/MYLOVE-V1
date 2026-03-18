@@ -1,5 +1,5 @@
 # =============================================================================
-# MYLOVE ULTIMATE VERSI 1 - DEPENDENCIES (FINAL FIXED)
+# MYLOVE ULTIMATE VERSI 1 - DEPENDENCIES (VERSI TERBARU)
 # =============================================================================
 
 # Telegram Bot
@@ -8,10 +8,10 @@ python-telegram-bot[job-queue]==20.7
 # AI & DeepSeek
 openai>=1.0.0
 
-# Configuration - Fixed versions
-pydantic==2.5.0
-pydantic-core==2.14.6
-pydantic-settings==2.1.0
+# Configuration - Versi terbaru (kompatibel dengan pydantic-core terbaru)
+pydantic==2.11.3
+pydantic-core==2.33.1
+pydantic-settings==2.8.1
 python-dotenv==1.0.0
 
 # Database
@@ -42,3 +42,6 @@ cryptography==41.0.7
 
 # System
 psutil==5.9.5
+
+# HTTP client for telegram bot
+httpx~=0.25.2
