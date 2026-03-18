@@ -286,8 +286,7 @@ async def setup_webhook(app):
             url=webhook_url,
             allowed_updates=['message', 'callback_query'],
             drop_pending_updates=True,
-            max_connections=40,
-            timeout=30
+            max_connections=40
         )
         
         # Verify
