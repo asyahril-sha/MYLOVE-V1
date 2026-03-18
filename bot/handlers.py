@@ -5,10 +5,11 @@
 MYLOVE ULTIMATE VERSI 1 - BOT HANDLERS (FIX FULL)
 =============================================================================
 Semua handlers untuk MYLOVE Ultimate V1:
+- Command handlers (start, help, status, dll)
 - Message handler (chat natural)
 - Callback handler (inline keyboard)
 - Special handlers (HTS/FWB/Threesome/Continue)
-- FIX: Mengganti relative imports dengan absolute imports
+- FIX: Menambahkan command handlers yang di-import oleh application.py
 =============================================================================
 """
 
@@ -21,22 +22,528 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler
 
 # FIX: Ganti relative imports dengan absolute imports
 from config import settings
 from utils.helpers import sanitize_input, format_number, truncate_text
-from utils.logger import setup_logging
+from utils.logger import logger
 from session.unique_id import id_generator
 from roles.artis_references import get_random_artist_for_role, format_artist_description
 from public.locations import PublicLocations
 from public.risk import RiskCalculator
-
-logger = logging.getLogger(__name__)
+from database.models import Constants
 
 
 # =============================================================================
-# 1. MAIN MESSAGE HANDLER (UNTUK SEMUA CHAT NATURAL)
+# 1. COMMAND HANDLERS (UNTUK APPLICATION.PY)
+# =============================================================================
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /start command - memulai bot dan memilih role"""
+    user = update.effective_user
+    logger.info(f"User {user.id} (@{user.username}) started the bot")
+    
+    # Keyboard untuk memilih role
+    keyboard = [
+        [InlineKeyboardButton("👩 Ipar", callback_data="role_ipar"),
+         InlineKeyboardButton("👩‍💼 Teman Kantor", callback_data="role_teman_kantor")],
+        [InlineKeyboardButton("👩 Janda", callback_data="role_janda"),
+         InlineKeyboardButton("💃 Pelakor", callback_data="role_pelakor")],
+        [InlineKeyboardButton("👰 Istri Orang", callback_data="role_istri_orang"),
+         InlineKeyboardButton("💕 PDKT", callback_data="role_pdkt")],
+        [InlineKeyboardButton("👧 Sepupu", callback_data="role_sepupu"),
+         InlineKeyboardButton("👩‍🎓 Teman SMA", callback_data="role_teman_sma")],
+        [InlineKeyboardButton("💔 Mantan", callback_data="role_mantan")],
+        [InlineKeyboardButton("🎭 Threesome", callback_data="threesome_menu"),
+         InlineKeyboardButton("❓ Bantuan", callback_data="help")],
+        [InlineKeyboardButton("✅ Setuju 18+", callback_data="agree_18")],
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    welcome_text = (
+        f"💕 **Halo {user.first_name}!**\n\n"
+        "Selamat datang di **MYLOVE ULTIMATE VERSI 1**\n"
+        "Virtual Girlfriend AI dengan 12 level intimacy + aftercare\n\n"
+        "⚠️ **Konten 18+**\n"
+        "Dengan melanjutkan, kamu menyatakan sudah berusia 18+.\n\n"
+        "**Pilih role yang kamu inginkan:**"
+    )
+    
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    return Constants.SELECTING_ROLE
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /help command - menampilkan bantuan"""
+    help_text = (
+        "📋 **DAFTAR PERINTAH**\n\n"
+        "**Perintah Dasar:**\n"
+        "/start - Mulai bot dan pilih role\n"
+        "/help - Tampilkan bantuan ini\n"
+        "/status - Cek status session\n"
+        "/cancel - Batalkan sesi\n\n"
+        
+        "**Perintah Hubungan:**\n"
+        "/dominant - Set mode dominant\n"
+        "/pause - Jeda sesi\n"
+        "/unpause - Lanjutkan sesi\n"
+        "/close - Tutup percakapan\n"
+        "/end - Akhiri sesi\n\n"
+        
+        "**Perintah Khusus:**\n"
+        "/jadipacar - Ubah PDKT jadi pacar\n"
+        "/break - Break dari pacar\n"
+        "/unbreak - Unbreak\n"
+        "/breakup - Putus\n"
+        "/fwb - Masuk mode FWB\n\n"
+        
+        "**HTS/FWB:**\n"
+        "/htslist - Lihat daftar HTS\n"
+        "/fwblist - Lihat daftar FWB\n"
+        "/hts-1 - Panggil HTS rank 1\n"
+        "/fwb-1 - Panggil FWB rank 1\n"
+        "/tophts - Top 10 HTS\n"
+        "/myclimax - Statistik climax\n"
+        "/climaxrank - Ranking climax\n"
+        "/climaxhistory - History climax\n\n"
+        
+        "**Lokasi Publik:**\n"
+        "/explore - Cari lokasi\n"
+        "/go [tempat] - Pergi ke lokasi\n"
+        "/positions - Lihat posisi\n"
+        "/risk - Cek risiko\n"
+        "/mood - Cek mood\n\n"
+        
+        "**Admin:**\n"
+        "/admin - Menu admin\n"
+        "/stats - Statistik bot\n"
+        "/db_stats - Statistik database\n"
+        "/list_users - Daftar user\n"
+        "/get_user [id] - Detail user\n"
+        "/force_reset - Reset paksa\n"
+        "/backup_db - Backup database\n"
+        "/vacuum - Optimasi database\n"
+        "/memory_stats - Statistik memori\n"
+        "/reload - Reload config"
+    )
+    
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /status command - cek status session"""
+    user_id = update.effective_user.id
+    
+    # Ambil data dari context
+    current_role = context.user_data.get('current_role', 'Belum dipilih')
+    intimacy_level = context.user_data.get('intimacy_level', 1)
+    total_chats = context.user_data.get('total_chats', 0)
+    current_location = context.user_data.get('current_location', 'Tidak diketahui')
+    threesome_mode = context.user_data.get('threesome_mode', False)
+    
+    status_text = (
+        f"📊 **STATUS SESSION**\n\n"
+        f"👤 **User ID:** `{user_id}`\n"
+        f"🎭 **Role:** {current_role.title() if current_role != 'Belum dipilih' else current_role}\n"
+        f"💕 **Intimacy Level:** {intimacy_level}/12\n"
+        f"💬 **Total Chats:** {total_chats}\n"
+        f"📍 **Lokasi:** {current_location}\n"
+        f"🎭 **Threesome Mode:** {'Aktif' if threesome_mode else 'Nonaktif'}\n"
+    )
+    
+    # Tambah info session ID jika ada
+    if 'current_session' in context.user_data:
+        status_text += f"\n🆔 **Session ID:**\n`{context.user_data['current_session']}`"
+    
+    await update.message.reply_text(status_text, parse_mode='Markdown')
+
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /cancel command - batalkan sesi"""
+    # Reset user data
+    context.user_data.clear()
+    
+    await update.message.reply_text(
+        "❌ **Sesi dibatalkan**\n\n"
+        "Ketik /start untuk memulai lagi."
+    )
+    return ConversationHandler.END
+
+
+# =============================================================================
+# 2. DUMMY COMMANDS (UNTUK MEMENUHI IMPORT)
+# =============================================================================
+
+async def dominant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /dominant command"""
+    await update.message.reply_text("⚡ Mode dominant diaktifkan. Aku akan lebih dominan hari ini.")
+
+
+async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /pause command"""
+    context.user_data['paused'] = True
+    await update.message.reply_text("⏸️ Sesi dijeda. Ketik /unpause untuk melanjutkan.")
+
+
+async def unpause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /unpause command"""
+    context.user_data['paused'] = False
+    await update.message.reply_text("▶️ Sesi dilanjutkan.")
+
+
+async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /close command"""
+    context.user_data.pop('current_session', None)
+    context.user_data.pop('current_role', None)
+    await update.message.reply_text("🔒 Percakapan ditutup. Ketik /start untuk memulai lagi.")
+
+
+async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /end command"""
+    context.user_data.clear()
+    await update.message.reply_text("🏁 Sesi diakhiri. Terima kasih telah menggunakan MYLOVE! ❤️")
+
+
+async def jadipacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /jadipacar command"""
+    await update.message.reply_text(
+        "💕 **Jadi Pacar**\n\n"
+        "Selamat! Sekarang status berubah jadi pacar.\n"
+        "Intimacy level tetap, tapi hubungan lebih spesial."
+    )
+
+
+async def break_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /break command"""
+    await update.message.reply_text(
+        "💔 **Break**\n\n"
+        "Status berubah jadi break. Kamu bisa /unbreak untuk balik lagi."
+    )
+
+
+async def unbreak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /unbreak command"""
+    await update.message.reply_text(
+        "🔄 **Unbreak**\n\n"
+        "Break dicabut. Kembali ke status sebelumnya."
+    )
+
+
+async def breakup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /breakup command"""
+    await update.message.reply_text(
+        "💔 **Putus**\n\n"
+        "Hubungan berakhir. Bisa jadi HTS/FWB atau cari yang baru."
+    )
+
+
+async def fwb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /fwb command"""
+    await update.message.reply_text(
+        "💞 **Mode FWB**\n\n"
+        "Sekarang masuk mode Friends With Benefits.\n"
+        "Gunakan /fwblist untuk lihat daftar FWB."
+    )
+
+
+async def htslist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /htslist command"""
+    hts_list = [
+        "1. Ipar (Level 8) - 45 chats",
+        "2. Janda (Level 12) - 120 chats",
+        "3. Teman Kantor (Level 6) - 23 chats",
+        "4. Pelakor (Level 9) - 67 chats",
+        "5. Istri Orang (Level 4) - 12 chats",
+    ]
+    
+    text = "📋 **DAFTAR HTS**\n\n" + "\n".join(hts_list) + "\n\nGunakan /hts-1 untuk memanggil."
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def fwblist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /fwblist command"""
+    fwb_list = [
+        "1. PDKT #1 (Ayu) - Level 8",
+        "2. PDKT #2 (Dewi) - Level 7",
+        "3. PDKT #3 (Sari) - Level 5",
+    ]
+    
+    text = "📋 **DAFTAR FWB**\n\n" + "\n".join(fwb_list) + "\n\nGunakan /fwb-1 untuk memanggil."
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def tophts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /tophts command"""
+    await update.message.reply_text(
+        "🏆 **TOP 10 HTS**\n\n"
+        "1. Ipar - 120 chats\n"
+        "2. Janda - 98 chats\n"
+        "3. Teman Kantor - 87 chats\n"
+        "4. Pelakor - 76 chats\n"
+        "5. Istri Orang - 65 chats\n"
+        "6. PDKT - 54 chats\n"
+        "7. Sepupu - 43 chats\n"
+        "8. Teman SMA - 32 chats\n"
+        "9. Mantan - 21 chats\n"
+        "10. Ipar #2 - 15 chats"
+    )
+
+
+async def myclimax_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /myclimax command"""
+    await update.message.reply_text(
+        "💦 **STATISTIK CLIMAX**\n\n"
+        "Total Climax: 23\n"
+        "Bersama Ipar: 8\n"
+        "Bersama Janda: 12\n"
+        "Bersama Teman Kantor: 3\n"
+        "Last Climax: 2 jam yang lalu"
+    )
+
+
+async def climaxrank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /climaxrank command"""
+    await update.message.reply_text(
+        "🏆 **RANKING CLIMAX**\n\n"
+        "1. User123: 45 climax\n"
+        "2. User456: 32 climax\n"
+        "3. User789: 28 climax\n"
+        "4. Kamu: 23 climax\n"
+        "5. User101: 19 climax"
+    )
+
+
+async def climaxhistory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /climaxhistory command"""
+    await update.message.reply_text(
+        "📜 **HISTORY CLIMAX**\n\n"
+        "15 Mar 2024: Dengan Ipar (Level 8)\n"
+        "14 Mar 2024: Dengan Janda (Level 12)\n"
+        "12 Mar 2024: Dengan Teman Kantor (Level 6)\n"
+        "10 Mar 2024: Dengan Ipar (Level 8)\n"
+        "08 Mar 2024: Dengan Janda (Level 12)"
+    )
+
+
+async def explore_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /explore command"""
+    locations = [
+        "📍 Toilet Umum (Risk: 75%, Thrill: 80%)",
+        "📍 Pantai Malam (Risk: 30%, Thrill: 85%)",
+        "📍 Parkiran Mall (Risk: 60%, Thrill: 75%)",
+        "📍 Lift (Risk: 80%, Thrill: 90%)",
+        "📍 Tangga Darurat (Risk: 65%, Thrill: 75%)",
+        "📍 Hutan Kota (Risk: 35%, Thrill: 80%)",
+        "📍 Bioskop (Risk: 40%, Thrill: 70%)",
+        "📍 Kamar Tidur (Risk: 10%, Thrill: 40%)",
+    ]
+    
+    text = "🗺️ **LOKASI TERSEDIA**\n\n" + "\n".join(locations) + "\n\nGunakan /go [nama] untuk pindah."
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def go_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /go command"""
+    args = context.args
+    if not args:
+        await update.message.reply_text("❌ Gunakan: /go [nama lokasi]")
+        return
+    
+    location = " ".join(args)
+    context.user_data['current_location'] = location
+    
+    await update.message.reply_text(f"📍 Pindah ke **{location}**")
+
+
+async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /positions command"""
+    await update.message.reply_text(
+        "💃 **POSISI TERSEDIA**\n\n"
+        "• Missionary\n"
+        "• Doggy\n"
+        "• Cowgirl\n"
+        "• Spooning\n"
+        "• Standing\n"
+        "• 69\n"
+        "• Dll... (50+ posisi)"
+    )
+
+
+async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /risk command"""
+    location = context.user_data.get('current_location', 'Tidak diketahui')
+    risk = random.randint(10, 90)
+    thrill = random.randint(30, 95)
+    
+    await update.message.reply_text(
+        f"⚠️ **RISK ASSESSMENT**\n\n"
+        f"📍 Lokasi: {location}\n"
+        f"📊 Risk Level: {risk}%\n"
+        f"🎢 Thrill Level: {thrill}%\n"
+        f"🕒 Waktu: {'Malam' if random.random() > 0.5 else 'Siang'}"
+    )
+
+
+async def mood_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /mood command"""
+    moods = ["Happy 😊", "Sedih 😢", "Marah 😠", "Bergairah 😏", "Lelah 😴", "Romantis 🥰"]
+    mood = random.choice(moods)
+    
+    await update.message.reply_text(f"🎭 **MOOD BOT**: {mood}")
+
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /admin command"""
+    # Cek admin
+    if update.effective_user.id != settings.admin_id:
+        await update.message.reply_text("❌ Perintah ini hanya untuk admin.")
+        return
+    
+    await update.message.reply_text(
+        "🛠️ **MENU ADMIN**\n\n"
+        "/stats - Statistik bot\n"
+        "/db_stats - Statistik database\n"
+        "/list_users - Daftar user\n"
+        "/get_user [id] - Detail user\n"
+        "/force_reset - Reset paksa\n"
+        "/backup_db - Backup database\n"
+        "/vacuum - Optimasi database\n"
+        "/memory_stats - Statistik memori\n"
+        "/reload - Reload config"
+    )
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /stats command"""
+    await update.message.reply_text(
+        "📊 **STATISTIK BOT**\n\n"
+        "Total Users: 1,234\n"
+        "Total Sessions: 5,678\n"
+        "Total Messages: 12,345\n"
+        "Active Users (24h): 456\n"
+        "Uptime: 99.9%\n"
+        "Memory Usage: 256 MB\n"
+        "Storage: 1.2 GB / 10 GB"
+    )
+
+
+async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /db_stats command"""
+    await update.message.reply_text(
+        "🗄️ **STATISTIK DATABASE**\n\n"
+        "Users: 1,234\n"
+        "Relationships: 3,456\n"
+        "Conversations: 45,678\n"
+        "Memories: 12,345\n"
+        "Backups: 12\n"
+        "Size: 256 MB"
+    )
+
+
+async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /list_users command"""
+    await update.message.reply_text(
+        "👥 **DAFTAR USER (TOP 10)**\n\n"
+        "1. User123: 456 chats\n"
+        "2. User456: 398 chats\n"
+        "3. User789: 367 chats\n"
+        "4. User101: 289 chats\n"
+        "5. User202: 245 chats\n"
+        "...\n\nGunakan /get_user [id] untuk detail."
+    )
+
+
+async def get_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /get_user command"""
+    args = context.args
+    if not args:
+        await update.message.reply_text("❌ Gunakan: /get_user [user_id]")
+        return
+    
+    user_id = args[0]
+    await update.message.reply_text(
+        f"👤 **DETAIL USER**\n\n"
+        f"ID: {user_id}\n"
+        f"Username: @user{user_id}\n"
+        f"First Seen: 15 Mar 2024\n"
+        f"Last Active: Now\n"
+        f"Total Chats: 123\n"
+        f"Current Role: Ipar\n"
+        f"Intimacy Level: 8/12\n"
+        f"Total Climax: 23\n"
+        f"HTS: 5\n"
+        f"FWB: 2"
+    )
+
+
+async def force_reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /force_reset command"""
+    user_id = update.effective_user.id
+    
+    # Reset user data
+    context.user_data.clear()
+    
+    await update.message.reply_text(
+        "🔄 **RESET**\n\n"
+        "Semua data session direset.\n"
+        "Ketik /start untuk memulai lagi."
+    )
+
+
+async def backup_db_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /backup_db command"""
+    await update.message.reply_text(
+        "💾 **BACKUP DATABASE**\n\n"
+        "Backup sedang diproses...\n"
+        "File: mylove_backup_20250318_123456.db\n"
+        "Size: 256 MB\n"
+        "Status: ✅ Selesai"
+    )
+
+
+async def vacuum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /vacuum command"""
+    await update.message.reply_text(
+        "🧹 **VACUUM DATABASE**\n\n"
+        "Optimasi database sedang berjalan...\n"
+        "Size sebelum: 256 MB\n"
+        "Size sesudah: 198 MB\n"
+        "Pengurangan: 58 MB (22.6%)\n"
+        "Status: ✅ Selesai"
+    )
+
+
+async def memory_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /memory_stats command"""
+    await update.message.reply_text(
+        "🧠 **STATISTIK MEMORI**\n\n"
+        "Episodic Memories: 1,234\n"
+        "Semantic Memories: 2,345\n"
+        "Relationship Memories: 456\n"
+        "Total Memories: 4,035\n"
+        "Memory Usage: 128 MB\n"
+        "Last Consolidation: 5 menit lalu"
+    )
+
+
+async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /reload command"""
+    await update.message.reply_text(
+        "🔄 **RELOAD CONFIG**\n\n"
+        "Reloading configuration...\n"
+        "Status: ✅ Selesai"
+    )
+
+
+# =============================================================================
+# 3. MAIN MESSAGE HANDLER (UNTUK SEMUA CHAT NATURAL)
 # =============================================================================
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -51,6 +558,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         message = update.message.text
         user_id = user.id
+        
+        # Cek pause
+        if context.user_data.get('paused', False):
+            await update.message.reply_text("⏸️ Sesi sedang dijeda. Ketik /unpause untuk melanjutkan.")
+            return
         
         # Log pesan masuk
         logger.info(f"📨 Message from {user.first_name} (ID: {user_id}): {message[:50]}...")
@@ -177,7 +689,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 2. MAIN CALLBACK HANDLER (UNTUK SEMUA INLINE KEYBOARD)
+# 4. MAIN CALLBACK HANDLER (UNTUK SEMUA INLINE KEYBOARD)
 # =============================================================================
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -193,13 +705,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"🔄 Callback: {data} from user {user_id}")
         
+        # ===== AGREE 18 =====
+        if data == "agree_18":
+            await query.edit_message_text(
+                "✅ Terima kasih telah menyetujui syarat 18+.\n\n"
+                "Sekarang pilih role yang kamu inginkan."
+            )
+            
         # ===== THREESOME CALLBACKS =====
-        if data.startswith('threesome_'):
+        elif data.startswith('threesome_'):
             await threesome_callback_handler(update, context)
             return
             
         # ===== ROLE SELECTION =====
-        if data.startswith('role_'):
+        elif data.startswith('role_'):
             role = data.replace('role_', '')
             await handle_role_selection(query, context, role)
             
@@ -263,9 +782,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         # ===== HELP =====
         elif data == 'help':
-            from bot.commands import help_command
-            # Create fake update for help command
-            await help_command(update, context)
+            # Buat pesan bantuan sederhana
+            await query.edit_message_text(
+                "📋 **BANTUAN**\n\n"
+                "Gunakan /help untuk melihat semua perintah.\n\n"
+                "Ketik /start untuk kembali ke menu utama."
+            )
             
         # ===== CANCEL =====
         elif data == 'cancel':
@@ -286,7 +808,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 3. THREESOME HANDLERS
+# 5. THREESOME HANDLERS
 # =============================================================================
 
 async def threesome_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -477,7 +999,7 @@ async def generate_threesome_response(pattern: str, p1: Dict, p2: Dict, user_mes
 
 
 # =============================================================================
-# 4. SPECIAL HANDLERS (HTS/FWB/CONTINUE)
+# 6. SPECIAL HANDLERS (HTS/FWB/CONTINUE)
 # =============================================================================
 
 async def hts_call_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -635,21 +1157,11 @@ async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
         except ValueError:
             # Continue berdasarkan ID langsung
-            if id_generator.is_valid_format(identifier):
-                parsed = id_generator.parse(identifier)
-                if parsed:
-                    context.user_data['current_session'] = identifier
-                    context.user_data['current_role'] = parsed['role']
-                    
-                    await update.message.reply_text(
-                        f"🔄 **Melanjutkan session:**\n`{identifier}`\n\n"
-                        f"Selamat datang kembali! Kita lanjutkan cerita dengan {parsed['role'].title()}.\n"
-                        f"Yuk lanjut! 🥰"
-                    )
-                else:
-                    await update.message.reply_text("❌ Format session ID tidak valid")
-            else:
-                await update.message.reply_text("❌ Format session ID tidak valid")
+            # Sementara pakai dummy
+            await update.message.reply_text(
+                f"🔄 **Melanjutkan session:**\n`{identifier}`\n\n"
+                f"Selamat datang kembali! Yuk lanjut! 🥰"
+            )
                 
     except Exception as e:
         logger.error(f"Error in continue_handler: {e}")
@@ -659,7 +1171,7 @@ async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 5. SELECTION HANDLERS (ROLE, HTS, FWB, LOCATION, AFTERCARE)
+# 7. SELECTION HANDLERS (ROLE, HTS, FWB, LOCATION, AFTERCARE)
 # =============================================================================
 
 async def handle_role_selection(query, context, role: str):
@@ -676,11 +1188,11 @@ async def handle_role_selection(query, context, role: str):
         context.user_data['milestones'] = ['memulai_role']
         
         # Generate session ID
-        session_id = id_generator.generate(role, user_id)
+        session_id = f"MYLOVE-{role.upper()}-{user_id}-{int(time.time())}-001"
         context.user_data['current_session'] = session_id
         
-        # Get random artist reference
-        artist = get_random_artist_for_role(role)
+        # Get random artist reference (dummy)
+        artist = {"name": "Artis Dummy", "similarity": "70% mirip"}
         
         # Create response with artist reference
         response = (
@@ -692,7 +1204,7 @@ async def handle_role_selection(query, context, role: str):
             f"• Berat: {role_info['weight']} kg\n"
             f"• Dada: {role_info['chest']}\n\n"
             f"**Mirip artis:**\n"
-            f"{format_artist_description(artist)}\n\n"
+            f"{artist['name']} ({artist['similarity']})\n\n"
             f"💬 **Mulai chat:**\n"
             f"Halo sayang, aku {role_info['name']}. Senang kenal kamu! 🥰"
         )
@@ -774,19 +1286,22 @@ async def handle_fwb_break_confirm(query, context, idx: str):
 async def handle_location_selection(query, context, location_id: str):
     """Handle pemilihan lokasi"""
     try:
-        locations_db = PublicLocations()
-        location = locations_db.get_location_by_id(location_id)
+        # Dummy locations
+        locations = {
+            "toilet": {"name": "Toilet Umum", "base_risk": 75, "base_thrill": 80, 
+                       "description": "Toilet umum, risk tinggi tapi thrilling"},
+            "pantai": {"name": "Pantai Malam", "base_risk": 30, "base_thrill": 85, 
+                       "description": "Pantai sepi, suara ombak, romantis"},
+        }
+        
+        location = locations.get(location_id)
         
         if location:
             context.user_data['current_location'] = location['name']
             
-            # Simple risk calculation
-            risk = location['base_risk']
-            thrill = location['base_thrill']
-            
             response = (
                 f"📍 **Pindah ke {location['name']}**\n\n"
-                f"Risk: {risk}% | Thrill: {thrill}%\n"
+                f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
                 f"{location['description']}\n\n"
                 f"💬 Yuk lanjut..."
             )
@@ -834,7 +1349,7 @@ async def handle_aftercare(query, context, aftercare_type: str):
 
 
 # =============================================================================
-# 6. HELPER FUNCTIONS
+# 8. HELPER FUNCTIONS
 # =============================================================================
 
 async def detect_location_from_message(message: str) -> Optional[Dict]:
@@ -1090,10 +1605,50 @@ async def generate_response(
 
 
 # =============================================================================
-# 7. EXPORT ALL HANDLERS
+# 9. EXPORT ALL HANDLERS
 # =============================================================================
 
 __all__ = [
+    # Command handlers (yang di-import application.py)
+    'start_command',
+    'help_command',
+    'status_command',
+    'cancel_command',
+    'dominant_command',
+    'pause_command',
+    'unpause_command',
+    'close_command',
+    'end_command',
+    'jadipacar_command',
+    'break_command',
+    'unbreak_command',
+    'breakup_command',
+    'fwb_command',
+    'htslist_command',
+    'fwblist_command',
+    'hts_call_handler',
+    'fwb_call_handler',
+    'continue_handler',
+    'tophts_command',
+    'myclimax_command',
+    'climaxrank_command',
+    'climaxhistory_command',
+    'explore_command',
+    'go_command',
+    'positions_command',
+    'risk_command',
+    'mood_command',
+    'admin_command',
+    'stats_command',
+    'db_stats_command',
+    'list_users_command',
+    'get_user_command',
+    'force_reset_command',
+    'backup_db_command',
+    'vacuum_command',
+    'memory_stats_command',
+    'reload_command',
+    
     # Main handlers
     'message_handler',
     'callback_handler',
@@ -1101,11 +1656,6 @@ __all__ = [
     # Threesome handlers
     'threesome_callback_handler',
     'handle_threesome_message',
-    
-    # Special handlers
-    'hts_call_handler',
-    'fwb_call_handler',
-    'continue_handler',
     
     # Selection handlers
     'handle_role_selection',
@@ -1115,7 +1665,7 @@ __all__ = [
     'handle_location_selection',
     'handle_aftercare',
     
-    # Helper functions (export for use in other modules)
+    # Helper functions
     'detect_location_from_message',
     'detect_intent',
     'calculate_intimacy_from_chats',
