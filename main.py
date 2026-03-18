@@ -251,6 +251,7 @@ async def init_components():
     try:
         from bot.application import create_application
         _bot_app = create_application()
+        await _bot_app.initialize()
         logger.info("✅ Bot application created")
     except ImportError as e:
         logger.error(f"❌ Bot application module error: {e}")
