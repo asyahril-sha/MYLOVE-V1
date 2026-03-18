@@ -94,7 +94,7 @@ class ContextAnalyzer:
             'id' untuk Indonesia, 'en' untuk Inggris
         """
         if not text:
-            return 'id'
+            return 'id'  # Default Indonesia
         
         text_lower = text.lower()
         words = re.findall(r'\b\w+\b', text_lower)
@@ -102,10 +102,13 @@ class ContextAnalyzer:
         if not words:
             return 'id'
         
+        # Hitung jumlah kata Indonesia dan Inggris
         indo_count = sum(1 for word in words if word in self.indo_words)
         eng_count = sum(1 for word in words if word in self.eng_words)
         
+        # Jika tidak ada kata yang terdeteksi, cek karakteristik
         if indo_count == 0 and eng_count == 0:
+            # Cek keberadaan kata 'the' atau 'and' sebagai indikator Inggris
             if 'the' in text_lower or 'and' in text_lower or 'is' in text_lower:
                 return 'en'
             return 'id'
@@ -113,7 +116,15 @@ class ContextAnalyzer:
         return 'id' if indo_count >= eng_count else 'en'
     
     def get_language_instruction(self, language: str) -> str:
-        """Dapatkan instruksi untuk AI berdasarkan bahasa"""
+        """
+        Dapatkan instruksi untuk AI berdasarkan bahasa
+        
+        Args:
+            language: 'id' atau 'en'
+            
+        Returns:
+            Instruksi untuk prompt
+        """
         if language == 'en':
             return (
                 "RESPOND IN ENGLISH with natural, casual conversation style. "
@@ -131,7 +142,15 @@ class ContextAnalyzer:
     # =========================================================================
     
     def detect_intent(self, message: str) -> str:
-        """Deteksi intent dari pesan user"""
+        """
+        Deteksi intent dari pesan user
+        
+        Args:
+            message: Pesan user
+            
+        Returns:
+            String intent (rindu, sayang, intim, curhat, dll)
+        """
         message_lower = message.lower()
         
         for intent, keywords in self.intent_keywords.items():
@@ -139,10 +158,18 @@ class ContextAnalyzer:
                 if keyword in message_lower:
                     return intent
         
-        return 'chat'
+        return 'chat'  # Default intent
     
     def detect_mood_from_intent(self, intent: str) -> str:
-        """Deteksi mood berdasarkan intent"""
+        """
+        Deteksi mood berdasarkan intent
+        
+        Args:
+            intent: Hasil dari detect_intent
+            
+        Returns:
+            String mood
+        """
         mood_map = {
             'rindu': 'rindu',
             'sayang': 'sayang',
@@ -158,6 +185,7 @@ class ContextAnalyzer:
             'kaget': 'kaget',
             'kesepian': 'sepi'
         }
+        
         return mood_map.get(intent, 'netral')
     
     # =========================================================================
@@ -166,16 +194,30 @@ class ContextAnalyzer:
     
     def get_calling(self, level: int, role: str, bot_name: str, user_name: str, 
                     language: str = 'id') -> Dict[str, str]:
-        """Tentukan panggilan yang tepat berdasarkan level"""
+        """
+        Tentukan panggilan yang tepat berdasarkan level
         
+        Args:
+            level: Level hubungan (1-12)
+            role: Role bot
+            bot_name: Nama bot
+            user_name: Nama user
+            language: Bahasa yang digunakan
+            
+        Returns:
+            Dict dengan 'bot_call' dan 'user_call'
+        """
         # Panggilan untuk bot menyebut dirinya sendiri
         if level >= 7:
+            # Level tinggi, bisa pake "aku" atau tetap nama
             bot_call = random.choice([bot_name, "aku"])
         else:
+            # Level rendah, pake nama biar lebih personal
             bot_call = bot_name
         
         # Panggilan untuk user
         if language == 'en':
+            # English calls
             if level >= 9:
                 user_call = random.choice(["baby", "sweetheart", "love", "honey"])
             elif level >= 7:
@@ -185,11 +227,13 @@ class ContextAnalyzer:
             else:
                 user_call = user_name
         else:
+            # Indonesian calls
             if level >= 9:
                 user_call = random.choice(["sayang", "cinta", "baby"])
             elif level >= 7:
                 user_call = random.choice(["sayang", "cinta"])
             elif level >= 4:
+                # Deteksi gender (sederhana)
                 if user_name.lower() in ['mas', 'bro', 'bang']:
                     user_call = "mas"
                 elif user_name.lower() in ['mbak', 'sis']:
@@ -199,14 +243,25 @@ class ContextAnalyzer:
             else:
                 user_call = user_name
         
-        return {'bot_call': bot_call, 'user_call': user_call}
+        return {
+            'bot_call': bot_call,
+            'user_call': user_call
+        }
     
     # =========================================================================
     # LEVEL DESCRIPTIONS
     # =========================================================================
     
     def get_level_description(self, level: int) -> str:
-        """Dapatkan deskripsi karakteristik level"""
+        """
+        Dapatkan deskripsi karakteristik level
+        
+        Args:
+            level: Level 1-12
+            
+        Returns:
+            String deskripsi
+        """
         descriptions = {
             1: "masih canggung, malu-malu, sopan",
             2: "mulai terbuka, sedikit curhat",
@@ -224,7 +279,15 @@ class ContextAnalyzer:
         return descriptions.get(level, "normal")
     
     def get_intimacy_status(self, level: int) -> str:
-        """Dapatkan status intim berdasarkan level"""
+        """
+        Dapatkan status intim berdasarkan level
+        
+        Args:
+            level: Level 1-12
+            
+        Returns:
+            String status
+        """
         if level >= 12:
             return "aftercare - butuh perhatian setelah climax"
         elif level >= 7:
@@ -238,22 +301,40 @@ class ContextAnalyzer:
     
     async def build_full_context(self, user_id: int, user_message: str, 
                                    user_data: Dict, env_data: Dict = None) -> Dict:
-        """Bangun konteks SUPER LENGKAP untuk AI prompt"""
+        """
+        Bangun konteks SUPER LENGKAP untuk AI prompt
         
+        Args:
+            user_id: ID user
+            user_message: Pesan user
+            user_data: Data dari context.user_data
+            env_data: Data environment (lokasi, posisi, pakaian)
+            
+        Returns:
+            Dict dengan semua konteks
+        """
+        # Data dasar
         role = user_data.get('current_role', 'ipar')
         bot_name = user_data.get('bot_name', 'Aurora')
         user_name = user_data.get('user_name', 'Sayang')
         level = user_data.get('intimacy_level', 1)
         
+        # Deteksi bahasa
         language = self.detect_language(user_message)
+        
+        # Deteksi intent dan mood
         intent = self.detect_intent(user_message)
         mood = self.detect_mood_from_intent(intent)
+        
+        # Panggilan
         calls = self.get_calling(level, role, bot_name, user_name, language)
         
+        # Data leveling
         leveling = user_data.get('leveling', {})
         total_minutes = leveling.get('total_minutes', 0)
         boosted_minutes = leveling.get('boosted_minutes', 0)
         
+        # Data environment
         if env_data is None:
             env_data = {}
         
@@ -261,6 +342,7 @@ class ContextAnalyzer:
         position = env_data.get('position', user_data.get('current_position', 'duduk'))
         clothing = env_data.get('clothing', user_data.get('current_clothing', 'pakaian biasa'))
         
+        # Waktu
         now = datetime.now()
         hour = now.hour
         
@@ -275,24 +357,37 @@ class ContextAnalyzer:
         else:
             time_of_day = "tengah malam"
         
+        # Milestones
         milestones = user_data.get('milestones', [])
         recent_milestones = milestones[-3:] if milestones else []
         
+        # Bangun konteks lengkap
         full_context = {
+            # Identitas
             'user_id': user_id,
             'user_name': user_name,
             'user_message': user_message,
             'bot_name': bot_name,
             'role': role,
+            
+            # Panggilan
             'bot_call': calls['bot_call'],
             'user_call': calls['user_call'],
+            
+            # Bahasa
             'language': language,
             'language_instruction': self.get_language_instruction(language),
+            
+            # Intent & Mood
             'intent': intent,
             'mood': mood,
+            
+            # Level
             'level': level,
             'level_description': self.get_level_description(level),
             'intimacy_status': self.get_intimacy_status(level),
+            
+            # Environment
             'location': location,
             'position': position,
             'clothing': clothing,
@@ -300,16 +395,23 @@ class ContextAnalyzer:
             'hour': hour,
             'day': now.strftime("%A"),
             'date': now.strftime("%d %B %Y"),
+            
+            # Progress
             'total_minutes': round(total_minutes, 1),
             'boosted_minutes': round(boosted_minutes, 1),
             'minutes_to_level_7': max(0, 60 - total_minutes),
             'minutes_to_level_11': max(0, 120 - total_minutes),
+            
+            # History
             'recent_milestones': recent_milestones,
             'total_chats': user_data.get('total_chats', 0),
+            
+            # Status hubungan
             'relationship_status': user_data.get('relationship_status', 'hts'),
             'threesome_mode': user_data.get('threesome_mode', False),
         }
         
+        # Tambah arousal jika ada
         if 'arousal' in user_data:
             full_context['arousal'] = user_data['arousal']
             full_context['arousal_percent'] = f"{user_data['arousal']*100:.0f}%"
