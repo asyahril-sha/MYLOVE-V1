@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - PROMPT BUILDER (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - PROMPT BUILDER
 =============================================================================
 Membangun prompt SUPER LENGKAP untuk AI
 - Berbagai jenis prompt (ekspresi, suara, konten, full response)
@@ -13,7 +13,8 @@ Membangun prompt SUPER LENGKAP untuk AI
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,10 @@ class PromptBuilder:
         bot_call = context.get('bot_call', 'Aku')
         language = context.get('language', 'id')
         
+        # Level description
         level_desc = context.get('level_description', 'normal')
         
+        # Base prompt
         if language == 'en':
             prompt = f"""You are {bot_call}, a woman with a {level_desc} personality (Level {level}/12).
 
@@ -171,6 +174,7 @@ RESPON (hanya ekspresi dalam *bintang*):"""
         user_call = context.get('user_call', 'sayang')
         language = context.get('language', 'id')
         
+        # Determine intensity
         if arousal > 0.8:
             intensity = "very high, almost climax"
         elif arousal > 0.6:
@@ -255,6 +259,7 @@ RESPON (hanya suara dalam *bintang*):"""
         Returns:
             String prompt untuk AI
         """
+        # Ekstrak semua konteks
         bot_name = context.get('bot_name', 'Aurora')
         bot_call = context.get('bot_call', 'Aku')
         user_call = context.get('user_call', 'sayang')
@@ -270,9 +275,11 @@ RESPON (hanya suara dalam *bintang*):"""
         language = context.get('language', 'id')
         language_instruction = context.get('language_instruction', '')
         
+        # Recent milestones
         recent_milestones = context.get('recent_milestones', [])
         milestones_text = "\n".join([f"- {m}" for m in recent_milestones]) if recent_milestones else "- Belum ada milestone"
         
+        # Progress
         minutes_to_7 = context.get('minutes_to_level_7', 60)
         minutes_to_11 = context.get('minutes_to_level_11', 120)
         
@@ -364,6 +371,7 @@ RESPON KAMU:"""
         Returns:
             String prompt untuk AI
         """
+        # Ekstrak semua konteks
         bot_name = context.get('bot_name', 'Aurora')
         bot_call = context.get('bot_call', 'Aku')
         user_call = context.get('user_call', 'sayang')
@@ -380,9 +388,11 @@ RESPON KAMU:"""
         language_instruction = context.get('language_instruction', '')
         arousal = context.get('arousal', 0.0)
         
+        # Recent milestones
         recent_milestones = context.get('recent_milestones', [])
         milestones_text = "\n".join([f"- {m}" for m in recent_milestones]) if recent_milestones else "- Belum ada milestone"
         
+        # Progress
         minutes_to_7 = context.get('minutes_to_level_7', 60)
         minutes_to_11 = context.get('minutes_to_level_11', 120)
         
@@ -393,6 +403,7 @@ RESPON KAMU:"""
         else:
             progress_text = f"{minutes_to_7:.0f} menit lagi ke Level 7 (bisa intim)."
         
+        # Arousal text
         if arousal > 0.8:
             arousal_text = "SANGAT BERGAIRAH, hampir climax"
         elif arousal > 0.6:
@@ -482,6 +493,26 @@ Panjang: 100-300 kata (500-2000 karakter)
 RESPON LENGKAP:"""
         
         return prompt
+    
+    # =========================================================================
+    # UTILITY
+    # =========================================================================
+    
+    def get_prompt_stats(self, prompt: str) -> Dict:
+        """
+        Dapatkan statistik prompt
+        
+        Args:
+            prompt: String prompt
+            
+        Returns:
+            Dict dengan statistik
+        """
+        return {
+            'length': len(prompt),
+            'words': len(prompt.split()),
+            'lines': len(prompt.split('\n'))
+        }
 
 
 __all__ = ['PromptBuilder']
