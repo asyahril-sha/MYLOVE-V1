@@ -86,7 +86,7 @@ class WebhookManager:
                 "admin_id": settings.admin_id
             }
             
-        @self.fastapi_app.post(f"/webhook/{settings.telegram_token}")
+        @self.fastapi_app.post("/webhook")
         async def webhook(request: Request):
             """
             Endpoint utama webhook dari Telegram
@@ -143,7 +143,7 @@ class WebhookManager:
             base_url = f"http://localhost:{settings.webhook.port}"
             logger.warning(f"No public domain, using local URL: {base_url}")
             
-        self.webhook_url = f"{base_url}/webhook/{settings.telegram_token}"
+        self.webhook_url = f"{base_url}/webhook"
         
         logger.info(f"🔗 Setting webhook to: {self.webhook_url}")
         
