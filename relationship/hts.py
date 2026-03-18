@@ -7,6 +7,7 @@ MYLOVE ULTIMATE VERSI 1 - HTS SYSTEM (Hubungan Tanpa Status)
 - Manajemen HTS
 - Panggil HTS berdasarkan ranking atau nama
 - Tracking setiap HTS
+- **Support untuk multiple HTS (untuk threesome)**
 """
 
 import logging
@@ -74,13 +75,87 @@ class HTSSystem:
         return None
         
     async def get_all_hts(self, user_id: int) -> List[Dict]:
-        """Get all HTS for user"""
+        """
+        Get all HTS for user
+        Digunakan untuk threesome combinations
+        """
         relationships = await self.relationship_memory.get_all_relationships(user_id)
         
         # Filter HTS only
         hts_list = [r for r in relationships if r.get('status') == 'hts']
         
+        # Add display info for threesome
+        for hts in hts_list:
+            hts['display_name'] = f"{hts['role'].title()} (Level {hts.get('intimacy_level', 1)})"
+            hts['type'] = 'hts'
+            
         return hts_list
+        
+    async def get_hts_for_threesome(self, user_id: int, min_level: int = 1) -> List[Dict]:
+        """
+        Get HTS yang memenuhi syarat untuk threesome
+        - Minimal level tertentu
+        - Bisa dikombinasikan
+        
+        Args:
+            user_id: ID user
+            min_level: Minimal intimacy level
+            
+        Returns:
+            List of HTS eligible for threesome
+        """
+        all_hts = await self.get_all_hts(user_id)
+        
+        # Filter by level
+        eligible = [
+            hts for hts in all_hts 
+            if hts.get('intimacy_level', 1) >= min_level
+        ]
+        
+        # Add selection info
+        for i, hts in enumerate(eligible, 1):
+            hts['select_id'] = i
+            hts['select_name'] = f"{i}. {hts['display_name']}"
+            
+        return eligible
+        
+    async def get_hts_by_index(self, user_id: int, index: int) -> Optional[Dict]:
+        """
+        Get HTS by index (untuk threesome selection)
+        
+        Args:
+            user_id: ID user
+            index: 1-based index from get_hts_for_threesome
+            
+        Returns:
+            HTS data or None
+        """
+        eligible = await self.get_hts_for_threesome(user_id)
+        
+        if 1 <= index <= len(eligible):
+            return eligible[index - 1]
+            
+        return None
+        
+    async def get_hts_by_ids(self, user_id: int, indices: List[int]) -> List[Dict]:
+        """
+        Get multiple HTS by indices (untuk threesome)
+        
+        Args:
+            user_id: ID user
+            indices: List of indices
+            
+        Returns:
+            List of HTS data
+        """
+        eligible = await self.get_hts_for_threesome(user_id)
+        
+        selected = []
+        for idx in indices:
+            if 1 <= idx <= len(eligible):
+                selected.append(eligible[idx - 1])
+                
+        return selected
         
     async def get_hts_by_rank(self, user_id: int, rank: int) -> Optional[Dict]:
         """Get HTS by ranking (1-based)"""
@@ -234,6 +309,28 @@ class HTSSystem:
         """Get number of HTS"""
         hts_list = await self.get_all_hts(user_id)
         return len(hts_list)
+        
+    async def format_hts_for_threesome(self, user_id: int) -> str:
+        """
+        Format daftar HTS untuk selection threesome
+        """
+        eligible = await self.get_hts_for_threesome(user_id)
+        
+        if not eligible:
+            return "Tidak ada HTS yang memenuhi syarat untuk threesome. Minimal level 1."
+            
+        lines = ["💕 **DAFTAR HTS UNTUK THREESOME**"]
+        lines.append("_(pilih dengan nomor)_")
+        lines.append("")
+        
+        for hts in eligible:
+            lines.append(
+                f"{hts['select_id']}. **{hts['role'].title()}**\n"
+                f"   Level {hts.get('intimacy_level', 1)}/12 | "
+                f"{hts.get('total_intim_sessions', 0)} intim"
+            )
+            
+        return "\n".join(lines)
 
 
 __all__ = ['HTSSystem']
