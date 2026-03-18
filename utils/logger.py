@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from loguru import logger as loguru_logger
 
-# Coba import settings, jika gagal buat default
+# Coba import settings
 try:
     from config import settings
 except ImportError:
@@ -30,12 +30,12 @@ def setup_logging(module_name: str = "gadis_v81"):
     - Error tracking
     """
     
-    # Tentukan direktori log dengan fallback
-    if settings and hasattr(settings, 'log_dir'):
-        log_dir = Path(settings.log_dir)
+    # Tentukan direktori log dari settings
+    if settings and hasattr(settings, 'logging') and hasattr(settings.logging, 'log_dir'):
+        log_dir = Path(settings.logging.log_dir)
     else:
         # Fallback ke direktori logs lokal
-        log_dir = Path("logs")
+        log_dir = Path("data/logs")
     
     # Pastikan direktori log ada
     log_dir.mkdir(exist_ok=True, parents=True)
@@ -43,11 +43,12 @@ def setup_logging(module_name: str = "gadis_v81"):
     # Remove default handler
     logger.remove()
     
-    # Console handler dengan warna (INFO ke atas)
+    # Console handler dengan warna (sesuai level dari settings)
+    console_level = settings.logging.level if settings and hasattr(settings, 'logging') else "INFO"
     logger.add(
         sys.stdout,
         format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
-        level="INFO",
+        level=console_level,
         colorize=True,
         enqueue=True,
         backtrace=True,
@@ -82,7 +83,7 @@ def setup_logging(module_name: str = "gadis_v81"):
         diagnose=True
     )
     
-    # JSON handler untuk monitoring
+    # JSON handler untuk monitoring (opsional)
     json_log = log_dir / f"{module_name}_json.log"
     logger.add(
         json_log,
@@ -97,6 +98,7 @@ def setup_logging(module_name: str = "gadis_v81"):
     logger.info(f"   • Log file: {log_file}")
     logger.info(f"   • Error file: {error_file}")
     logger.info(f"   • JSON log: {json_log}")
+    logger.info(f"   • Log level: {console_level}")
     
     return logger
 
