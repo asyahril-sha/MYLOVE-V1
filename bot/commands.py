@@ -2,24 +2,33 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - BOT COMMANDS (FINAL)
+MYLOVE ULTIMATE VERSI 1 - BOT COMMANDS (FIX FULL)
 =============================================================================
 Semua command handlers untuk MYLOVE Ultimate V1
 Total 55+ commands dengan semua fitur:
 - Basic, Relationship, HTS/FWB, Threesome, Session, Public Area, Ranking, Admin
+- FIX: Mengganti relative imports dengan absolute imports
 =============================================================================
 """
 
 import time
 import logging
 import random
+import asyncio
 from datetime import datetime
+from typing import Dict, List, Optional, Any
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+# FIX: Ganti relative imports dengan absolute imports
 from config import settings
-from ..utils.helpers import format_number, sanitize_input
-from ..utils.logger import setup_logging
+from utils.helpers import format_number, sanitize_input, truncate_text
+from utils.logger import setup_logging
+from session.unique_id import id_generator
+from public.locations import PublicLocations
+from public.risk import RiskCalculator
+from threesome.manager import ThreesomeManager, ThreesomeType, ThreesomeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +46,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith('continue_'):
         session_id = args[0].replace('continue_', '')
         context.args = [session_id]
-        from .handlers import continue_handler
+        # Import di sini untuk menghindari circular import
+        from bot.handlers import continue_handler
         return await continue_handler(update, context)
     
     # Welcome message
@@ -570,7 +580,7 @@ async def threesome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data['threesome_mode'] = True
             context.user_data['threesome_combination'] = idx
-        except:
+        except ValueError:
             await update.message.reply_text(
                 "❌ Format salah. Gunakan /threesome-list dulu untuk lihat kombinasi."
             )
@@ -825,47 +835,55 @@ async def sessions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def explore_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cari lokasi random"""
-    from ..public.locations import PublicLocations
-    
-    locations_db = PublicLocations()
-    location = locations_db.get_random_location()
-    
-    explore_text = (
-        f"📍 **{location['name']}**\n"
-        f"Kategori: {location['category'].title()}\n"
-        f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
-        f"_{location['description']}_\n\n"
-        f"💡 Mau ke sini? Ketik: \"ke {location['name'].lower()} yuk\""
-    )
-    
-    await update.message.reply_text(explore_text, parse_mode='Markdown')
+    try:
+        locations_db = PublicLocations()
+        location = locations_db.get_random_location()
+        
+        explore_text = (
+            f"📍 **{location['name']}**\n"
+            f"Kategori: {location['category'].title()}\n"
+            f"Risk: {location['base_risk']}% | Thrill: {location['base_thrill']}%\n"
+            f"_{location['description']}_\n\n"
+            f"💡 Mau ke sini? Ketik: \"ke {location['name'].lower()} yuk\""
+        )
+        
+        await update.message.reply_text(explore_text, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in explore_command: {e}")
+        await update.message.reply_text(
+            "❌ Gagal mendapatkan lokasi. Coba lagi nanti."
+        )
 
 
 async def locations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat semua lokasi"""
-    from ..public.locations import PublicLocations
-    
-    locations_db = PublicLocations()
-    stats = locations_db.get_location_stats()
-    
-    categories = {
-        "urban": "🏙️ Urban",
-        "nature": "🌳 Alam",
-        "extreme": "⚡ Extreme",
-        "transport": "🚗 Transport"
-    }
-    
-    text = f"📍 **PUBLIC AREAS**\nTotal: {stats['total']} lokasi\n\n"
-    
-    for cat, name in categories.items():
-        count = stats.get(cat, 0)
-        text += f"{name}: {count} lokasi\n"
+    try:
+        locations_db = PublicLocations()
+        stats = locations_db.get_location_stats()
         
-    text += f"\nRata-rata Risk: {stats['avg_risk']:.0f}%\n"
-    text += f"Rata-rata Thrill: {stats['avg_thrill']:.0f}%\n\n"
-    text += "💡 Gunakan /explore untuk cari random lokasi"
-    
-    await update.message.reply_text(text, parse_mode='Markdown')
+        categories = {
+            "urban": "🏙️ Urban",
+            "nature": "🌳 Alam",
+            "extreme": "⚡ Extreme",
+            "transport": "🚗 Transport"
+        }
+        
+        text = f"📍 **PUBLIC AREAS**\nTotal: {stats['total']} lokasi\n\n"
+        
+        for cat, name in categories.items():
+            count = stats.get(cat, 0)
+            text += f"{name}: {count} lokasi\n"
+            
+        text += f"\nRata-rata Risk: {stats['avg_risk']:.0f}%\n"
+        text += f"Rata-rata Thrill: {stats['avg_thrill']:.0f}%\n\n"
+        text += "💡 Gunakan /explore untuk cari random lokasi"
+        
+        await update.message.reply_text(text, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in locations_command: {e}")
+        await update.message.reply_text(
+            "❌ Gagal mendapatkan data lokasi."
+        )
 
 
 async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -879,40 +897,46 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
         
-    # Dummy risk data
-    risk_data = {
-        "final_risk": random.randint(30, 90),
-        "risk_level": "TINGGI",
-        "description": "Risk tinggi, harus hati-hati",
-        "factors": {
-            "time": {"category": "malam", "multiplier": 0.7},
-            "day": {"category": "weekend", "multiplier": 0.8},
-            "weather": {"condition": "cerah", "multiplier": 1.0}
+    try:
+        # Dummy risk data - akan diganti dengan real calculator
+        risk_data = {
+            "final_risk": random.randint(30, 90),
+            "risk_level": "TINGGI",
+            "description": "Risk tinggi, harus hati-hati",
+            "factors": {
+                "time": {"category": "malam", "multiplier": 0.7},
+                "day": {"category": "weekend", "multiplier": 0.8},
+                "weather": {"condition": "cerah", "multiplier": 1.0}
+            }
         }
-    }
-    
-    if risk_data['final_risk'] < 40:
-        risk_level = "RENDAH"
-        desc = "Aman banget, santai aja"
-    elif risk_data['final_risk'] < 60:
-        risk_level = "SEDANG"
-        desc = "Lumayan aman, tapi tetap hati-hati"
-    elif risk_data['final_risk'] < 80:
-        risk_level = "TINGGI"
-        desc = "Wah risk tinggi, harus cepet"
-    else:
-        risk_level = "EXTREME"
-        desc = "GILA! Nyaris ketahuan!"
-    
-    text = f"📍 **{location}**\n"
-    text += f"⚠️ Risk: {risk_data['final_risk']}% ({risk_level})\n"
-    text += f"📝 {desc}\n\n"
-    text += "**Faktor:**\n"
-    text += f"• Waktu ({risk_data['factors']['time']['category']})\n"
-    text += f"• Hari ({risk_data['factors']['day']['category']})\n"
-    text += f"• Cuaca ({risk_data['factors']['weather']['condition']})"
-    
-    await update.message.reply_text(text, parse_mode='Markdown')
+        
+        if risk_data['final_risk'] < 40:
+            risk_level = "RENDAH"
+            desc = "Aman banget, santai aja"
+        elif risk_data['final_risk'] < 60:
+            risk_level = "SEDANG"
+            desc = "Lumayan aman, tapi tetap hati-hati"
+        elif risk_data['final_risk'] < 80:
+            risk_level = "TINGGI"
+            desc = "Wah risk tinggi, harus cepet"
+        else:
+            risk_level = "EXTREME"
+            desc = "GILA! Nyaris ketahuan!"
+        
+        text = f"📍 **{location}**\n"
+        text += f"⚠️ Risk: {risk_data['final_risk']}% ({risk_level})\n"
+        text += f"📝 {desc}\n\n"
+        text += "**Faktor:**\n"
+        text += f"• Waktu ({risk_data['factors']['time']['category']})\n"
+        text += f"• Hari ({risk_data['factors']['day']['category']})\n"
+        text += f"• Cuaca ({risk_data['factors']['weather']['condition']})"
+        
+        await update.message.reply_text(text, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in risk_command: {e}")
+        await update.message.reply_text(
+            "❌ Gagal menghitung risk. Coba lagi nanti."
+        )
 
 
 # =============================================================================
@@ -1200,5 +1224,4 @@ __all__ = [
     'recover_command', 'debug_command'
 ]
 
-# Total commands: 4 + 5 + 6 + 6 + 3 + 3 + 3 + 5 = 35 commands
-# Plus callback handlers dan special handlers = 55+ total interactions
+# Total commands: 35 commands + callback handlers = 55+ total interactions
