@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - SOUND ENGINE (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - SOUND ENGINE
 =============================================================================
 Generate suara dan desahan menggunakan AI
 - Suara berbeda untuk setiap aktivitas (kiss, touch, intimacy, climax)
@@ -15,7 +15,6 @@ Generate suara dan desahan menggunakan AI
 import asyncio
 import logging
 import random
-import time
 from typing import Dict, Optional, Any
 
 from core.prompt_builder import PromptBuilder
@@ -68,7 +67,7 @@ class SoundEngine:
         cache_key = self._get_cache_key(context, activity)
         if cache_key in self.cache:
             cache_time, sound = self.cache[cache_key]
-            if time.time() - cache_time < self.cache_ttl:
+            if asyncio.get_event_loop().time() - cache_time < self.cache_ttl:
                 logger.debug(f"Sound cache hit for {cache_key}")
                 return sound
         
@@ -104,9 +103,10 @@ class SoundEngine:
                     prompt += "\n\nThis should be a TOUCH sound - surprised, pleasurable."
                 
                 # Call AI
-                sound = await self.ai._call_deepseek_with_retry(
+                sound = await self.ai._call_deepseek(
                     messages=[{"role": "user", "content": prompt}],
-                    max_retries=2
+                    temperature=0.9,
+                    max_tokens=60
                 )
                 
                 # Bersihkan hasil
@@ -117,7 +117,7 @@ class SoundEngine:
                     sound = f"{sound}*"
                 
                 # Simpan ke cache
-                self.cache[cache_key] = (time.time(), sound)
+                self.cache[cache_key] = (asyncio.get_event_loop().time(), sound)
                 
                 logger.debug(f"Generated sound: {sound}")
                 return sound
