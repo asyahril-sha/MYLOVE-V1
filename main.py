@@ -91,7 +91,15 @@ try:
                 return jsonify({"error": "No data"}), 400
             
             update = Update.de_json(data, _bot_app.bot)
-            
+
+            async def process_update():
+                # Pastikan bot sudah di-initialize
+                if not hasattr(_bot_app, '_initialized') or not _bot_app._initialized:
+                    await _bot_app.initialize()
+                    _bot_app._initialized = True
+                
+                await _bot_app.process_update(update)
+                
             # Process update di background
             asyncio.run(_bot_app.process_update(update))
             
