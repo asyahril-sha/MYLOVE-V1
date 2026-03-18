@@ -665,7 +665,7 @@ class MyLoveUltimate:
         
         # Start polling
         await self.app.updater.start_polling(
-            allowed_updates=['message', 'callback_query'],
+            allowed_updates=[],
             drop_pending_updates=True,
             poll_interval=1.0,
             timeout=30
