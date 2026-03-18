@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - NICKNAME SYSTEM (FIX LENGKAP)
+MYLOVE ULTIMATE VERSI 2 - NICKNAME SYSTEM
 =============================================================================
 Sistem panggilan berdasarkan level dan role
 - Menentukan bagaimana bot memanggil user
@@ -387,6 +387,7 @@ class NicknameSystem:
         Returns:
             'male', 'female', atau 'unknown'
         """
+        # Cek akhiran nama
         name_lower = user_name.lower()
         
         # Indikasi cowok
