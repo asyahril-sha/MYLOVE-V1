@@ -21,7 +21,7 @@ except ImportError:
 logger = loguru_logger
 
 
-def setup_logging(module_name: str = "gadis_v81"):
+def setup_logging(module_name: str = "MYLOVE-V1"):
     """
     Setup logging dengan loguru
     - Console logging dengan warna
