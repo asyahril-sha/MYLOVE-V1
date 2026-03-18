@@ -289,6 +289,8 @@ async def setup_webhook(app):
                 logger.warning(f"No public domain, using local URL: {webhook_url}")
         
         logger.info(f"🔗 Setting webhook to: {webhook_url}")
+
+        loop = asyncio.get_running_loop()
         
         # Set webhook
         await app.bot.set_webhook(
