@@ -15,9 +15,6 @@ import asyncio
 from typing import Optional
 from telegram import Update
 from telegram.ext import Application
-from fastapi import FastAPI, Request, Response
-import uvicorn
-
 from config import settings
 from ..utils.logger import setup_logging
 
