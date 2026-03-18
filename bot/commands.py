@@ -1236,6 +1236,9 @@ __all__ = [
     # Admin (5)
     'stats_command', 'db_stats_command', 'backup_command', 
     'recover_command', 'debug_command'
+
+    # Error Handle
+    'error_handler',
 ]
 
 # Total commands: 35 commands + callback handlers = 55+ total interactions
