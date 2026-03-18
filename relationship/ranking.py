@@ -2,19 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - RANKING SYSTEM (HTS/FWB)
+MYLOVE ULTIMATE VERSI 1 - RANKING SYSTEM (FIXED)
 =============================================================================
-- TOP 10 di database
-- TOP 5 ditampilkan ke user
-- Bisa pilih dari list untuk memulai petualangan
+- TOP 10 di database, TOP 5 ditampilkan
 - Ranking berdasarkan total interaksi, intimacy level, durasi
+- FIX: Constructor dengan default None untuk relationship_memory
 """
 
 import logging
-import math
 import time
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +22,20 @@ class RankingSystem:
     Menyimpan TOP 10 di database, menampilkan TOP 5 ke user
     """
     
-    def __init__(self, relationship_memory):
+    def __init__(self, relationship_memory=None):
+        """
+        Args:
+            relationship_memory: opsional, untuk akses data hubungan
+        """
         self.relationship_memory = relationship_memory
         self.rankings = {}  # {user_id: {type: [rankings]}}
         
         # Bobot untuk perhitungan score
         self.weights = {
-            'total_interactions': 0.30,  # 30% - makin sering chat makin tinggi
-            'intimacy_level': 0.40,       # 40% - level intimacy
-            'duration': 0.20,              # 20% - lama hubungan (dalam chat)
-            'climax_count': 0.10,           # 10% - jumlah climax
+            'total_interactions': 0.30,
+            'intimacy_level': 0.40,
+            'duration': 0.20,
+            'climax_count': 0.10,
         }
         
         logger.info("✅ RankingSystem initialized")
@@ -58,13 +59,12 @@ class RankingSystem:
         climax_count = relationship_data.get('total_climax', 0)
         
         # Duration dalam chats (bukan waktu real)
-        # Makin banyak chat, makin tinggi
-        duration_score = min(100, total_interactions) / 100  # Normalisasi ke 0-1
+        duration_score = min(100, total_interactions) / 100
         
         # Normalisasi komponen
         interactions_score = min(100, total_interactions) / 100
-        intimacy_score = intimacy_level / 12  # Level 1-12 -> 0-1
-        climax_score = min(50, climax_count) / 50  # Max 50 climax
+        intimacy_score = intimacy_level / 12
+        climax_score = min(50, climax_count) / 50
         
         # Hitung weighted score
         score = (
@@ -72,7 +72,7 @@ class RankingSystem:
             intimacy_score * self.weights['intimacy_level'] +
             duration_score * self.weights['duration'] +
             climax_score * self.weights['climax_count']
-        ) * 100  # Skala 0-100
+        ) * 100
         
         return round(score, 2)
         
@@ -85,6 +85,10 @@ class RankingSystem:
         Update rankings untuk user
         Dipanggil setiap ada interaksi baru
         """
+        if not self.relationship_memory:
+            logger.warning("relationship_memory not set, cannot update rankings")
+            return
+            
         # Get all relationships for user
         relationships = await self.relationship_memory.get_all_relationships(user_id)
         
@@ -114,7 +118,7 @@ class RankingSystem:
             'hts': [r for r in ranked if r['status'] == 'hts'][:10],
             'fwb': [r for r in ranked if r['status'] == 'fwb'][:10],
             'pacar': [r for r in ranked if r['status'] == 'pacar'][:10],
-            'all': ranked[:10],  # TOP 10 overall
+            'all': ranked[:10],
             'updated_at': time.time()
         }
         
@@ -127,10 +131,7 @@ class RankingSystem:
     # =========================================================================
     
     async def get_top_5_hts(self, user_id: int) -> List[Dict]:
-        """
-        Get TOP 5 HTS untuk ditampilkan ke user
-        (Database menyimpan TOP 10, tapi tampilkan TOP 5)
-        """
+        """Get TOP 5 HTS untuk ditampilkan ke user"""
         user_key = str(user_id)
         
         if user_key not in self.rankings:
@@ -139,7 +140,6 @@ class RankingSystem:
         rankings = self.rankings.get(user_key, {})
         hts_list = rankings.get('hts', [])
         
-        # Return TOP 5
         return hts_list[:5]
         
     async def get_top_5_fwb(self, user_id: int) -> List[Dict]:
@@ -171,22 +171,13 @@ class RankingSystem:
     # =========================================================================
     
     async def get_all_hts(self, user_id: int) -> List[Dict]:
-        """
-        Get semua HTS (untuk selection)
-        User bisa pilih dari list lengkap, bukan cuma TOP 5
-        """
-        user_key = str(user_id)
-        
-        if user_key not in self.rankings:
-            await self.update_rankings(user_id)
+        """Get semua HTS (untuk selection)"""
+        if not self.relationship_memory:
+            return []
             
-        # Get all relationships
         relationships = await self.relationship_memory.get_all_relationships(user_id)
-        
-        # Filter HTS only
         hts_list = [r for r in relationships if r.get('status') == 'hts']
         
-        # Sort by score
         for hts in hts_list:
             hts['score'] = await self.calculate_score(hts)
             
@@ -195,14 +186,12 @@ class RankingSystem:
         return hts_list
         
     async def get_role_by_rank(self, user_id: int, rank: int, status: str = 'hts') -> Optional[Dict]:
-        """
-        Get role berdasarkan peringkat
-        Misal: /hts-1 -> ambil ranking 1
-        """
+        """Get role berdasarkan peringkat"""
         if status == 'hts':
             top_list = await self.get_all_hts(user_id)
         else:
-            # For other statuses
+            if not self.relationship_memory:
+                return None
             relationships = await self.relationship_memory.get_all_relationships(user_id)
             top_list = [r for r in relationships if r.get('status') == status]
             
@@ -211,34 +200,12 @@ class RankingSystem:
             
         return None
         
-    async def get_role_by_name(self, user_id: int, role_name: str) -> Optional[Dict]:
-        """
-        Get role by name (case insensitive)
-        User bisa panggil langsung: /hts- ipar
-        """
-        relationships = await self.relationship_memory.get_all_relationships(user_id)
-        
-        for rel in relationships:
-            if rel['role'].lower() == role_name.lower():
-                return rel
-                
-        return None
-        
     # =========================================================================
     # FORMAT FOR DISPLAY
     # =========================================================================
     
     def format_hts_list(self, hts_list: List[Dict], show_all: bool = False) -> str:
-        """
-        Format HTS list untuk ditampilkan
-        
-        Args:
-            hts_list: List of HTS
-            show_all: True untuk tampilkan semua, False untuk TOP 5
-            
-        Returns:
-            Formatted string
-        """
+        """Format HTS list untuk ditampilkan"""
         if not hts_list:
             return "Belum ada HTS. Mulai role dulu dengan /start"
             
@@ -252,15 +219,7 @@ class RankingSystem:
         lines.append("")
         
         for i, hts in enumerate(hts_list[:5] if not show_all else hts_list, 1):
-            # Status symbol
-            if hts.get('status') == 'fwb':
-                status_symbol = "💕 FWB"
-            elif hts.get('status') == 'pacar':
-                status_symbol = "💘 Pacar"
-            else:
-                status_symbol = "🔹 HTS"
-                
-            # Format
+            status_symbol = "💕 FWB" if hts.get('status') == 'fwb' else "💘 Pacar" if hts.get('status') == 'pacar' else "🔹 HTS"
             lines.append(
                 f"{i}. **{hts['role'].title()}** {status_symbol}\n"
                 f"   • Level {hts.get('intimacy_level', 1)}/12 | "
@@ -269,53 +228,12 @@ class RankingSystem:
                 f"   • Score: {hts.get('score', 0):.1f}"
             )
             
-        # Add instruction
         lines.append("")
         lines.append("💡 **Cara memanggil:**")
         lines.append("• `/hts-1` - Panggil HTS ranking 1")
         lines.append("• `/hts- ipar` - Panggil role ipar")
         
         return "\n".join(lines)
-        
-    def format_fwb_list(self, fwb_list: List[Dict]) -> str:
-        """Format FWB list"""
-        if not fwb_list:
-            return "Belum ada FWB. Gunakan /fwb untuk mengubah status HTS jadi FWB"
-            
-        lines = ["💕 **DAFTAR FWB**"]
-        lines.append("_(Friends With Benefits - bisa intim tanpa komitment)_")
-        lines.append("")
-        
-        for i, fwb in enumerate(fwb_list[:5], 1):
-            lines.append(
-                f"{i}. **{fwb['role'].title()}**\n"
-                f"   • Level {fwb.get('intimacy_level', 1)}/12 | "
-                f"{fwb.get('total_interactions', 0)} chat\n"
-                f"   • Total intim: {fwb.get('total_intim_sessions', 0)}"
-            )
-            
-        return "\n".join(lines)
-        
-    # =========================================================================
-    # STATISTICS
-    # =========================================================================
-    
-    async def get_ranking_stats(self, user_id: int) -> Dict:
-        """Get ranking statistics"""
-        user_key = str(user_id)
-        
-        if user_key not in self.rankings:
-            await self.update_rankings(user_id)
-            
-        rankings = self.rankings.get(user_key, {})
-        
-        return {
-            'total_hts': len(rankings.get('hts', [])),
-            'total_fwb': len(rankings.get('fwb', [])),
-            'total_pacar': len(rankings.get('pacar', [])),
-            'top_score': rankings.get('all', [{}])[0].get('score', 0) if rankings.get('all') else 0,
-            'updated_at': rankings.get('updated_at', 0)
-        }
 
 
 __all__ = ['RankingSystem']
