@@ -74,7 +74,30 @@ class AIEngineComplete:
         self.total_tokens = 0
         
         logger.info(f"✅ AIEngineComplete initialized for user {user_id}, session {session_id}")
-    
+
+    async def _sync_location_memory(self):
+        """Sinkronisasi lokasi antara working memory dan long-term memory"""
+        
+        # Ambil lokasi dari working memory
+        current_loc = self.working.current_state.get('location')
+        if current_loc:
+            # Simpan ke semantic memory (long-term)
+            await self.semantic.save_location_to_long_term(
+                user_id=self.user_id,
+                location=current_loc,
+                timestamp=time.time()
+            )
+            logger.debug(f"📍 Location synced to long-term: {current_loc}")
+        
+        # Kalau working memory lupa, coba ambil dari long-term
+        if not current_loc:
+            recent = await self.semantic.get_recent_locations(self.user_id, hours=4)
+            if recent and len(recent) > 0:
+                # Set working memory ke lokasi terakhir
+                last_loc = recent[-1]
+                self.working.update_location(last_loc)
+                logger.info(f"📍 Restored location from long-term memory: {last_loc}")
+                
     # =========================================================================
     # SESSION MANAGEMENT
     # =========================================================================
