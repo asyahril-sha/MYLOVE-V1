@@ -26,4 +26,5 @@ __all__ = [
     'ExpressionEngineV2',
     'SoundEngineV2',
     'NameGenerator',
+    'LocationValidator',
 ]
