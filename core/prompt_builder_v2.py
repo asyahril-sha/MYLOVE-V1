@@ -18,9 +18,19 @@ Membangun prompt untuk AI dengan semua konteks:
 =============================================================================
 """
 
+import openai
+import json
+import time
+import random
+import asyncio
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
+from pathlib import Path
+
+from config import settings
+from .prompt_builder_v2 import PromptBuilderV2
+from .context_analyzer import ContextAnalyzer
 
 logger = logging.getLogger(__name__)
 
