@@ -45,6 +45,7 @@ class EpisodeType:
     USER_MESSAGE = "user_message"
     BOT_MESSAGE = "bot_message"
     IMPORTANT_TOPIC = "important_topic"
+    ACTIVITY_CHANGE = "activity_change"  # Tambahan
 
 
 class EpisodicMemory:
@@ -75,24 +76,123 @@ class EpisodicMemory:
         self.important_moments = {}  # {session_id: list of episode_ids}
         
         logger.info(f"✅ EpisodicMemory initialized (max {max_episodes} episodes)")
-        
+    
+    # =========================================================================
+    # EPISODE METHODS UNTUK SEMUA STATE
+    # =========================================================================
+    
     async def add_location_episode(self, session_id: str, from_loc: str, to_loc: str):
         """Catat perpindahan lokasi sebagai episode"""
-        
         await self.add_episode(
             session_id=session_id,
-            episode_type="location_change",
-            data={
-                'from': from_loc,
-                'to': to_loc,
-                'timestamp': time.time()
-            },
+            episode_type=EpisodeType.LOCATION_CHANGE,
+            data={'from': from_loc, 'to': to_loc},
             importance=0.6
         )
-        logger.debug(f"📍 Location episode recorded: {from_loc} → {to_loc}")
-        
+        logger.info(f"📍 Location episode recorded: {from_loc} → {to_loc}")
+    
+    async def add_clothing_episode(self, session_id: str, from_cloth: str, to_cloth: str, reason: str):
+        """Catat pergantian pakaian sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.CLOTHING_CHANGE,
+            data={'from': from_cloth, 'to': to_cloth, 'reason': reason},
+            importance=0.5
+        )
+        logger.info(f"👗 Clothing episode recorded: {from_cloth} → {to_cloth} ({reason})")
+    
+    async def add_position_episode(self, session_id: str, from_pos: str, to_pos: str):
+        """Catat perubahan posisi sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.POSITION_CHANGE,
+            data={'from': from_pos, 'to': to_pos},
+            importance=0.4
+        )
+        logger.info(f"🧍 Position episode recorded: {from_pos} → {to_pos}")
+    
+    async def add_activity_episode(self, session_id: str, from_act: str, to_act: str):
+        """Catat perubahan aktivitas sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.ACTIVITY_CHANGE,
+            data={'from': from_act, 'to': to_act},
+            importance=0.5
+        )
+        logger.info(f"🎯 Activity episode recorded: {from_act} → {to_act}")
+    
+    async def add_mood_episode(self, session_id: str, from_mood: str, to_mood: str, reason: str = ""):
+        """Catat perubahan mood sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.MOOD_CHANGE,
+            data={'from': from_mood, 'to': to_mood, 'reason': reason},
+            importance=0.6
+        )
+        logger.info(f"🎭 Mood episode recorded: {from_mood} → {to_mood}")
+    
+    async def add_arousal_episode(self, session_id: str, from_level: int, to_level: int, reason: str = ""):
+        """Catat perubahan gairah sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.AROUSAL_CHANGE,
+            data={'from': from_level, 'to': to_level, 'reason': reason},
+            importance=0.7
+        )
+        logger.debug(f"🔥 Arousal episode recorded: {from_level} → {to_level}")
+    
+    async def add_intimacy_start_episode(self, session_id: str, location: str):
+        """Catat mulai intim sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.INTIMACY_START,
+            data={'location': location},
+            importance=0.9
+        )
+        logger.info(f"💕 Intimacy started at {location}")
+    
+    async def add_intimacy_end_episode(self, session_id: str, duration: float):
+        """Catat selesai intim sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.INTIMACY_END,
+            data={'duration': duration},
+            importance=0.8
+        )
+        logger.info(f"💕 Intimacy ended after {duration:.0f}s")
+    
+    async def add_climax_episode(self, session_id: str, intensity: int, position: str = ""):
+        """Catat climax sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.CLIMAX,
+            data={'intensity': intensity, 'position': position},
+            importance=1.0
+        )
+        logger.info(f"💦 Climax episode recorded (intensity: {intensity})")
+    
+    async def add_first_kiss_episode(self, session_id: str, location: str):
+        """Catat first kiss sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.FIRST_KISS,
+            data={'location': location},
+            importance=1.0
+        )
+        logger.info(f"💋 First kiss episode recorded at {location}")
+    
+    async def add_first_intim_episode(self, session_id: str, location: str):
+        """Catat first intim sebagai episode"""
+        await self.add_episode(
+            session_id=session_id,
+            episode_type=EpisodeType.FIRST_INTIM,
+            data={'location': location},
+            importance=1.0
+        )
+        logger.info(f"🔥 First intim episode recorded at {location}")
+    
     # =========================================================================
-    # ADD EPISODE
+    # ADD EPISODE (METHOD UTAMA)
     # =========================================================================
     
     async def add_episode(self,
@@ -176,21 +276,6 @@ class EpisodicMemory:
         logger.debug(f"Episode added: {episode_type} - {summary}")
         
         return episode_id
-
-    async def add_location_episode(self, session_id: str, from_loc: str, to_loc: str):
-    """Catat perpindahan lokasi sebagai episode"""
-    
-    await self.add_episode(
-        session_id=session_id,
-        episode_type="location_change",
-        data={
-            'from': from_loc,
-            'to': to_loc,
-            'timestamp': time.time()
-        },
-        importance=0.6
-    )
-    logger.info(f"📍 Location episode recorded: {from_loc} → {to_loc}")
     
     def _generate_episode_id(self, session_id: str, episode_type: str) -> str:
         """Generate unique episode ID"""
@@ -209,6 +294,7 @@ class EpisodicMemory:
             EpisodeType.LOCATION_CHANGE: f"Pindah ke {data.get('to', '?')}",
             EpisodeType.CLOTHING_CHANGE: f"Ganti {data.get('to', '?')} ({data.get('reason', 'ganti baju')})",
             EpisodeType.POSITION_CHANGE: f"Ganti posisi ke {data.get('to', '?')}",
+            EpisodeType.ACTIVITY_CHANGE: f"Ganti aktivitas ke {data.get('to', '?')}",
             EpisodeType.MOOD_CHANGE: f"Mood berubah: {data.get('from', '?')} → {data.get('to', '?')}",
             EpisodeType.AROUSAL_CHANGE: f"Gairah: {data.get('from', '?')} → {data.get('to', '?')}",
             EpisodeType.INTIMACY_START: "Mulai intim",
@@ -455,6 +541,9 @@ class EpisodicMemory:
             ],
             EpisodeType.LOCATION_CHANGE: [
                 f"Inget gak waktu kita di {episode['data'].get('to', 'sana')}? {time_ago}.",
+            ],
+            EpisodeType.CLOTHING_CHANGE: [
+                f"Inget gak waktu kamu ganti {episode['data'].get('to', 'baju')}? {time_ago}.",
             ],
         }
         
