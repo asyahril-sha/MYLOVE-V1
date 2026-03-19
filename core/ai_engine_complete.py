@@ -141,6 +141,14 @@ class AIEngineComplete:
         """
         start_time = time.time()
         
+        # ===== 1. TAMBAHKAN LOGGING DI SINI =====  # <-- TAMBAHKAN INI
+        logger.info("=" * 50)                        # <-- TAMBAHKAN INI
+        logger.info(f"🔍 PROCESS MESSAGE START")     # <-- TAMBAHKAN INI
+        logger.info(f"👤 User message: {user_message[:100]}")  # <-- TAMBAHKAN INI
+        logger.info(f"📋 Context: {context}")        # <-- TAMBAHKAN INI
+        logger.info(f"🆔 Session: {self.session_id}")  # <-- TAMBAHKAN INI
+        # ===== SAMPAI SINI =====
+        
         try:
             # ===== 1. CEK CACHE =====
             cache_key = f"{self.session_id}:{user_message[:50]}"
@@ -175,13 +183,23 @@ class AIEngineComplete:
             )
             
             # ===== 7. GENERATE RESPONSE =====
+            # ===== TAMBAHKAN LOGGING DI SINI =====  # <-- TAMBAHKAN INI
+            logger.info("🤖 Calling DeepSeek API...")  # <-- TAMBAHKAN INI
+            logger.info(f"📝 Prompt length: {len(prompt)} chars")  # <-- TAMBAHKAN INI
+            # ===== SAMPAI SINI =====
+            
             messages = [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_message}
             ]
             
             response = await self._call_deepseek(messages)
-            
+
+            # ===== TAMBAHKAN LOGGING DI SINI =====  # <-- TAMBAHKAN INI
+            logger.info(f"✅ DeepSeek response received: {len(response)} chars")  # <-- TAMBAHKAN INI
+            logger.info(f"💬 Response preview: {response[:100]}...") # <-- TAMBAHKAN INI
+            # ===== SAMPAI SINI =====
+        
             # ===== 8. UPDATE SEMUA MEMORY =====
             await self._update_all_memories(user_message, response, context)
             
