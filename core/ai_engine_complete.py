@@ -173,6 +173,7 @@ class AIEngineComplete:
         # ===== SAMPAI SINI =====
         
         try:
+            await self._sync_location_memory()
             # ===== 1. CEK CACHE =====
             cache_key = f"{self.session_id}:{user_message[:50]}"
             if cache_key in self.response_cache:
