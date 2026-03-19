@@ -4,12 +4,10 @@
 =============================================================================
 MYLOVE ULTIMATE VERSI 2 - INTIMACY SYSTEM V2 (TIME-BASED)
 =============================================================================
-Berdasarkan V1 dengan perubahan fundamental:
-- Level berdasarkan DURASI PERCAKAPAN (bukan jumlah chat)
+- Level berdasarkan DURASI PERCAKAPAN
 - 60 menit → Level 7 (bisa intim)
 - 120 menit → Level 11 (deep connection)
-- Activity boost untuk aktivitas tertentu
-- Reset mechanism ke level 7 setelah level 12
+- FIX: Tambah get_status untuk progress command
 =============================================================================
 """
 
@@ -30,19 +28,13 @@ logger = logging.getLogger(__name__)
 class IntimacySystemV2:
     """
     Sistem intimacy level berdasarkan DURASI PERCAKAPAN
-    BUKAN jumlah chat - lebih realistis seperti hubungan manusia
     """
     
     def __init__(self, relationship_memory=None, consolidation=None):
-        """
-        Args:
-            relationship_memory: RelationshipMemory instance (optional)
-            consolidation: MemoryConsolidation instance (optional)
-        """
         self.relationship_memory = relationship_memory
         self.consolidation = consolidation
         
-        # Level definitions (sama dengan V1, tapi cara hitung berbeda)
+        # Level definitions
         self.level_names = {
             1: "Malu-malu",
             2: "Mulai terbuka",
@@ -99,28 +91,28 @@ class IntimacySystemV2:
             "movie", "music", "walk", "coffee", "hug"
         ]
         
-        # Level requirements untuk berbagai action
+        # Level requirements
         self.level_requirements = {
-            "intim": 7,        # Minimal level 7 untuk intim
-            "pacar": 6,         # Minimal level 6 untuk jadi pacar (khusus PDKT)
-            "fwb": 6,           # Minimal level 6 untuk FWB
-            "aftercare": 12,     # Level 12 untuk aftercare
+            "intim": 7,
+            "pacar": 6,
+            "fwb": 6,
+            "aftercare": 12,
         }
         
-        # Session tracking untuk durasi
-        self.sessions = {}  # {session_id: session_data}
+        # Session tracking
+        self.sessions = {}
         
-        # Cache untuk performa
-        self.level_cache = {}  # {user_id_role: level}
-        self.cache_ttl = 300   # 5 menit
+        # Cache
+        self.level_cache = {}
+        self.cache_ttl = 300
         
-        # Leveling engine V2
+        # Leveling engine
         self.leveling = TimeBasedLevelingV2()
         
         # Activity boost
         self.activity_boost = ActivityBoost()
         
-        logger.info("✅ IntimacySystemV2 initialized (TIME-BASED)")
+        logger.info("✅ IntimacySystemV2 initialized")
         logger.info(f"  • Level 7 dalam {self.time_targets[7]} menit")
         logger.info(f"  • Level 11 dalam {self.time_targets[11]} menit")
     
@@ -129,17 +121,8 @@ class IntimacySystemV2:
     # =========================================================================
     
     async def start_session(self, session_id: str, user_id: int, role: str):
-        """
-        Memulai session baru untuk tracking durasi
-        
-        Args:
-            session_id: ID sesi
-            user_id: ID user
-            role: Nama role
-        """
+        """Memulai session baru"""
         await self.leveling.start_session(session_id, user_id, role)
-        
-        # Simpan juga di cache lokal
         self.sessions[session_id] = {
             'user_id': user_id,
             'role': role,
@@ -147,11 +130,11 @@ class IntimacySystemV2:
         }
     
     async def pause_session(self, session_id: str):
-        """Pause session (waktu berhenti)"""
+        """Pause session"""
         await self.leveling.pause_session(session_id)
     
     async def resume_session(self, session_id: str):
-        """Resume session (waktu jalan lagi)"""
+        """Resume session"""
         await self.leveling.resume_session(session_id)
     
     async def end_session(self, session_id: str) -> Dict:
@@ -163,26 +146,14 @@ class IntimacySystemV2:
     # =========================================================================
     
     async def get_level(self, user_id: int, role: str, session_id: str = None) -> int:
-        """
-        Get current intimacy level based on duration
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            session_id: ID sesi (optional)
-            
-        Returns:
-            Level 1-12
-        """
+        """Get current intimacy level"""
         cache_key = f"{user_id}_{role}"
         
-        # Cek cache
         if cache_key in self.level_cache:
             cache_time, level = self.level_cache[cache_key]
             if time.time() - cache_time < self.cache_ttl:
                 return level
         
-        # Jika ada session_id, ambil dari leveling
         if session_id and session_id in self.sessions:
             status = await self.leveling.get_status(session_id)
             if status:
@@ -190,25 +161,35 @@ class IntimacySystemV2:
                 self.level_cache[cache_key] = (time.time(), level)
                 return level
         
-        # Default level 1
         return 1
     
-    async def get_level_info(self, user_id: int, role: str, session_id: str = None) -> Dict:
+    async def get_status(self, session_id: str) -> Optional[Dict]:
         """
-        Get detailed level info
+        Dapatkan status leveling untuk session
+        Digunakan oleh command /progress
+        """
+        if session_id not in self.sessions:
+            return None
         
-        Args:
-            user_id: ID user
-            role: Role name
-            session_id: ID sesi
-            
-        Returns:
-            Dict with level info
-        """
-        # Get current level
+        status = await self.leveling.get_status(session_id)
+        if not status:
+            return None
+        
+        return {
+            'current_level': status['current_level'],
+            'level_name': self.level_names.get(status['current_level'], f"Level {status['current_level']}"),
+            'description': self.level_descriptions.get(status['current_level'], ""),
+            'can_intim': status['current_level'] >= self.level_requirements["intim"],
+            'total_duration': status['total_duration'],
+            'effective_duration': status['effective_duration'],
+            'progress': status['progress'],
+            'next_level_in': status['next_level_in']
+        }
+    
+    async def get_level_info(self, user_id: int, role: str, session_id: str = None) -> Dict:
+        """Get detailed level info"""
         current_level = await self.get_level(user_id, role, session_id)
         
-        # Get total duration
         total_duration = 0
         effective_duration = 0
         progress = 0
@@ -238,28 +219,16 @@ class IntimacySystemV2:
                              session_id: str,
                              activity_type: BoostType = BoostType.CHAT,
                              context: Dict = None) -> Dict:
-        """
-        Update progress berdasarkan aktivitas
+        """Update progress berdasarkan aktivitas"""
         
-        Args:
-            session_id: ID sesi
-            activity_type: Tipe aktivitas
-            context: Konteks tambahan
-            
-        Returns:
-            Dict dengan status update
-        """
-        # Hitung boost
         boost = self.activity_boost.calculate_boost([activity_type], context)
         
-        # Update ke leveling engine
         result = await self.leveling.update_progress(
             session_id=session_id,
             activity_type=activity_type,
-            duration=None  # Auto dari last message
+            duration=None
         )
         
-        # Jika level up, update cache
         if result.get('level_up'):
             status = await self.leveling.get_status(session_id)
             if status and session_id in self.sessions:
@@ -276,23 +245,12 @@ class IntimacySystemV2:
         }
     
     async def increment_level(self, user_id: int, role: str, session_id: str = None) -> int:
-        """
-        Increment level (dipanggil otomatis oleh update_progress)
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            session_id: ID sesi
-            
-        Returns:
-            New level
-        """
+        """Increment level"""
         if session_id and session_id in self.sessions:
             status = await self.leveling.get_status(session_id)
             if status:
                 new_level = status['current_level']
                 
-                # Check for special events
                 if new_level == 7:
                     await self._on_can_intim(user_id, role)
                 elif new_level == 12:
@@ -303,79 +261,40 @@ class IntimacySystemV2:
         return 1
     
     async def set_level(self, user_id: int, role: str, level: int, session_id: str = None) -> bool:
-        """
-        Set intimacy level manually
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            level: New level (1-12)
-            session_id: ID sesi
-            
-        Returns:
-            True if successful
-        """
+        """Set intimacy level manually"""
         if level < 1 or level > 12:
             logger.error(f"Invalid level: {level}")
             return False
         
-        # Update di leveling engine
         if session_id and session_id in self.sessions:
-            # Adjust effective duration to match level
-            target_duration = self.time_targets[level]
-            # TODO: Implement set_level di leveling engine
-            
-            # Update relationship memory if available
             if self.relationship_memory:
                 try:
                     await self.relationship_memory.set_intimacy_level(user_id, role, level)
-                    
-                    # Add milestone
-                    await self.relationship_memory.add_milestone(
-                        user_id, role, f"level_set_{level}"
-                    )
+                    await self.relationship_memory.add_milestone(user_id, role, f"level_set_{level}")
                 except Exception as e:
                     logger.error(f"Error updating relationship memory: {e}")
         
-        # Update cache
         cache_key = f"{user_id}_{role}"
         self.level_cache[cache_key] = (time.time(), level)
         
         logger.info(f"📊 Set level for user {user_id} role {role}: {level}")
-        
         return True
     
     async def reset_after_aftercare(self, user_id: int, role: str, session_id: str = None) -> int:
-        """
-        Reset level after aftercare
-        Level 12 -> Reset ke level 7
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            session_id: ID sesi
-            
-        Returns:
-            New level (reset_level)
-        """
+        """Reset level after aftercare"""
         current = await self.get_level(user_id, role, session_id)
         
         if current == 12:
-            # Reset ke level 7
             await self.set_level(user_id, role, self.reset_level, session_id)
             
-            # Record reset
             if self.relationship_memory:
                 try:
                     await self.relationship_memory.record_aftercare(user_id, role, 'reset')
-                    await self.relationship_memory.add_milestone(
-                        user_id, role, f"reset_to_{self.reset_level}"
-                    )
+                    await self.relationship_memory.add_milestone(user_id, role, f"reset_to_{self.reset_level}")
                 except Exception as e:
                     logger.error(f"Error recording reset: {e}")
             
             logger.info(f"🔄 Reset intimacy: user {user_id} role {role}: 12 -> {self.reset_level}")
-            
             return self.reset_level
         
         return current
@@ -385,15 +304,7 @@ class IntimacySystemV2:
     # =========================================================================
     
     def get_level_from_duration(self, total_minutes: float) -> int:
-        """
-        Hitung level berdasarkan durasi total
-        
-        Args:
-            total_minutes: Total durasi dalam menit
-            
-        Returns:
-            Level 1-12
-        """
+        """Hitung level berdasarkan durasi"""
         for level, target in sorted(self.time_targets.items()):
             if total_minutes <= target:
                 return level
@@ -423,27 +334,14 @@ class IntimacySystemV2:
     # =========================================================================
     
     async def trigger_aftercare(self, user_id: int, role: str, session_id: str = None) -> Optional[Dict]:
-        """
-        Trigger aftercare at level 12
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            session_id: ID sesi
-            
-        Returns:
-            Aftercare data or None if not level 12
-        """
+        """Trigger aftercare at level 12"""
         level = await self.get_level(user_id, role, session_id)
         
         if level != 12:
-            logger.debug(f"Not level 12 (current: {level}), no aftercare needed")
             return None
         
-        # Choose random aftercare type
         aftercare_type = random.choice(self.aftercare_types)
         
-        # Generate response based on type
         responses = {
             "cuddle": "Habis gitu aja? Aku masih ingin dipeluk...",
             "soft_talk": "Jangan pergi dulu, ngobrol bentar yuk...",
@@ -459,7 +357,6 @@ class IntimacySystemV2:
         
         response = responses.get(aftercare_type, "Aku butuh kamu...")
         
-        # Record aftercare
         if self.relationship_memory:
             try:
                 await self.relationship_memory.record_aftercare(user_id, role, aftercare_type)
@@ -479,20 +376,7 @@ class IntimacySystemV2:
                                    aftercare_type: str,
                                    satisfaction: int = 10,
                                    session_id: str = None) -> Dict:
-        """
-        Complete aftercare session and reset intimacy
-        
-        Args:
-            user_id: ID user
-            role: Role name
-            aftercare_type: Tipe aftercare yang dilakukan
-            satisfaction: Tingkat kepuasan (1-10)
-            session_id: ID sesi
-            
-        Returns:
-            Dict dengan hasil aftercare
-        """
-        # Calculate satisfaction effects
+        """Complete aftercare session"""
         if satisfaction >= 8:
             satisfaction_msg = "Kamu puas banget, hubungan makin erat!"
         elif satisfaction >= 5:
@@ -500,7 +384,6 @@ class IntimacySystemV2:
         else:
             satisfaction_msg = "Kurang puas, butuh aftercare lain next time."
         
-        # Reset level
         new_level = await self.reset_after_aftercare(user_id, role, session_id)
         
         logger.info(f"✅ Aftercare completed for user {user_id} role {role}: satisfaction {satisfaction}/10")
@@ -515,10 +398,8 @@ class IntimacySystemV2:
         }
     
     async def _on_can_intim(self, user_id: int, role: str):
-        """Trigger when reaching level 7 (can intim)"""
-        logger.info(f"🔓 User {user_id} role {role} can now have intimacy (after {self.time_targets[7]} minutes)")
-        
-        # Add milestone
+        """Trigger when reaching level 7"""
+        logger.info(f"🔓 User {user_id} role {role} can now have intimacy")
         if self.relationship_memory:
             try:
                 await self.relationship_memory.add_milestone(user_id, role, 'can_intim')
@@ -526,10 +407,8 @@ class IntimacySystemV2:
                 logger.error(f"Error adding milestone: {e}")
     
     async def _on_aftercare_ready(self, user_id: int, role: str):
-        """Trigger when reaching level 12 (aftercare ready)"""
-        logger.info(f"💝 User {user_id} role {role} is ready for aftercare (after {self.time_targets[12]} minutes)")
-        
-        # Add milestone
+        """Trigger when reaching level 12"""
+        logger.info(f"💝 User {user_id} role {role} is ready for aftercare")
         if self.relationship_memory:
             try:
                 await self.relationship_memory.add_milestone(user_id, role, 'aftercare_ready')
@@ -540,18 +419,24 @@ class IntimacySystemV2:
     # UTILITY METHODS
     # =========================================================================
     
+    async def _get_total_chats(self, user_id: int, role: str) -> int:
+        """Get total chats for specific role"""
+        if self.relationship_memory:
+            try:
+                rel = await self.relationship_memory.get_relationship(user_id, role)
+                if rel and 'total_interactions' in rel:
+                    return rel['total_interactions']
+            except Exception as e:
+                logger.error(f"Error getting total chats: {e}")
+        return 0
+    
     async def can_intim(self, user_id: int, role: str, session_id: str = None) -> bool:
         """Check if can have intimacy"""
         level = await self.get_level(user_id, role, session_id)
         return level >= self.level_requirements["intim"]
     
     async def can_be_pacar(self, user_id: int, role: str, session_id: str = None) -> Tuple[bool, str]:
-        """
-        Check if can become pacar (khusus PDKT)
-        
-        Returns:
-            (can, reason)
-        """
+        """Check if can become pacar"""
         if role != 'pdkt':
             return False, f"Role {role} tidak bisa jadi pacar. Hanya PDKT yang bisa."
         
@@ -562,12 +447,7 @@ class IntimacySystemV2:
         return True, f"Bisa jadi pacar dengan level {level}/12"
     
     async def can_be_fwb(self, user_id: int, role: str, session_id: str = None) -> Tuple[bool, str]:
-        """
-        Check if can become FWB
-        
-        Returns:
-            (can, reason)
-        """
+        """Check if can become FWB"""
         if role != 'pdkt':
             return False, f"Role {role} tidak bisa jadi FWB. Hanya PDKT yang bisa."
         
@@ -583,19 +463,9 @@ class IntimacySystemV2:
         return level == self.level_requirements["aftercare"]
     
     async def get_level_progress_bar(self, session_id: str, bar_length: int = 20) -> str:
-        """
-        Get progress bar untuk level
-        
-        Args:
-            session_id: ID sesi
-            bar_length: Panjang progress bar
-            
-        Returns:
-            String progress bar
-        """
+        """Get progress bar untuk level"""
         if session_id not in self.sessions:
             return "Session tidak ditemukan"
-        
         return self.leveling.format_progress_bar(session_id, bar_length)
     
     def format_level_info(self, level_info: Dict) -> str:
@@ -640,9 +510,7 @@ class IntimacySystemV2:
         
         if user_id and self.relationship_memory:
             try:
-                # Get all relationships for user
                 relationships = await self.relationship_memory.get_all_relationships(user_id)
-                
                 stats["user_stats"] = {
                     "total_roles": len(relationships),
                     "average_level": sum(r.get('intimacy_level', 1) for r in relationships) / len(relationships) if relationships else 0,
