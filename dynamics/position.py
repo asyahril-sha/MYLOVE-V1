@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM
+MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM (UPDATED)
 =============================================================================
 Mengelola posisi tubuh bot
 - Posisi berubah sesuai aktivitas
 - 6+ posisi tubuh
+- get_random_position() untuk callback
 =============================================================================
 """
 
@@ -27,37 +28,47 @@ class PositionSystem:
             "duduk": {
                 "name": "duduk",
                 "description": "duduk santai",
-                "activities": ["ngobrol", "nonton TV", "baca buku", "main HP"]
+                "activities": ["ngobrol", "nonton TV", "baca buku", "main HP", "kerja"]
             },
             "berdiri": {
                 "name": "berdiri",
                 "description": "berdiri tegak",
-                "activities": ["masak", "cuci piring", "siap-siap"]
+                "activities": ["masak", "cuci piring", "siap-siap", "ngantri", "stretch"]
             },
             "berbaring": {
                 "name": "berbaring",
                 "description": "berbaring",
-                "activities": ["tidur-tiduran", "rebahan", "istirahat"]
+                "activities": ["tidur-tiduran", "rebahan", "istirahat", "baca buku", "main HP"]
             },
             "bersandar": {
                 "name": "bersandar",
-                "description": "bersandar di dinding",
-                "activities": ["santai", "ngobrol", "nunggu"]
+                "description": "bersandar",
+                "activities": ["santai", "ngobrol", "nunggu", "ngopi", "melamun"]
             },
             "jongkok": {
                 "name": "jongkok",
                 "description": "jongkok",
-                "activities": ["bersih-bersih", "main sama kucing"]
+                "activities": ["bersih-bersih", "main sama kucing", "foto", "ngambil barang"]
             },
             "merangkak": {
                 "name": "merangkak",
                 "description": "merangkak",
-                "activities": ["nyari barang", "main"]
+                "activities": ["nyari barang", "main", "bersih-bersih"]
+            },
+            "miring": {
+                "name": "miring",
+                "description": "berbaring miring",
+                "activities": ["tidur", "rebahan", "nonton HP", "baca buku"]
+            },
+            "telentang": {
+                "name": "telentang",
+                "description": "telentang",
+                "activities": ["tidur", "rebahan", "stretch", "meditasi"]
             }
         }
         
         self.current_position = "duduk"
-        logger.info("✅ PositionSystem initialized")
+        logger.info(f"✅ PositionSystem initialized with {len(self.positions)} positions")
     
     def get_current(self) -> Dict:
         """Dapatkan posisi saat ini"""
@@ -70,6 +81,16 @@ class PositionSystem:
     def get_current_description(self) -> str:
         """Dapatkan deskripsi posisi saat ini"""
         return self.get_current()["description"]
+    
+    def get_random_position(self) -> Dict:
+        """
+        Dapatkan posisi random (untuk callback)
+        
+        Returns:
+            Dict posisi dengan name, description, activities
+        """
+        pos_id = random.choice(list(self.positions.keys()))
+        return self.positions[pos_id]
     
     def change_position(self, position_id: str = None) -> Dict:
         """
@@ -84,7 +105,6 @@ class PositionSystem:
         if position_id and position_id in self.positions:
             self.current_position = position_id
         else:
-            # Random position, beda dari yang sekarang
             others = [p for p in self.positions.keys() if p != self.current_position]
             self.current_position = random.choice(others)
         
@@ -105,7 +125,6 @@ class PositionSystem:
                 self.current_position = pos_id
                 break
         else:
-            # Default ke random
             self.change_position()
         
         return self.get_current()
@@ -123,11 +142,6 @@ class PositionSystem:
         if random.random() < chance:
             return self.change_position()
         return None
-    
-    def format_position_text(self) -> str:
-        """Format teks posisi untuk ditampilkan"""
-        pos = self.get_current()
-        return f"🧍 Aku lagi {pos['description']}."
     
     def get_all_positions(self) -> List[str]:
         """Dapatkan semua nama posisi"""
