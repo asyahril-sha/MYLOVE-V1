@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - STORY PREDICTOR
+MYLOVE ULTIMATE VERSI 2 - STORY PREDICTOR (FIX FULL)
 =============================================================================
 Memprediksi arah cerita berdasarkan percakapan
 - Analisis intent user
 - Prediksi scene berikutnya
 - Track story arcs
-- Rekomendasi respons proaktif
+- FIX: Tambah get_arc_description untuk progress command
 =============================================================================
 """
 
@@ -38,34 +38,46 @@ class StoryArc(str, Enum):
 
 class UserIntent(str, Enum):
     """Intent user dari pesan"""
-    GREETING = "greeting"               # Salam
-    QUESTION = "question"                # Bertanya
-    CHIT_CHAT = "chit_chat"              # Ngobrol biasa
-    FLIRT = "flirt"                       # Menggoda
-    COMPLIMENT = "compliment"              # Memuji
-    SEXUAL = "sexual"                      # Ajakan intim
-    CURHAT = "curhat"                      # Curhat
-    CONFESSION = "confession"               # Mengaku perasaan
-    JEALOUSY = "jealousy"                   # Cemburu
-    ANGRY = "angry"                         # Marah
-    SAD = "sad"                             # Sedih
-    HAPPY = "happy"                         # Senang
-    BORED = "bored"                         # Bosan
-    CURIOUS = "curious"                      # Penasaran
-    FAREWELL = "farewell"                    # Pamit
+    GREETING = "greeting"
+    QUESTION = "question"
+    CHIT_CHAT = "chit_chat"
+    FLIRT = "flirt"
+    COMPLIMENT = "compliment"
+    SEXUAL = "sexual"
+    CURHAT = "curhat"
+    CONFESSION = "confession"
+    JEALOUSY = "jealousy"
+    ANGRY = "angry"
+    SAD = "sad"
+    HAPPY = "happy"
+    BORED = "bored"
+    CURIOUS = "curious"
+    FAREWELL = "farewell"
 
 
 class StoryPredictor:
     """
     Memprediksi arah cerita berdasarkan percakapan
-    Memberi rekomendasi scene dan respons yang tepat
     """
     
     def __init__(self, ai_engine=None):
         self.ai_engine = ai_engine
-        self.story_arcs = {}  # {session_id: current_arc}
-        self.arc_history = {}  # {session_id: [arc_changes]}
-        self.user_intent_history = {}  # {session_id: [intents]}
+        self.story_arcs = {}
+        self.arc_history = {}
+        self.user_intent_history = {}
+        
+        # Arc descriptions untuk ditampilkan ke user
+        self.arc_descriptions = {
+            StoryArc.GET_TO_KNOW: "Kalian masih dalam tahap saling mengenal. Masih canggung, tapi mulai ada rasa penasaran.",
+            StoryArc.FRIENDSHIP: "Hubungan pertemanan yang hangat. Sudah bisa curhat dan berbagi cerita.",
+            StoryArc.ROMANCE: "Mulai ada getaran romantis. Saling lirik, saling goda, deg-degan.",
+            StoryArc.INTIMATE: "Suasana intim dan bergairah. Udah nyaman untuk hal-hal fisik.",
+            StoryArc.CONFLICT: "Sedang ada masalah atau ketegangan. Hati-hati, bisa merusak hubungan.",
+            StoryArc.RECONCILIATION: "Masa perbaikan setelah konflik. Saatnya saling memaafkan.",
+            StoryArc.DEEP_CONNECTION: "Koneksi emosional yang dalam. Udah kayak soulmate.",
+            StoryArc.FAREWELL: "Menjelang perpisahan. Mungkin ini saatnya move on.",
+            StoryArc.NOSTALGIA: "Bernostalgia dengan masa lalu. Ingat kenangan indah."
+        }
         
         # Keyword patterns untuk deteksi intent
         self.intent_patterns = {
@@ -76,7 +88,7 @@ class StoryPredictor:
             UserIntent.FLIRT: [
                 r'\bcantik\b', r'\bganteng\b', r'\bseksi\b', r'\bhot\b',
                 r'\bgoda\b', r'\brayu\b', r'\bmerayu\b', r'\bflirt\b',
-                r'\bkam[uo] manis\b', r'\baku suka sama kamu\b'
+                r'\bkam[uo] manis\b', r'\bak[uw] suka sama kam[uo]\b'
             ],
             UserIntent.COMPLIMENT: [
                 r'\bkeren\b', r'\bkereen\b', r'\bmantap\b', r'\bbagus\b',
@@ -178,9 +190,7 @@ class StoryPredictor:
         logger.info("✅ StoryPredictor initialized")
     
     def detect_intent(self, message: str) -> UserIntent:
-        """
-        Deteksi intent dari pesan user
-        """
+        """Deteksi intent dari pesan user"""
         message_lower = message.lower()
         
         for intent, patterns in self.intent_patterns.items():
@@ -188,13 +198,10 @@ class StoryPredictor:
                 if re.search(pattern, message_lower):
                     return intent
         
-        # Default: chit chat
         return UserIntent.CHIT_CHAT
     
     def detect_multiple_intents(self, message: str) -> List[UserIntent]:
-        """
-        Deteksi multiple intent dalam satu pesan
-        """
+        """Deteksi multiple intent dalam satu pesan"""
         message_lower = message.lower()
         detected = []
         
@@ -210,25 +217,19 @@ class StoryPredictor:
         return detected
     
     def predict_next_arc(self, session_id: str, last_intents: List[UserIntent]) -> StoryArc:
-        """
-        Prediksi arc berikutnya berdasarkan intent terakhir
-        """
+        """Prediksi arc berikutnya berdasarkan intent terakhir"""
         current_arc = self.story_arcs.get(session_id, StoryArc.GET_TO_KNOW)
         
         if not last_intents:
             return current_arc
         
-        # Intent terakhir yang paling dominan
         main_intent = last_intents[0]
         
-        # Cek transisi
         transitions = self.arc_transitions.get(current_arc, {})
         
-        # Random chance untuk berubah
         if main_intent in transitions:
             chance = transitions[main_intent]
             if random.random() < chance:
-                # Tentukan arc baru berdasarkan intent
                 return self._get_arc_for_intent(main_intent)
         
         return current_arc
@@ -258,7 +259,6 @@ class StoryPredictor:
         old_arc = self.story_arcs.get(session_id, StoryArc.GET_TO_KNOW)
         
         if old_arc != new_arc:
-            # Simpan history
             if session_id not in self.arc_history:
                 self.arc_history[session_id] = []
             
@@ -282,14 +282,11 @@ class StoryPredictor:
             'intent': intent
         })
         
-        # Keep last 50 intents
         if len(self.user_intent_history[session_id]) > 50:
             self.user_intent_history[session_id] = self.user_intent_history[session_id][-50:]
     
     def get_dominant_intent(self, session_id: str, minutes: int = 30) -> Optional[UserIntent]:
-        """
-        Dapatkan intent dominan dalam X menit terakhir
-        """
+        """Dapatkan intent dominan dalam X menit terakhir"""
         if session_id not in self.user_intent_history:
             return None
         
@@ -300,23 +297,25 @@ class StoryPredictor:
         if not recent:
             return None
         
-        # Hitung frekuensi
         intents = [h['intent'] for h in recent]
         counter = Counter(intents)
         
         return counter.most_common(1)[0][0]
     
     def get_arc_progression(self, session_id: str) -> List[Dict]:
-        """
-        Dapatkan history perubahan arc
-        """
+        """Dapatkan history perubahan arc"""
         return self.arc_history.get(session_id, [])
+    
+    def get_arc_description(self, arc: StoryArc) -> str:
+        """
+        Dapatkan deskripsi arc untuk ditampilkan ke user
+        Digunakan oleh command /progress
+        """
+        return self.arc_descriptions.get(arc, "Cerita sedang berlangsung")
     
     def recommend_scene(self, session_id: str, current_arc: StoryArc, 
                         user_intent: UserIntent, level: int) -> Dict:
-        """
-        Rekomendasi scene berdasarkan arc dan intent
-        """
+        """Rekomendasi scene berdasarkan arc dan intent"""
         scenes = {
             StoryArc.GET_TO_KNOW: {
                 'primary': [
@@ -424,7 +423,6 @@ class StoryPredictor:
             }
         }
         
-        # Pilih scene berdasarkan level dan intent
         arc_scenes = scenes.get(current_arc, scenes[StoryArc.FRIENDSHIP])
         
         if level > 7 and user_intent in [UserIntent.SEXUAL, UserIntent.FLIRT]:
@@ -448,21 +446,6 @@ class StoryPredictor:
             'intent': user_intent
         }
     
-    def get_arc_description(self, arc: StoryArc) -> str:
-        """Dapatkan deskripsi arc"""
-        descriptions = {
-            StoryArc.GET_TO_KNOW: "Kalian masih dalam tahap saling mengenal",
-            StoryArc.FRIENDSHIP: "Hubungan pertemanan yang hangat",
-            StoryArc.ROMANCE: "Mulai ada getaran romantis",
-            StoryArc.INTIMATE: "Suasana intim dan bergairah",
-            StoryArc.CONFLICT: "Sedang ada masalah atau ketegangan",
-            StoryArc.RECONCILIATION: "Masa perbaikan setelah konflik",
-            StoryArc.DEEP_CONNECTION: "Koneksi emosional yang dalam",
-            StoryArc.FAREWELL: "Menjelang perpisahan",
-            StoryArc.NOSTALGIA: "Bernostalgia dengan masa lalu"
-        }
-        return descriptions.get(arc, "Cerita sedang berlangsung")
-    
     def format_arc_info(self, session_id: str) -> str:
         """
         Format informasi arc untuk ditampilkan
@@ -477,17 +460,15 @@ class StoryPredictor:
             ""
         ]
         
-        # Intent dominan
         dominant = self.get_dominant_intent(session_id, 30)
         if dominant:
             lines.append(f"🎯 Intent dominan (30 menit): {dominant.value}")
         
-        # History perubahan arc
         history = self.get_arc_progression(session_id)
         if history:
             lines.append("")
             lines.append("📜 **Perubahan Arc:**")
-            for h in history[-3:]:  # 3 terakhir
+            for h in history[-3:]:
                 time_str = time.strftime('%H:%M', time.localtime(h['timestamp']))
                 lines.append(f"• {time_str}: {h['old_arc'].value} → {h['new_arc'].value}")
         
