@@ -557,7 +557,7 @@ RESPON:"""
                     model="deepseek-chat",
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=1000,
+                    max_tokens=3000,
                     timeout=30
                 )
                 
