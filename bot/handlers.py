@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (FIX FULL)
+MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (FIX LENGKAP)
 =============================================================================
-Semua handlers untuk MYLOVE Ultimate V2
+Semua handlers untuk MYLOVE Ultimate V2:
 - Command handlers
-- Message handler
-- FIX: Hapus import dynamics yang bermasalah
+- Message handler dengan AI Engine
+- Callback handler
+- FIX: Terhubung ke AI engine untuk respons natural
 =============================================================================
 """
 
@@ -29,13 +30,14 @@ from session.unique_id import id_generator
 from database.models import Constants
 
 # =============================================================================
-# HAPUS SEMUA IMPORT INI (SUDAH TIDAK DIPAKAI DI V2)
-# from dynamics.location import LocationSystem, LocationType
-# from dynamics.risk import RiskCalculator
-# from dynamics.thrill import ThrillSystem
-# from dynamics.events import RandomEvents
-# from dynamics.auto_select import LocationAutoSelector
+# IMPORT AI ENGINE V2
 # =============================================================================
+try:
+    from core.ai_engine_v2 import AIEngineV2
+    AI_ENGINE_AVAILABLE = True
+except ImportError:
+    AI_ENGINE_AVAILABLE = False
+    logger.warning("AI Engine V2 not available, using fallback responses")
 
 
 # =============================================================================
@@ -130,6 +132,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_name = context.user_data.get('bot_name', '')
     intimacy_level = context.user_data.get('intimacy_level', 1)
     total_chats = context.user_data.get('total_chats', 0)
+    current_location = context.user_data.get('current_location', 'Tidak diketahui')
     
     status_text = (
         f"📊 **STATUS SESSION**\n\n"
@@ -138,6 +141,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💕 **Bot:** {bot_name}\n"
         f"📈 **Intimacy Level:** {intimacy_level}/12\n"
         f"💬 **Total Chats:** {total_chats}\n"
+        f"📍 **Lokasi:** {current_location[:50]}...\n"
     )
     
     if 'current_session' in context.user_data:
@@ -157,7 +161,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 # =============================================================================
-# 2. DUMMY COMMANDS (UNTUK MEMENUHI IMPORT)
+# 2. DUMMY COMMANDS (UNTUK IMPORT)
 # =============================================================================
 
 async def dominant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -270,31 +274,101 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 3. MESSAGE HANDLER
+# 3. MESSAGE HANDLER (DENGAN AI ENGINE)
 # =============================================================================
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk semua pesan teks"""
+    """
+    Handler untuk semua pesan teks
+    - Menggunakan AI Engine V2 untuk respons natural
+    - Fallback ke respons sederhana jika AI tidak tersedia
+    """
     try:
         user = update.effective_user
-        message = update.message.text
+        user_message = update.message.text
+        user_id = user.id
+        user_name = user.first_name or "User"
+        session_id = context.user_data.get('current_session')
         
+        # Cek pause
         if context.user_data.get('paused', False):
-            await update.message.reply_text("⏸️ Sesi sedang dijeda.")
+            await update.message.reply_text("⏸️ Sesi sedang dijeda. Ketik /unpause untuk melanjutkan.")
             return
         
-        logger.info(f"📨 Message from {user.first_name}: {message[:50]}...")
-        
+        # Ambil data dari context
         bot_name = context.user_data.get('bot_name', 'Aku')
-        role = context.user_data.get('current_role', 'unknown')
+        role = context.user_data.get('current_role', 'pdkt')
+        level = context.user_data.get('intimacy_level', 1)
+        total_chats = context.user_data.get('total_chats', 0)
         
-        response = f"{bot_name} menerima pesanmu: {message[:50]}..."
+        logger.info(f"📨 Message from {user_name}: {user_message[:50]}...")
         
-        await update.message.reply_text(response)
+        # ===== GENERATE RESPONSE DENGAN AI ENGINE =====
+        response = None
+        
+        if AI_ENGINE_AVAILABLE and settings.deepseek_api_key:
+            try:
+                # Inisialisasi AI engine
+                ai_engine = AIEngineV2(api_key=settings.deepseek_api_key)
+                
+                # Siapkan konteks
+                context_data = {
+                    'role': role,
+                    'bot_name': bot_name,
+                    'level': level,
+                    'user_name': user_name,
+                    'mood': context.user_data.get('mood', 'netral'),
+                    'location': context.user_data.get('current_location', 'Tidak diketahui'),
+                    'clothing': context.user_data.get('current_clothing', 'Pakaian biasa'),
+                    'total_chats': total_chats
+                }
+                
+                # Generate response dari AI
+                response = await ai_engine.generate_response(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_message=user_message,
+                    context=context_data
+                )
+                
+                logger.info(f"✅ AI response generated ({len(response)} chars)")
+                
+            except Exception as e:
+                logger.error(f"AI Engine error: {e}")
+                # Fallback ke response manual
+        
+        # ===== FALLBACK RESPONSE JIKA AI GAGAL =====
+        if not response:
+            # Template fallback sederhana
+            fallbacks = [
+                f"{bot_name} dengar kok. Kamu bilang: {user_message[:50]}...",
+                f"Hmm... {bot_name} mikir dulu ya. Kamu tadi bilang apa?",
+                f"{user_name}, {bot_name} lagi dengerin. Lanjutkan...",
+                f"{bot_name} ngerti. Cerita lagi dong...",
+            ]
+            response = random.choice(fallbacks)
+        
+        # ===== UPDATE STATISTIK =====
+        context.user_data['total_chats'] = total_chats + 1
+        
+        # Update intimacy level sederhana (setiap 5 chat)
+        if (total_chats + 1) % 5 == 0:
+            new_level = min(12, level + 1)
+            context.user_data['intimacy_level'] = new_level
+            logger.info(f"Level up! {level} → {new_level}")
+        
+        # Simpan pesan terakhir
+        context.user_data['last_message'] = user_message
+        context.user_data['last_response'] = response
+        
+        # Kirim response
+        await update.message.reply_text(response, parse_mode='Markdown')
         
     except Exception as e:
         logger.error(f"Error in message_handler: {e}")
-        await update.message.reply_text("❌ Maaf, terjadi kesalahan.")
+        await update.message.reply_text(
+            "❌ Maaf, terjadi kesalahan. Coba lagi nanti."
+        )
 
 
 # =============================================================================
@@ -336,6 +410,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text("💕 **Pilih role:**", reply_markup=reply_markup)
         
+        elif data == "threesome_menu":
+            keyboard = [
+                [InlineKeyboardButton("🎭 Lihat Kombinasi", callback_data="threesome_list")],
+                [InlineKeyboardButton("💕 HTS + HTS", callback_data="threesome_type_hts")],
+                [InlineKeyboardButton("💞 FWB + FWB", callback_data="threesome_type_fwb")],
+                [InlineKeyboardButton("💘 HTS + FWB", callback_data="threesome_type_mix")],
+                [InlineKeyboardButton("❌ Kembali", callback_data="back_to_main")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                "🎭 **MODE THREESOME**\n\nPilih tipe threesome:",
+                reply_markup=reply_markup
+            )
+        
         else:
             await query.edit_message_text(f"✅ {data} diterima")
             
@@ -373,10 +461,11 @@ async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# 6. EXPORT
+# 6. EXPORT ALL HANDLERS
 # =============================================================================
 
 __all__ = [
+    # Command handlers
     'start_command', 'help_command', 'status_command', 'cancel_command',
     'dominant_command', 'pause_command', 'unpause_command',
     'close_command', 'end_command', 'jadipacar_command',
@@ -387,6 +476,11 @@ __all__ = [
     'mood_command', 'admin_command', 'stats_command', 'db_stats_command',
     'list_users_command', 'get_user_command', 'force_reset_command',
     'backup_db_command', 'vacuum_command', 'memory_stats_command',
-    'reload_command', 'message_handler', 'callback_handler',
+    'reload_command',
+    
+    # Message & callback handlers
+    'message_handler', 'callback_handler',
+    
+    # Special handlers
     'hts_call_handler', 'fwb_call_handler', 'continue_handler',
 ]
