@@ -24,7 +24,7 @@ from database.models import Constants
 from utils.logger import logger
 
 # =============================================================================
-# IMPORT NAME GENERATOR (V2)
+# IMPORT V2 COMPONENTS
 # =============================================================================
 try:
     from dynamics.name_generator import NameGenerator
@@ -40,13 +40,15 @@ try:
     cloth_system = ClothingSystem()
     pos_system = PositionSystem()
     
+    print("✅ V2 components loaded in callbacks")
+    
 except ImportError as e:
     V2_ENABLED = False
     name_gen = None
     loc_system = None
     cloth_system = None
     pos_system = None
-    logger.warning(f"Some V2 components not found: {e}")
+    print(f"⚠️ V2 components not loaded: {e}")
 
 
 # =============================================================================
@@ -84,8 +86,8 @@ def get_bot_name(role: str, user_id: int) -> tuple:
         try:
             name_data = name_gen.get_name_with_meaning(role, user_id)
             return name_data['name'], name_data['meaning']
-        except:
-            pass
+        except Exception as e:
+            print(f"NameGenerator error: {e}")
     
     # Fallback
     fallback = {
@@ -117,14 +119,18 @@ def get_random_artist(role: str) -> dict:
                 'ciri': artist['ciri'],
                 'similarity': random.randint(75, 90)
             }
-    except:
-        pass
+    except Exception as e:
+        print(f"Artist error: {e}")
     
     # Fallback
     fallback = {
         'ipar': {
             'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
             'chest': '34B', 'ig': 'pevpearce', 'ciri': 'Aktris dengan wajah natural dan elegan'
+        },
+        'teman_kantor': {
+            'name': 'Prilly Latuconsina', 'age': 25, 'height': 162, 'weight': 50,
+            'chest': '34B', 'ig': 'prillylatuconsina96', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
         },
         'janda': {
             'name': 'Amanda Manopo', 'age': 24, 'height': 165, 'weight': 53,
@@ -133,6 +139,26 @@ def get_random_artist(role: str) -> dict:
         'pelakor': {
             'name': 'Cinta Laura', 'age': 25, 'height': 172, 'weight': 58,
             'chest': '36C', 'ig': 'claurakiehl', 'ciri': 'Aktris, pintar, atletis, seksi natural'
+        },
+        'istri_orang': {
+            'name': 'Dian Sastro', 'age': 26, 'height': 165, 'weight': 54,
+            'chest': '34B', 'ig': 'diansastro', 'ciri': 'Aktris dengan wajah anggun dan elegan'
+        },
+        'pdkt': {
+            'name': 'Fuji', 'age': 23, 'height': 160, 'weight': 48,
+            'chest': '34B', 'ig': 'fuji_an', 'ciri': 'Selebgram muda dengan pertumbuhan followers tercepat'
+        },
+        'sepupu': {
+            'name': 'Mikha Tambayong', 'age': 25, 'height': 167, 'weight': 53,
+            'chest': '34B', 'ig': 'mikhata', 'ciri': 'Penyanyi dan aktris, manis, anggun'
+        },
+        'teman_sma': {
+            'name': 'Angga Yunanda', 'age': 24, 'height': 170, 'weight': 62,
+            'chest': '-', 'ig': 'anggayunanda', 'ciri': 'Aktor muda populer, wajah fresh'
+        },
+        'mantan': {
+            'name': 'Natasha Wilona', 'age': 25, 'height': 165, 'weight': 51,
+            'chest': '34B', 'ig': 'natashawilona12', 'ciri': 'Artis muda sangat populer, wajah manis'
         }
     }
     result = fallback.get(role, fallback['ipar']).copy()
@@ -148,8 +174,8 @@ def get_random_location() -> tuple:
             location_text = f"📍 Aku di **{loc['name']}**. {loc['description']}"
             activity = random.choice(loc.get('activities', ['santai']))
             return location_text, activity
-    except:
-        pass
+    except Exception as e:
+        print(f"Location error: {e}")
     
     # Fallback
     locations = [
@@ -158,6 +184,9 @@ def get_random_location() -> tuple:
         ("📍 Aku di **dapur**. Dapur bersih dengan peralatan masak lengkap.", "masak"),
         ("📍 Aku di **pantai**. Pantai dengan pasir putih dan ombak tenang.", "jalan-jalan"),
         ("📍 Aku di **taman**. Taman kecil dengan rumput hijau dan bunga-bunga.", "santai"),
+        ("📍 Aku di **kantor**. Ruang kantor dengan meja kerja dan komputer.", "kerja"),
+        ("📍 Aku di **cafe**. Cafe cozy dengan aroma kopi.", "ngopi"),
+        ("📍 Aku di **mall**. Mall ramai dengan banyak toko.", "jalan-jalan"),
     ]
     return random.choice(locations)
 
@@ -168,8 +197,8 @@ def get_random_clothing() -> str:
         if V2_ENABLED and cloth_system:
             cloth = cloth_system.get_random_clothing()
             return f"👗 Aku pakai **{cloth['name']}**. {cloth['description']}"
-    except:
-        pass
+    except Exception as e:
+        print(f"Clothing error: {e}")
     
     # Fallback
     clothes = [
@@ -177,7 +206,9 @@ def get_random_clothing() -> str:
         "👗 Aku pakai **piyama lucu** dengan motif boneka.",
         "👚 Aku pakai **kaos oversized** dan **celana pendek**.",
         "👗 Aku pakai **dress cantik** warna pastel.",
-        "👚 Aku pakai **kemeja putih** dan **rok span hitam**."
+        "👚 Aku pakai **kemeja putih** dan **rok span hitam**.",
+        "👖 Aku pakai **jeans** dan **kaos** santai.",
+        "🧥 Aku pakai **sweater hangat** buat malem-malem.",
     ]
     return random.choice(clothes)
 
@@ -188,11 +219,11 @@ def get_random_position() -> str:
         if V2_ENABLED and pos_system:
             pos = pos_system.get_random_position()
             return f"**{pos['description']}**"
-    except:
-        pass
+    except Exception as e:
+        print(f"Position error: {e}")
     
     # Fallback
-    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok"]
+    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok", "miring"]
     return f"**{random.choice(positions)}**"
 
 
@@ -394,7 +425,6 @@ ROLE_DATA = {
 # 1. AGREE 18 CALLBACK
 # =============================================================================
 async def agree_18_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle agree 18+ callback"""
     query = update.callback_query
     await query.answer()
     
@@ -405,10 +435,9 @@ async def agree_18_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 # =============================================================================
-# 2. BACK TO MAIN MENU CALLBACK
+# 2. BACK TO MAIN MENU
 # =============================================================================
 async def back_to_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Kembali ke menu utama"""
     query = update.callback_query
     await query.answer()
     
@@ -420,7 +449,6 @@ async def back_to_main_callback(update: Update, context: ContextTypes.DEFAULT_TY
 # 3. START/PAUSE CALLBACK
 # =============================================================================
 async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle start/pause callback"""
     query = update.callback_query
     await query.answer()
     
@@ -440,9 +468,8 @@ async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # =============================================================================
-# 4. ROLE CALLBACK GENERATOR
+# 4. GENERIC ROLE CALLBACK
 # =============================================================================
-
 async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role_key: str) -> int:
     """Generic role callback handler"""
     query = update.callback_query
@@ -452,8 +479,11 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
     user_id = user.id
     user_name = user.first_name or "User"
     
+    print(f"🔵 Processing role: {role_key} for user {user_id}")
+    
     # ===== 1. DAPATKAN NAMA =====
     bot_name, meaning = get_bot_name(role_key, user_id)
+    print(f"  • Bot name: {bot_name} ({meaning})")
     
     # ===== 2. DAPATKAN DATA ROLE =====
     role_info = ROLE_DATA.get(role_key, ROLE_DATA['ipar'])
@@ -562,7 +592,6 @@ async def role_mantan_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 # 6. END/CLOSE CALLBACKS
 # =============================================================================
 async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle end callback"""
     query = update.callback_query
     await query.answer()
     
@@ -581,7 +610,6 @@ async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle close callback"""
     query = update.callback_query
     await query.answer()
     
@@ -604,7 +632,6 @@ async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # 7. RELATIONSHIP CALLBACKS
 # =============================================================================
 async def jadipacar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle jadipacar callback"""
     query = update.callback_query
     await query.answer()
     
@@ -626,7 +653,6 @@ async def jadipacar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def break_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle break callback"""
     query = update.callback_query
     await query.answer()
     
@@ -648,7 +674,6 @@ async def break_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def breakup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle breakup callback"""
     query = update.callback_query
     await query.answer()
     
@@ -670,7 +695,6 @@ async def breakup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def fwb_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle fwb callback"""
     query = update.callback_query
     await query.answer()
     
@@ -696,7 +720,6 @@ async def fwb_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 # 8. THREESOME CALLBACKS
 # =============================================================================
 async def threesome_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle threesome menu"""
     query = update.callback_query
     await query.answer()
     
