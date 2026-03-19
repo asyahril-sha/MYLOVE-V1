@@ -22,7 +22,7 @@ from .models import (
     User, Session, Conversation, Memory, Relationship,
     Preference, Milestone, Backup, RelationshipStatus,
     MemoryType, MilestoneType, BackupType, BackupStatus,
-    PDKT, PDKTStatus, PDKTDirection, PDKTStage
+    PDKTStatus, PDKTDirection, PDKTStage
 )
 
 logger = logging.getLogger(__name__)
