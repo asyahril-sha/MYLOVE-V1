@@ -482,7 +482,9 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
     print(f"🔵 Processing role: {role_key} for user {user_id}")
     
     # ===== 1. DAPATKAN NAMA =====
-    bot_name, meaning = get_bot_name(role_key, user_id)
+    name_data = get_bot_name(role_key, user_id)  # ← fungsi ini harus return dict
+    bot_name = name_data['name']
+    meaning = name_data['meaning']
     print(f"  • Bot name: {bot_name} ({meaning})")
     
     # ===== 2. DAPATKAN DATA ROLE =====
