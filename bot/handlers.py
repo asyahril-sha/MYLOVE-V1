@@ -33,13 +33,19 @@ from database.models import Constants
 # IMPORT AI ENGINE V2
 # =============================================================================
 try:
-    from core.ai_engine_v2 import AIEngineV2 as AIEngineV2
-    import core.ai_engine_v2
+    # Coba import yang simple dulu
+    from core.ai_engine_simple import AIEngineSimple as AIEngineV2
     AI_ENGINE_AVAILABLE = True
-except ImportError:
-    AI_ENGINE_AVAILABLE = False
-    logger.warning("AI Engine V2 not available, using fallback responses")
-
+    logger.info("✅ AI Engine Simple loaded")
+except ImportError as e:
+    try:
+        # Fallback ke yang lama
+        from core.ai_engine_v2 import AIEngineV2
+        AI_ENGINE_AVAILABLE = True
+        logger.info("✅ AI Engine V2 loaded")
+    except ImportError:
+        AI_ENGINE_AVAILABLE = False
+        logger.warning("⚠️ AI Engine not available, using fallback")
 
 # =============================================================================
 # 1. COMMAND HANDLERS
