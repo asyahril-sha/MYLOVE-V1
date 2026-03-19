@@ -114,6 +114,7 @@ class EpisodicMemory:
         Returns:
             episode_id
         """
+        
         # Inisialisasi jika belum ada
         if session_id not in self.episodes:
             self.episodes[session_id] = deque(maxlen=self.max_episodes)
@@ -175,6 +176,21 @@ class EpisodicMemory:
         logger.debug(f"Episode added: {episode_type} - {summary}")
         
         return episode_id
+
+    async def add_location_episode(self, session_id: str, from_loc: str, to_loc: str):
+    """Catat perpindahan lokasi sebagai episode"""
+    
+    await self.add_episode(
+        session_id=session_id,
+        episode_type="location_change",
+        data={
+            'from': from_loc,
+            'to': to_loc,
+            'timestamp': time.time()
+        },
+        importance=0.6
+    )
+    logger.info(f"📍 Location episode recorded: {from_loc} → {to_loc}")
     
     def _generate_episode_id(self, session_id: str, episode_type: str) -> str:
         """Generate unique episode ID"""
