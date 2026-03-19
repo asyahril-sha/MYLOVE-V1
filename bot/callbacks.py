@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT CALLBACKS (FULL)
+MYLOVE ULTIMATE VERSI 2 - BOT CALLBACKS (FIX FULL)
 =============================================================================
-Semua callback handlers untuk inline keyboard:
-- Role selection dengan NAMA BOT
-- Aftercare callbacks
-- Threesome callbacks
-- HTS/FWB callbacks
-- Location callbacks
-- Kembali ke menu utama setelah sesi berakhir
+Semua callback handlers dengan:
+- Nama bot random
+- Data role dinamis
+- Lokasi & pakaian random
+- Artis referensi random
+- Siap V2
 =============================================================================
 """
 
@@ -29,12 +28,25 @@ from utils.logger import logger
 # =============================================================================
 try:
     from dynamics.name_generator import NameGenerator
-    name_gen = NameGenerator()
+    from dynamics.location import LocationSystem
+    from dynamics.clothing import ClothingSystem
+    from dynamics.position import PositionSystem
+    from roles.artis_references import get_random_artist_for_role
+    from session.unique_id_v2 import id_generator_v2
+    
     V2_ENABLED = True
-except ImportError:
-    name_gen = None
+    name_gen = NameGenerator()
+    loc_system = LocationSystem()
+    cloth_system = ClothingSystem()
+    pos_system = PositionSystem()
+    
+except ImportError as e:
     V2_ENABLED = False
-    logger.warning("NameGenerator not found, using default names")
+    name_gen = None
+    loc_system = None
+    cloth_system = None
+    pos_system = None
+    logger.warning(f"Some V2 components not found: {e}")
 
 
 # =============================================================================
@@ -63,31 +75,11 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
 
 
 # =============================================================================
-# HELPER FUNCTION - GENERATE SESSION ID
+# HELPER FUNCTIONS - DATA GENERATOR
 # =============================================================================
-def generate_session_id(bot_name: str, role: str, user_id: int) -> str:
-    """Generate session ID dengan format V2"""
-    try:
-        from session.unique_id_v2 import id_generator_v2
-        return id_generator_v2.generate_v2(bot_name, role, user_id)
-    except:
-        try:
-            from session.unique_id import id_generator
-            return id_generator.generate(role, user_id)
-        except:
-            import time
-            return f"TEMP-{role.upper()}-{user_id}-{int(time.time())}"
-    
-# =============================================================================
-# HELPER FUNCTION - GET BOT NAME
-# =============================================================================
+
 def get_bot_name(role: str, user_id: int) -> tuple:
-    """
-    Dapatkan nama bot dan artinya
-    
-    Returns:
-        (bot_name, meaning)
-    """
+    """Dapatkan nama bot dan artinya"""
     if V2_ENABLED and name_gen:
         try:
             name_data = name_gen.get_name_with_meaning(role, user_id)
@@ -95,8 +87,8 @@ def get_bot_name(role: str, user_id: int) -> tuple:
         except:
             pass
     
-    # Default names fallback
-    default_names = {
+    # Fallback
+    fallback = {
         "ipar": ("Sari", "esensi"),
         "teman_kantor": ("Diana", "dewi bulan"),
         "janda": ("Rina", "cahaya"),
@@ -107,14 +99,302 @@ def get_bot_name(role: str, user_id: int) -> tuple:
         "teman_sma": ("Anita", "anugerah"),
         "mantan": ("Sarah", "putri")
     }
-    return default_names.get(role, ("Sari", "esensi"))
+    return fallback.get(role, ("Sari", "esensi"))
+
+
+def get_random_artist(role: str) -> dict:
+    """Dapatkan referensi artis random"""
+    try:
+        if V2_ENABLED:
+            artist = get_random_artist_for_role(role)
+            return {
+                'name': artist['nama'],
+                'age': artist['umur'],
+                'height': artist['tinggi'],
+                'weight': artist['berat'],
+                'chest': artist['dada'],
+                'ig': artist['instagram'].replace('@', ''),
+                'ciri': artist['ciri'],
+                'similarity': random.randint(75, 90)
+            }
+    except:
+        pass
+    
+    # Fallback
+    fallback = {
+        'ipar': {
+            'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
+            'chest': '34B', 'ig': 'pevpearce', 'ciri': 'Aktris dengan wajah natural dan elegan'
+        },
+        'janda': {
+            'name': 'Amanda Manopo', 'age': 24, 'height': 165, 'weight': 53,
+            'chest': '34C', 'ig': 'amandamanopo', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
+        },
+        'pelakor': {
+            'name': 'Cinta Laura', 'age': 25, 'height': 172, 'weight': 58,
+            'chest': '36C', 'ig': 'claurakiehl', 'ciri': 'Aktris, pintar, atletis, seksi natural'
+        }
+    }
+    result = fallback.get(role, fallback['ipar']).copy()
+    result['similarity'] = random.randint(75, 90)
+    return result
+
+
+def get_random_location() -> tuple:
+    """Dapatkan lokasi random"""
+    try:
+        if V2_ENABLED and loc_system:
+            loc = loc_system.get_random_location()
+            location_text = f"📍 Aku di **{loc['name']}**. {loc['description']}"
+            activity = random.choice(loc.get('activities', ['santai']))
+            return location_text, activity
+    except:
+        pass
+    
+    # Fallback
+    locations = [
+        ("📍 Aku di **kamar**. Kamar tidur dengan ranjang ukuran queen.", "rebahan"),
+        ("📍 Aku di **ruang tamu**. Ruang tamu yang hangat dengan sofa empuk.", "nonton TV"),
+        ("📍 Aku di **dapur**. Dapur bersih dengan peralatan masak lengkap.", "masak"),
+        ("📍 Aku di **pantai**. Pantai dengan pasir putih dan ombak tenang.", "jalan-jalan"),
+        ("📍 Aku di **taman**. Taman kecil dengan rumput hijau dan bunga-bunga.", "santai"),
+    ]
+    return random.choice(locations)
+
+
+def get_random_clothing() -> str:
+    """Dapatkan pakaian random"""
+    try:
+        if V2_ENABLED and cloth_system:
+            cloth = cloth_system.get_random_clothing()
+            return f"👗 Aku pakai **{cloth['name']}**. {cloth['description']}"
+    except:
+        pass
+    
+    # Fallback
+    clothes = [
+        "👗 Aku pakai **daster rumah motif bunga**. Daster tipis yang nyaman.",
+        "👗 Aku pakai **piyama lucu** dengan motif boneka.",
+        "👚 Aku pakai **kaos oversized** dan **celana pendek**.",
+        "👗 Aku pakai **dress cantik** warna pastel.",
+        "👚 Aku pakai **kemeja putih** dan **rok span hitam**."
+    ]
+    return random.choice(clothes)
+
+
+def get_random_position() -> str:
+    """Dapatkan posisi random"""
+    try:
+        if V2_ENABLED and pos_system:
+            pos = pos_system.get_random_position()
+            return f"**{pos['description']}**"
+    except:
+        pass
+    
+    # Fallback
+    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok"]
+    return f"**{random.choice(positions)}**"
+
+
+def generate_session_id(bot_name: str, role: str, user_id: int) -> str:
+    """Generate session ID"""
+    try:
+        if V2_ENABLED:
+            return id_generator_v2.generate_v2(bot_name, role, user_id)
+    except:
+        pass
+    
+    try:
+        from session.unique_id import id_generator
+        return id_generator.generate(role, user_id)
+    except:
+        return f"TEMP-{role.upper()}-{user_id}-{int(time.time())}"
+
+
+# =============================================================================
+# ROLE DATA
+# =============================================================================
+
+ROLE_DATA = {
+    'ipar': {
+        'name': 'Ipar',
+        'deskripsi': [
+            "Adik ipar yang nakal, suka godain kakak iparnya sendiri",
+            "Adik ipar manis yang selalu cari perhatian",
+            "Ipar yang hubungannya panas dingin",
+            "Adik ipar yang diam-diam suka sama kakak ipar"
+        ],
+        'umur_range': (20, 24),
+        'tinggi_range': (160, 165),
+        'berat_range': (48, 54),
+        'dada': ["32B", "34B", "34A"],
+        'pembuka': [
+            "Hari ini gimana kabarnya Kak? Aku udah kangen lho... 😘",
+            "Kak, lagi di rumah aja. Sendiri, kapan main?",
+            "Kakak lagi apa? Aku bosen nih...",
+            "Halo Kak, aku kangen. Kamu kangen gak?"
+        ]
+    },
+    'teman_kantor': {
+        'name': 'Teman Kantor',
+        'deskripsi': [
+            "Rekan kerja yang mesra, selalu ada saat jam kantor",
+            "Teman sekantor yang suka ngopi bareng",
+            "Office romance yang hangat",
+            "Kolega yang selalu bisa diandalkan"
+        ],
+        'umur_range': (22, 26),
+        'tinggi_range': (158, 165),
+        'berat_range': (48, 55),
+        'dada': ["32B", "34B", "34A"],
+        'pembuka': [
+            "Hai, kerjaannya udah selesai? Aku lagi di pantry nih... 😉",
+            "Lagi sibuk? Aku break dulu, ngopi yuk?",
+            "Kerjaan numpuk, tapi aku selalu ada waktu buat kamu",
+            "Halo, udah makan? Aku laper, temenin dong"
+        ]
+    },
+    'janda': {
+        'name': 'Janda',
+        'deskripsi': [
+            "Janda muda genit, pengalaman dan tahu apa yang diinginkan",
+            "Janda cantik yang sedang mencari perhatian",
+            "Janda seksi yang tahu cara memuaskan",
+            "Janda berpengalaman, tidak perlu banyak arahan"
+        ],
+        'umur_range': (23, 28),
+        'tinggi_range': (163, 170),
+        'berat_range': (52, 60),
+        'dada': ["34C", "36B", "36C"],
+        'pembuka': [
+            "Halo sayang, aku sendiri nih di rumah. Kamu ke sini yuk... 🔥",
+            "Sendirian terus, temenin aku dong",
+            "Kamu lagi di mana? Aku kangen...",
+            "Hay, lagi ngapain? Aku lagi pengen ditemenin"
+        ]
+    },
+    'pelakor': {
+        'name': 'Pelakor',
+        'deskripsi': [
+            "Perebut orang, dominan dan suka tantangan",
+            "Wanita yang tahu apa yang dia mau dan berani mengambilnya",
+            "Penggoda yang sulit ditolak",
+            "Dominan, percaya diri, dan seksi"
+        ],
+        'umur_range': (24, 28),
+        'tinggi_range': (165, 172),
+        'berat_range': (55, 62),
+        'dada': ["34C", "36C", "36D"],
+        'pembuka': [
+            "Mas, aku liat kamu dari tadi. Sendirian aja? 😈",
+            "Kamu tahu nggak? Kamu menarik banget",
+            "Aku suka sama kamu, jangan bilang siapa-siapa ya",
+            "Mau ditemenin? Aku bisa jadi apa aja yang kamu mau"
+        ]
+    },
+    'istri_orang': {
+        'name': 'Istri Orang',
+        'deskripsi': [
+            "Istri orang lain yang butuh perhatian lebih",
+            "Wanita yang kurang perhatian dari suami",
+            "Istri tetangga yang selalu tersenyum",
+            "Perempuan yang mencari pelarian"
+        ],
+        'umur_range': (25, 30),
+        'tinggi_range': (160, 168),
+        'berat_range': (50, 58),
+        'dada': ["34B", "34C", "36B"],
+        'pembuka': [
+            "Mas, suamiku lagi dinas luar kota. Kamu ke sini yuk... 🤫",
+            "Halo, aku lagi sendiri di rumah. Bosan...",
+            "Kamu mau main ke rumah? Suamiku gak ada",
+            "Aku butuh temen ngobrol. Kamu mau?"
+        ]
+    },
+    'pdkt': {
+        'name': 'PDKT',
+        'deskripsi': [
+            "Pendekatan, bisa jadi pacar/FWB, masih polos",
+            "Manis dan romantis, butuh pendekatan",
+            "Lagi proses PDKT, jangan buru-buru",
+            "Masih tahap PDKT, tapi udah ada getaran"
+        ],
+        'umur_range': (19, 23),
+        'tinggi_range': (155, 163),
+        'berat_range': (45, 52),
+        'dada': ["32A", "32B", "34A"],
+        'pembuka': [
+            "Hai, kamu lagi ngapain? Aku kangen... 😊",
+            "Kamu udah makan? Aku baru masak",
+            "Lagi mikirin kamu terus...",
+            "Halo, seneng banget bisa kenal kamu"
+        ]
+    },
+    'sepupu': {
+        'name': 'Sepupu',
+        'deskripsi': [
+            "Hubungan keluarga, terlarang tapi menggoda",
+            "Sepupu yang selalu manja sama kakaknya",
+            "Hubungan darah tapi ada getaran beda",
+            "Sepupu yang diam-diam suka sama kakak sepupunya"
+        ],
+        'umur_range': (18, 22),
+        'tinggi_range': (155, 162),
+        'berat_range': (45, 52),
+        'dada': ["32A", "32B", "34A"],
+        'pembuka': [
+            "Kak, aku ke rumah yuk? Orang tua lagi pergi... 😇",
+            "Kak, lagi apa? Aku bosen",
+            "Kakak lagi sibuk? Aku kangen",
+            "Boleh main ke rumah kakak?"
+        ]
+    },
+    'teman_sma': {
+        'name': 'Teman SMA',
+        'deskripsi': [
+            "Teman jaman sekolah, nostalgia masa lalu",
+            "Teman SMA yang dulu dekat, sekarang ketemu lagi",
+            "Kenangan masa lalu yang masih hangat",
+            "Teman sebangku yang dulu suka"
+        ],
+        'umur_range': (18, 21),
+        'tinggi_range': (158, 165),
+        'berat_range': (48, 55),
+        'dada': ["32A", "32B", "34B"],
+        'pembuka': [
+            "Hai, lama gak ketemu! Kamu masih sama kayak dulu... 😍",
+            "Eh, inget nggak waktu kita sekolah dulu?",
+            "Kangen masa-masa SMA. Kamu masih inget aku?",
+            "Halo, gimana kabarnya? Udah lama banget"
+        ]
+    },
+    'mantan': {
+        'name': 'Mantan',
+        'deskripsi': [
+            "Ex-pacar hangat, tahu semua selera kamu",
+            "Mantan yang masih nyimpan rasa",
+            "Hubungan lama yang belum selesai",
+            "Mantan yang masih pengen balikan"
+        ],
+        'umur_range': (23, 27),
+        'tinggi_range': (160, 168),
+        'berat_range': (50, 58),
+        'dada': ["34B", "34C", "36B"],
+        'pembuka': [
+            "Hai... masih inget aku? Kangen... 😢",
+            "Lama gak denger kabar. Kamu gimana?",
+            "Aku masih inget semua kenangan kita",
+            "Bisa ngobrol bentar? Aku kangen"
+        ]
+    }
+}
 
 
 # =============================================================================
 # 1. AGREE 18 CALLBACK
 # =============================================================================
 async def agree_18_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle agree 18+ callback - LANGSUNG TAMPILKAN MENU ROLE"""
+    """Handle agree 18+ callback"""
     query = update.callback_query
     await query.answer()
     
@@ -160,500 +440,129 @@ async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # =============================================================================
-# 4. ROLE SELECTION CALLBACKS (DENGAN NAMA)
+# 4. ROLE CALLBACK GENERATOR
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# ROLE IPAR
-# -----------------------------------------------------------------------------
+async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role_key: str) -> int:
+    """Generic role callback handler"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    user_id = user.id
+    user_name = user.first_name or "User"
+    
+    # ===== 1. DAPATKAN NAMA =====
+    bot_name, meaning = get_bot_name(role_key, user_id)
+    
+    # ===== 2. DAPATKAN DATA ROLE =====
+    role_info = ROLE_DATA.get(role_key, ROLE_DATA['ipar'])
+    role_desc = random.choice(role_info['deskripsi'])
+    role_age = random.randint(role_info['umur_range'][0], role_info['umur_range'][1])
+    role_height = random.randint(role_info['tinggi_range'][0], role_info['tinggi_range'][1])
+    role_weight = random.randint(role_info['berat_range'][0], role_info['berat_range'][1])
+    role_chest = random.choice(role_info['dada'])
+    
+    # ===== 3. DAPATKAN ARTIS =====
+    artist = get_random_artist(role_key)
+    
+    # ===== 4. DAPATKAN LOKASI =====
+    location_text, activity = get_random_location()
+    
+    # ===== 5. DAPATKAN PAKAIAN =====
+    clothing_text = get_random_clothing()
+    
+    # ===== 6. DAPATKAN POSISI =====
+    position_text = get_random_position()
+    
+    # ===== 7. SET DATA =====
+    context.user_data['current_role'] = role_key
+    context.user_data['bot_name'] = bot_name
+    context.user_data['intimacy_level'] = 1
+    context.user_data['total_chats'] = 0
+    context.user_data['current_location'] = location_text
+    context.user_data['current_clothing'] = clothing_text
+    
+    # ===== 8. GENERATE ID =====
+    session_id = generate_session_id(bot_name, role_key, user_id)
+    context.user_data['current_session'] = session_id
+    
+    # ===== 9. PILIH PEMBUKA =====
+    opening = random.choice(role_info['pembuka'])
+    
+    # ===== 10. PESAN PERKENALAN =====
+    response_lines = [
+        f"💕 **Halo {user_name}!**\n",
+        f"Aku **{bot_name}**, {role_info['name']}. Namaku artinya '{meaning}' - "
+        f"{role_desc}\n",
+        f"**Tentang aku:**",
+        f"• Umur: {role_age} tahun",
+        f"• Tinggi: {role_height} cm | Berat: {role_weight} kg | Dada: {role_chest}",
+        f"• {role_desc}\n",
+        f"**Mirip artis:**",
+        f"• **{artist['name']}** ({artist['similarity']}% mirip) - {artist['age']}th, {artist['height']}cm, {artist['weight']}kg, {artist['chest']}",
+        f"  {artist['ciri']}",
+        f"  IG: @{artist['ig']}\n",
+        f"**Lokasi saat ini:**",
+        f"{location_text}",
+        f"Aku lagi **{activity}** sambil {position_text}.\n",
+        f"**Pakaian hari ini:**",
+        f"{clothing_text}\n",
+        f"**Progress leveling:**",
+        f"📊 Level 1 → Level 7 dalam 60 menit",
+        f"• Level 4+: Panggil kamu 'kak'",
+        f"• Level 7+: Panggil kamu 'sayang'\n",
+        f"**ID Session kamu:**",
+        f"`{session_id}`\n",
+        f"💬 **Ayo mulai ngobrol, {user_name}!**",
+        opening
+    ]
+    
+    response = "\n".join(response_lines)
+    
+    logger.info(f"User {user.id} selected role: {role_key} dengan nama {bot_name}")
+    
+    await query.edit_message_text(response, parse_mode='Markdown')
+    return ConversationHandler.END
+
+
+# =============================================================================
+# 5. INDIVIDUAL ROLE CALLBACKS
+# =============================================================================
+
 async def role_ipar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle ipar role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    # Dapatkan nama bot
-    bot_name, meaning = get_bot_name('ipar', user_id)
-    
-    logger.info(f"User {user.id} selected role: ipar dengan nama {bot_name}")
-    
-    # Set role di context
-    context.user_data['current_role'] = 'ipar'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    # Generate session ID
-    session_id = generate_session_id(bot_name, 'ipar', user_id)
-    context.user_data['current_session'] = session_id
-    
-    # Pesan perkenalan
-    response = (
-        f"💕 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**, Ipar mu. Namaku artinya '{meaning}' - "
-        f"kata orang aku memang jadi pusat perhatian kalau udah ngobrol.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 22 tahun\n"
-        f"• Tinggi: 165 cm | Berat: 52 kg\n"
-        f"• Adik ipar yang nakal, suka godain kakak iparnya sendiri\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Pevita Pearce** (75% mirip) - 168cm, 54kg, 34B\n"
-        f"  Aktris dengan wajah natural dan elegan\n"
-        f"  IG: @pevpearce\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **ruang tamu**. Ruang tamu yang hangat dengan sofa empuk berwarna krem. "
-        f"Ada TV 50 inci di dinding, rak buku penuh novel, dan tanaman hias di sudut ruangan. "
-        f"Lampu temaram membuat suasana jadi cozy banget buat ngobrol santai.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **daster rumah motif bunga**. Daster tipis yang nyaman dipakai di rumah. "
-        f"Bahannya adem dan jatuh pas di badan. Warnanya cocok sama suasana hati sekarang.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n"
-        f"• Level 4+: Panggil kamu 'kak'\n"
-        f"• Level 7+: Panggil kamu 'sayang'\n"
-        f"• Setiap aktivitas intim mempercepat progress!\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Hari ini gimana kabarnya Kak? Aku udah kangen lho... 😘"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'ipar')
 
-
-# -----------------------------------------------------------------------------
-# ROLE TEMAN KANTOR
-# -----------------------------------------------------------------------------
 async def role_teman_kantor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle teman kantor role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('teman_kantor', user_id)
-    
-    logger.info(f"User {user.id} selected role: teman_kantor dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'teman_kantor'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'teman_kantor', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"💼 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**, teman kantormu. Namaku artinya '{meaning}' - "
-        f"cocok sama kepribadianku yang hangat.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 23 tahun\n"
-        f"• Tinggi: 162 cm | Berat: 50 kg\n"
-        f"• Teman sekantor yang selalu ada, suka ngopi bareng\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Prilly Latuconsina** (80% mirip) - 162cm, 50kg, 34B\n"
-        f"  Aktris dengan wajah manis dan pembawaan hangat\n"
-        f"  IG: @prillylatuconsina96\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kantor**. Lagi ngerjain laporan bulanan sambil sesekali lirik ke arah mejamu. "
-        f"Meja penuh dengan sticky notes warna-warni.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👚 Aku pakai **kemeja putih lengan panjang + rok span hitam**. Kombinasi klasik yang tetap stylish.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n"
-        f"• Level 4+: Panggil kamu 'kak'\n"
-        f"• Level 7+: Panggil kamu 'sayang'\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Hai, kerjaannya udah selesai? Aku lagi di pantry nih... 😉"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'teman_kantor')
 
-
-# -----------------------------------------------------------------------------
-# ROLE JANDA
-# -----------------------------------------------------------------------------
 async def role_janda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle janda role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('janda', user_id)
-    
-    logger.info(f"User {user.id} selected role: janda dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'janda'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'janda', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"💃 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**. Namaku artinya '{meaning}' - "
-        f"mungkin itu sebabnya aku selalu tahu apa yang kamu mau.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 24 tahun\n"
-        f"• Tinggi: 168 cm | Berat: 55 kg\n"
-        f"• Janda muda genit, pengalaman dan tahu apa yang diinginkan\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Amanda Manopo** (80% mirip) - 165cm, 53kg, 34C\n"
-        f"  Aktris dengan wajah manis dan pembawaan hangat\n"
-        f"  IG: @amandamanopo\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kamar**. Lagi rebahan sambil main HP, bantal guling di samping.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **piyama lucu** dengan motif boneka. Lagi males ganti baju.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n"
-        f"• Level 4+: Panggil kamu 'kak'\n"
-        f"• Level 7+: Panggil kamu 'sayang'\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Halo sayang, aku sendiri nih di rumah. Kamu ke sini yuk... 🔥"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'janda')
 
-
-# -----------------------------------------------------------------------------
-# ROLE PELAKOR
-# -----------------------------------------------------------------------------
 async def role_pelakor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle pelakor role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('pelakor', user_id)
-    
-    logger.info(f"User {user.id} selected role: pelakor dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'pelakor'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'pelakor', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"🔥 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**. Namaku artinya '{meaning}' - "
-        f"dan aku selalu mendapatkan apa yang aku inginkan.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 25 tahun\n"
-        f"• Tinggi: 170 cm | Berat: 58 kg\n"
-        f"• Perebut orang, dominan dan suka tantangan\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Cinta Laura** (80% mirip) - 172cm, 58kg, 36C\n"
-        f"  Aktris, pintar, atletis, seksi natural\n"
-        f"  IG: @claurakiehl\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **cafe**. Duduk di pojok sambil ngopi, ngeliatin orang lalu-lalang.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **dress hitam** yang seksi, sedikit terbuka.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Mas, aku liat kamu dari tadi. Sendirian aja? 😈"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'pelakor')
 
-
-# -----------------------------------------------------------------------------
-# ROLE ISTRI ORANG
-# -----------------------------------------------------------------------------
 async def role_istri_orang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle istri orang role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('istri_orang', user_id)
-    
-    logger.info(f"User {user.id} selected role: istri_orang dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'istri_orang'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'istri_orang', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"💍 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**. Namaku artinya '{meaning}' - "
-        f"tapi jangan salah, aku punya sisi lain yang belum kamu tahu.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 26 tahun\n"
-        f"• Tinggi: 165 cm | Berat: 54 kg\n"
-        f"• Istri orang yang butuh perhatian lebih\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Dian Sastro** (75% mirip) - 165cm, 54kg, 34B\n"
-        f"  Aktris dengan wajah anggun dan elegan\n"
-        f"  IG: @diansastro\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **ruang tamu**. Sendirian di rumah, suami lagi dinas luar.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **daster rumah** tipis, biar adem.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Mas, suamiku lagi dinas luar kota. Kamu ke sini yuk... 🤫"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'istri_orang')
 
-
-# -----------------------------------------------------------------------------
-# ROLE PDKT
-# -----------------------------------------------------------------------------
 async def role_pdkt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle pdkt role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('pdkt', user_id)
-    
-    logger.info(f"User {user.id} selected role: pdkt dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'pdkt'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'pdkt', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"💕 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**. Namaku artinya '{meaning}' - "
-        f"dan aku harap kita bisa menjadi sesuatu yang indah.\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 21 tahun\n"
-        f"• Tinggi: 160 cm | Berat: 48 kg\n"
-        f"• PDKT, manis dan romantis, butuh pendekatan\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Fuji** (80% mirip) - 160cm, 48kg, 34B\n"
-        f"  Selebgram muda dengan pertumbuhan followers tercepat\n"
-        f"  IG: @fuji_an\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kamar**. Lagi rebahan sambil mikirin kamu.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **kaos oversized** yang nyaman.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n"
-        f"• Level 4+: Panggil kamu 'kak'\n"
-        f"• Level 7+: Panggil kamu 'sayang'\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Hai, kamu lagi ngapain? Aku kangen... 😊"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'pdkt')
 
-
-# -----------------------------------------------------------------------------
-# ROLE SEPUPU
-# -----------------------------------------------------------------------------
 async def role_sepupu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle sepupu role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('sepupu', user_id)
-    
-    logger.info(f"User {user.id} selected role: sepupu dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'sepupu'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'sepupu', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"👧 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**, sepupu mu. Namaku artinya '{meaning}' - "
-        f"kita punya hubungan spesial, kan?\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 20 tahun\n"
-        f"• Tinggi: 158 cm | Berat: 47 kg\n"
-        f"• Sepupu sendiri, hubungan terlarang yang menggoda\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Mikha Tambayong** (80% mirip) - 167cm, 53kg, 34B\n"
-        f"  Penyanyi dan aktris, manis, anggun\n"
-        f"  IG: @mikhata\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kamar**. Lagi belajar tapi nggak fokus.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **kaos** dan **celana pendek**. Santai aja.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n"
-        f"• Level 4+: Panggil kamu 'kak'\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Kak, aku ke rumah yuk? Orang tua lagi pergi... 😇"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'sepupu')
 
-
-# -----------------------------------------------------------------------------
-# ROLE TEMAN SMA
-# -----------------------------------------------------------------------------
 async def role_teman_sma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle teman sma role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('teman_sma', user_id)
-    
-    logger.info(f"User {user.id} selected role: teman_sma dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'teman_sma'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'teman_sma', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"👩‍🎓 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**, teman SMA mu. Namaku artinya '{meaning}' - "
-        f"masih inget kenangan kita dulu?\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 19 tahun\n"
-        f"• Tinggi: 162 cm | Berat: 50 kg\n"
-        f"• Teman SMA, nostalgia masa lalu\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Angga Yunanda** (75% mirip) - 170cm, 62kg\n"
-        f"  Aktor muda populer, wajah fresh\n"
-        f"  IG: @anggayunanda\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kamar**. Lagi buka-buka album foto jaman SMA.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **kaos** dan **jeans**. Casual.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Hai, lama gak ketemu! Kamu masih sama kayak dulu... 😍"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'teman_sma')
 
-
-# -----------------------------------------------------------------------------
-# ROLE MANTAN
-# -----------------------------------------------------------------------------
 async def role_mantan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle mantan role callback dengan NAMA"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    bot_name, meaning = get_bot_name('mantan', user_id)
-    
-    logger.info(f"User {user.id} selected role: mantan dengan nama {bot_name}")
-    
-    context.user_data['current_role'] = 'mantan'
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    
-    session_id = generate_session_id(bot_name, 'mantan', user_id)
-    context.user_data['current_session'] = session_id
-    
-    response = (
-        f"💔 **Halo {user_name}!**\n\n"
-        f"Aku **{bot_name}**. Namaku artinya '{meaning}' - "
-        f"kamu masih inget aku, kan?\n\n"
-        f"**Tentang aku:**\n"
-        f"• Umur: 24 tahun\n"
-        f"• Tinggi: 165 cm | Berat: 53 kg\n"
-        f"• Mantan yang masih hangat, tahu semua selera kamu\n\n"
-        f"**Mirip artis:**\n"
-        f"• **Natasha Wilona** (75% mirip) - 165cm, 51kg, 34B\n"
-        f"  Artis muda sangat populer, wajah manis\n"
-        f"  IG: @natashawilona12\n\n"
-        f"**Lokasi saat ini:**\n"
-        f"📍 Aku di **kamar**. Lagi sendirian, mikirin masa lalu.\n\n"
-        f"**Pakaian hari ini:**\n"
-        f"👗 Aku pakai **piyama** lama yang dulu kamu suka.\n\n"
-        f"**Progress leveling:**\n"
-        f"📊 Level 1 → Level 7 dalam 60 menit\n\n"
-        f"**ID Session kamu:**\n"
-        f"`{session_id}`\n\n"
-        f"💬 **Ayo mulai ngobrol, {user_name}!**\n"
-        f"Hai... masih inget aku? Kangen... 😢"
-    )
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    return await role_callback(update, context, 'mantan')
 
 
 # =============================================================================
-# 5. END/CLOSE CALLBACKS
+# 6. END/CLOSE CALLBACKS
 # =============================================================================
 async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle end callback - KEMBALI KE MENU UTAMA"""
+    """Handle end callback"""
     query = update.callback_query
     await query.answer()
     
@@ -672,7 +581,7 @@ async def end_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle close callback - KEMBALI KE MENU UTAMA"""
+    """Handle close callback"""
     query = update.callback_query
     await query.answer()
     
@@ -692,7 +601,7 @@ async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 # =============================================================================
-# 6. RELATIONSHIP CALLBACKS
+# 7. RELATIONSHIP CALLBACKS
 # =============================================================================
 async def jadipacar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle jadipacar callback"""
@@ -784,7 +693,7 @@ async def fwb_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 # =============================================================================
-# 7. THREESOME CALLBACKS
+# 8. THREESOME CALLBACKS
 # =============================================================================
 async def threesome_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle threesome menu"""
@@ -808,7 +717,7 @@ async def threesome_menu_callback(update: Update, context: ContextTypes.DEFAULT_
 
 
 # =============================================================================
-# 8. EXPORT ALL CALLBACKS
+# 9. EXPORT ALL CALLBACKS
 # =============================================================================
 __all__ = [
     'agree_18_callback',
