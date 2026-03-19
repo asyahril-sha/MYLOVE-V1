@@ -4,10 +4,11 @@
 =============================================================================
 MYLOVE ULTIMATE VERSI 2 - WORKING MEMORY (SHORT-TERM)
 =============================================================================
-Ingatan jangka pendek seperti manusia (5-10 menit)
+Ingatan jangka pendek seperti manusia (12 jam)
 - Menyimpan 7±2 item terakhir
 - State saat ini (lokasi, baju, mood, aktivitas)
 - Auto-expire setelah waktu tertentu
+- Tracking aktivitas berkelanjutan
 =============================================================================
 """
 
@@ -26,11 +27,11 @@ class WorkingMemory:
     Kapasitas terbatas, auto-expire
     """
     
-    def __init__(self, capacity: int = 7, expire_seconds: int = 43200):
+    def __init__(self, capacity: int = 7, expire_seconds: int = 43200):  # 12 JAM
         """
         Args:
             capacity: Jumlah item yang bisa diingat (default 7)
-            expire_seconds: Waktu expire dalam detik (default 10 menit)
+            expire_seconds: Waktu expire dalam detik (default 12 jam)
         """
         self.capacity = capacity
         self.expire_seconds = expire_seconds
@@ -53,6 +54,7 @@ class WorkingMemory:
             
             # ===== POSISI TUBUH =====
             'position': None,             # Lagi posisi apa? (duduk, berdiri, berbaring)
+            'position_history': [],      # Riwayat posisi
             'last_position_change': 0,    # Kapan terakhir ganti posisi
             
             # ===== MOOD & PERASAAN =====
@@ -64,11 +66,15 @@ class WorkingMemory:
             
             # ===== AKTIVITAS =====
             'activity': None,               # Lagi ngapain?
+            'activity_history': [],         # Riwayat aktivitas
+            'activity_details': {},         # Detail aktivitas (misal: menu masakan)
+            'activity_start_time': None,    # Kapan mulai aktivitas
             'last_activity': None,          # Aktivitas sebelumnya
             
             # ===== INTERAKSI =====
             'last_user_message': None,      # Pesan user terakhir
             'last_bot_response': None,      # Respon bot terakhir
+            'last_response_time': 0,        # Kapan terakhir respon
             'last_interaction': time.time(), # Kapan terakhir chat
             
             # ===== KONTEKS =====
@@ -76,12 +82,24 @@ class WorkingMemory:
             'privacy_level': 1.0,            # 0 (rame) - 1 (sepi)
             'time_of_day': None,              # Pagi/siang/sore/malam
             
-            # ===== UNTUK AI ENGINE (TAMBAHAN) =====
+            # ===== UNTUK AI ENGINE =====
             'role': None,                     # Role bot (ipar, janda, dll)
             'bot_name': None,                  # Nama bot
             'rel_type': None,                   # Tipe hubungan (pdkt, hts, fwb)
             'instance_id': None,                 # ID instance (untuk multiple)
-            'last_update': time.time()            # Kapan terakhir diupdate
+            'last_update': time.time(),           # Kapan terakhir diupdate
+            
+            # ===== AKTIVITAS BERKELANJUTAN (BARU) =====
+            'current_activity': {
+                'name': None,
+                'details': {},
+                'start_time': None,
+                'last_update': None,
+                'progress': None,
+                'status': 'idle'  # idle, active, paused, completed
+            },
+            'activity_stack': [],               # Stack untuk aktivitas beruntun
+            'paused_activities': [],            # Aktivitas yang di-pause
         }
         
         # Timeline (urutan kejadian singkat)
@@ -90,13 +108,189 @@ class WorkingMemory:
         logger.info(f"✅ WorkingMemory initialized (capacity: {capacity}, expire: {expire_seconds}s)")
     
     # =========================================================================
-    # METHOD BARU - UPDATE STATE (DIPANGGIL AI ENGINE)
+    # METHOD UNTUK AKTIVITAS BERKELANJUTAN (BARU)
+    # =========================================================================
+    
+    def set_current_activity(self, activity: str, details: Optional[Dict] = None):
+        """
+        Set aktivitas saat ini
+        
+        Args:
+            activity: Nama aktivitas (masak, tidur, mandi, dll)
+            details: Detail aktivitas (misal: {'menu': 'ayam bakar'})
+        """
+        now = time.time()
+        
+        # Simpan aktivitas sebelumnya ke history
+        if self.current_state['current_activity']['name']:
+            self.current_state['activity_history'].append({
+                'name': self.current_state['current_activity']['name'],
+                'details': self.current_state['current_activity']['details'],
+                'start_time': self.current_state['current_activity']['start_time'],
+                'end_time': now,
+                'duration': now - (self.current_state['current_activity']['start_time'] or now)
+            })
+        
+        # Set aktivitas baru
+        self.current_state['current_activity'] = {
+            'name': activity,
+            'details': details or {},
+            'start_time': now,
+            'last_update': now,
+            'progress': None,
+            'status': 'active'
+        }
+        
+        # Update juga field activity lama untuk backward compatibility
+        self.current_state['activity'] = activity
+        self.current_state['activity_details'] = details or {}
+        self.current_state['activity_start_time'] = now
+        
+        # Catat di timeline
+        self.timeline.append({
+            'time': now,
+            'type': 'activity_start',
+            'data': f"Mulai {activity}"
+        })
+        
+        logger.debug(f"🎯 Activity started: {activity} with details: {details}")
+    
+    def update_activity_progress(self, progress: str, details: Optional[Dict] = None):
+        """
+        Update progress aktivitas
+        
+        Args:
+            progress: Progress (misal: '75% matang')
+            details: Update detail (opsional)
+        """
+        if self.current_state['current_activity']['name']:
+            self.current_state['current_activity']['progress'] = progress
+            self.current_state['current_activity']['last_update'] = time.time()
+            
+            if details:
+                self.current_state['current_activity']['details'].update(details)
+                self.current_state['activity_details'].update(details)
+            
+            logger.debug(f"📊 Activity progress: {progress}")
+    
+    def pause_current_activity(self):
+        """Pause aktivitas saat ini"""
+        if self.current_state['current_activity']['name'] and self.current_state['current_activity']['status'] == 'active':
+            self.current_state['current_activity']['status'] = 'paused'
+            self.current_state['current_activity']['last_update'] = time.time()
+            
+            # Simpan ke paused activities
+            self.current_state['paused_activities'].append(
+                self.current_state['current_activity'].copy()
+            )
+            
+            logger.debug(f"⏸️ Activity paused: {self.current_state['current_activity']['name']}")
+    
+    def resume_current_activity(self):
+        """Resume aktivitas yang di-pause"""
+        if self.current_state['paused_activities']:
+            last_paused = self.current_state['paused_activities'].pop()
+            self.current_state['current_activity'] = last_paused
+            self.current_state['current_activity']['status'] = 'active'
+            self.current_state['current_activity']['last_update'] = time.time()
+            
+            # Update juga field backward compatibility
+            self.current_state['activity'] = last_paused['name']
+            self.current_state['activity_details'] = last_paused['details']
+            
+            logger.debug(f"▶️ Activity resumed: {last_paused['name']}")
+    
+    def end_current_activity(self, completed: bool = True):
+        """
+        Akhiri aktivitas saat ini
+        
+        Args:
+            completed: True jika selesai, False jika dibatalkan
+        """
+        if self.current_state['current_activity']['name']:
+            activity = self.current_state['current_activity']['name']
+            duration = time.time() - (self.current_state['current_activity']['start_time'] or time.time())
+            
+            # Catat ke history
+            self.current_state['activity_history'].append({
+                'name': activity,
+                'details': self.current_state['current_activity']['details'],
+                'start_time': self.current_state['current_activity']['start_time'],
+                'end_time': time.time(),
+                'duration': duration,
+                'completed': completed
+            })
+            
+            # Reset current activity
+            self.current_state['current_activity'] = {
+                'name': None,
+                'details': {},
+                'start_time': None,
+                'last_update': None,
+                'progress': None,
+                'status': 'idle'
+            }
+            
+            # Update backward compatibility
+            self.current_state['activity'] = None
+            self.current_state['activity_details'] = {}
+            self.current_state['activity_start_time'] = None
+            
+            # Catat di timeline
+            status = "selesai" if completed else "dibatalkan"
+            self.timeline.append({
+                'time': time.time(),
+                'type': 'activity_end',
+                'data': f"{activity} {status} (durasi: {duration:.0f}s)"
+            })
+            
+            logger.debug(f"🏁 Activity ended: {activity} ({status})")
+    
+    def get_current_activity(self) -> Optional[Dict]:
+        """Dapatkan aktivitas saat ini"""
+        if self.current_state['current_activity']['name']:
+            return self.current_state['current_activity'].copy()
+        return None
+    
+    def get_activity_history(self, limit: int = 10) -> List[Dict]:
+        """Dapatkan history aktivitas"""
+        return self.current_state['activity_history'][-limit:]
+    
+    def push_activity_stack(self, activity: str, details: Optional[Dict] = None):
+        """
+        Push aktivitas ke stack (untuk aktivitas beruntun)
+        Misal: masak → ngobrol → masak lagi
+        """
+        self.current_state['activity_stack'].append({
+            'name': activity,
+            'details': details,
+            'pushed_at': time.time()
+        })
+        logger.debug(f"📌 Activity pushed to stack: {activity}")
+    
+    def pop_activity_stack(self) -> Optional[Dict]:
+        """Pop aktivitas dari stack"""
+        if self.current_state['activity_stack']:
+            return self.current_state['activity_stack'].pop()
+        return None
+    
+    def set_last_bot_response(self, response: str):
+        """Simpan respons terakhir bot"""
+        self.current_state['last_bot_response'] = response
+        self.current_state['last_response_time'] = time.time()
+    
+    def get_last_bot_response(self) -> Optional[str]:
+        """Dapatkan respons terakhir bot"""
+        return self.current_state.get('last_bot_response')
+    
+    # =========================================================================
+    # METHOD UPDATE STATE (YANG SUDAH ADA)
     # =========================================================================
     
     def update_state(self, role=None, bot_name=None, rel_type=None, instance_id=None):
         """
         Update state dengan data baru
-        Method ini dipanggil oleh AI Engine saat start_session
+        Method ini dipanggil oleh AI Engine
         """
         if role:
             self.current_state['role'] = role
@@ -111,10 +305,6 @@ class WorkingMemory:
         self.current_state['last_update'] = time.time()
         
         logger.debug(f"Working memory state updated: role={role}, bot_name={bot_name}")
-    
-    # =========================================================================
-    # METHOD YANG SUDAH ADA (UPDATE STATE LAINNYA)
-    # =========================================================================
     
     def update_location(self, location: str, category: str = "unknown"):
         """Update lokasi dan catat history"""
@@ -147,7 +337,7 @@ class WorkingMemory:
             'data': f"{old_location} → {location}"
         })
         
-        logger.debug(f"Location updated: {old_location} → {location}")
+        logger.debug(f"📍 Location updated: {old_location} → {location}")
     
     def update_clothing(self, clothing: str, reason: str = "ganti baju"):
         """Update pakaian dan catat history"""
@@ -172,7 +362,7 @@ class WorkingMemory:
             'data': f"{old_clothing} → {clothing} ({reason})"
         })
         
-        logger.debug(f"Clothing updated: {old_clothing} → {clothing} ({reason})")
+        logger.debug(f"👗 Clothing updated: {old_clothing} → {clothing} ({reason})")
     
     def update_position(self, position: str):
         """Update posisi tubuh"""
@@ -180,6 +370,13 @@ class WorkingMemory:
         
         self.current_state['position'] = position
         self.current_state['last_position_change'] = time.time()
+        
+        # Simpan ke history
+        self.current_state['position_history'].append({
+            'time': time.time(),
+            'from': old_position,
+            'to': position
+        })
         
         self.timeline.append({
             'time': time.time(),
@@ -249,15 +446,10 @@ class WorkingMemory:
         })
     
     def update_activity(self, activity: str):
-        """Update aktivitas saat ini"""
-        self.current_state['last_activity'] = self.current_state['activity']
-        self.current_state['activity'] = activity
-        
-        self.timeline.append({
-            'time': time.time(),
-            'type': 'activity_change',
-            'data': activity
-        })
+        """Update aktivitas saat ini (untuk backward compatibility)"""
+        # Method ini dipanggil oleh state tracker
+        # Kita arahkan ke set_current_activity
+        self.set_current_activity(activity)
     
     def add_interaction(self, user_message: str, bot_response: str, context: Dict):
         """Simpan interaksi ke working memory"""
@@ -309,17 +501,17 @@ class WorkingMemory:
         cutoff = time.time() - seconds
         recent_items = [i for i in self.items if i['time'] > cutoff]
         
-        # Hitung statistik
-        total_interactions = len(recent_items)
-        avg_response_time = 0  # TODO: hitung nanti
-        
         # Dapatkan timeline terbaru
         recent_timeline = list(self.timeline)[-5:]
         
+        # Dapatkan aktivitas saat ini
+        current_activity = self.get_current_activity()
+        
         return {
             'current_state': self.get_current_state(),
-            'recent_interactions': total_interactions,
+            'recent_interactions': len(recent_items),
             'recent_timeline': recent_timeline,
+            'current_activity': current_activity,
             'last_activity': self.current_state['activity'],
             'location': self.current_state['location'],
             'clothing': self.current_state['clothing'],
@@ -354,14 +546,17 @@ class WorkingMemory:
         
         # Transisi yang masuk akal
         plausible_transitions = {
-            'ruang tamu': ['kamar', 'dapur', 'teras', 'kamar mandi'],
-            'kamar': ['kamar mandi', 'ruang tamu'],
+            'ruang tamu': ['kamar', 'dapur', 'teras', 'kamar mandi', 'taman'],
+            'kamar': ['kamar mandi', 'ruang tamu', 'balkon'],
             'kamar mandi': ['kamar', 'ruang tamu'],
-            'dapur': ['ruang tamu'],
-            'teras': ['ruang tamu'],
-            'pantai': ['mobil', 'kafe'],
-            'mall': ['parkiran', 'mobil'],
-            'mobil': ['pantai', 'mall', 'rumah'],
+            'dapur': ['ruang tamu', 'kamar mandi'],
+            'teras': ['ruang tamu', 'taman'],
+            'taman': ['teras', 'ruang tamu'],
+            'pantai': ['mobil', 'kafe', 'rumah'],
+            'mall': ['parkiran', 'mobil', 'kafe'],
+            'mobil': ['pantai', 'mall', 'rumah', 'parkiran'],
+            'kafe': ['mall', 'pantai', 'jalan'],
+            'kantor': ['ruang tamu', 'mobil'],
         }
         
         current_lower = current.lower()
@@ -385,7 +580,7 @@ class WorkingMemory:
             return True
         
         # Ganti baju harus ada alasan
-        valid_reasons = ['mandi', 'gerah', 'dingin', 'ganti baju', 'habis mandi']
+        valid_reasons = ['mandi', 'gerah', 'dingin', 'ganti baju', 'habis mandi', 'buka baju', 'lepas baju']
         if reason and any(r in reason.lower() for r in valid_reasons):
             return True
         
@@ -416,6 +611,20 @@ class WorkingMemory:
             maxlen=20
         )
         
+        # Bersihkan history yang terlalu lama
+        self.current_state['location_history'] = [
+            h for h in self.current_state['location_history'] if h['time'] > cutoff
+        ]
+        self.current_state['clothing_history'] = [
+            h for h in self.current_state['clothing_history'] if h['time'] > cutoff
+        ]
+        self.current_state['position_history'] = [
+            h for h in self.current_state['position_history'] if h['time'] > cutoff
+        ]
+        self.current_state['activity_history'] = [
+            h for h in self.current_state['activity_history'] if h['time'] > cutoff
+        ]
+        
         logger.debug(f"Forgot memories older than {self.expire_seconds}s")
     
     # =========================================================================
@@ -425,19 +634,29 @@ class WorkingMemory:
     def format_for_prompt(self) -> str:
         """Format working memory untuk dimasukkan ke prompt AI"""
         state = self.get_current_state()
+        current_activity = self.get_current_activity()
         
         lines = [
-            "📝 **WORKING MEMORY (5 menit terakhir)**",
+            "📝 **WORKING MEMORY (12 jam terakhir)**",
             f"📍 Lokasi: {state['location'] or 'tidak diketahui'}",
             f"👕 Pakaian: {state['clothing'] or 'tidak diketahui'}",
             f"🧍 Posisi: {state['position'] or 'tidak diketahui'}",
             f"🎭 Mood: {state['mood']} (gairah: {state['arousal_level']}/10)",
             f"💕 Lagi intim: {'Ya' if state['is_intimate'] else 'Tidak'}",
             f"🕐 Waktu: {state['time_of_day']}",
-            "",
-            "**Timeline terakhir:**"
         ]
         
+        if current_activity:
+            activity = current_activity
+            duration = time.time() - (activity['start_time'] or time.time())
+            duration_str = f"{int(duration/60)} menit" if duration > 60 else f"{int(duration)} detik"
+            lines.append(f"🎯 Aktivitas: {activity['name']} ({duration_str})")
+            if activity['details']:
+                for key, value in activity['details'].items():
+                    lines.append(f"   • {key}: {value}")
+        
+        lines.append("")
+        lines.append("**Timeline terakhir:**")
         for t in list(self.timeline)[-3:]:
             lines.append(f"• {t['data']}")
         
