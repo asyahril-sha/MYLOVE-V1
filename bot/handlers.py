@@ -33,7 +33,8 @@ from database.models import Constants
 # IMPORT AI ENGINE V2
 # =============================================================================
 try:
-    from core.ai_engine_v2 import AIEngineV2
+    from core.ai_engine_v2 import AIEngineV2 as AIEngineV2
+    import core.ai_engine_v2
     AI_ENGINE_AVAILABLE = True
 except ImportError:
     AI_ENGINE_AVAILABLE = False
