@@ -458,7 +458,7 @@ class AIEngineComplete:
 3. Gunakan memory yang ada untuk membuat respons personal.
 4. Bahasa Indonesia sehari-hari, natural seperti manusia.
 5. Panggil user dengan "{call}".
-6. Panjang respons 100-300 kata.
+6. Panjang respons 300-1000 kata.
 
 PESAN USER: "{user_message}"
 
