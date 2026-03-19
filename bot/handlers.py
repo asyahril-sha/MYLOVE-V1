@@ -36,19 +36,20 @@ AI_ENGINE_AVAILABLE = False
 AIEngineV2 = None
 
 try:
-    # Coba import langsung
+    # Tambah path untuk import
     import sys
     import os
-    
-    # Tambah path jika perlu
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     
+    # Coba import simple engine
     from core.ai_engine_simple import AIEngineSimple
     AIEngineV2 = AIEngineSimple
     AI_ENGINE_AVAILABLE = True
-    print("🔥 AI Engine Simple LOADED!")
+    print("🔥🔥🔥 AI ENGINE SIMPLE LOADED! 🔥🔥🔥")
+    logger.info("✅ AI Engine Simple loaded successfully")
 except Exception as e:
-    print(f"❌ Gagal load AI engine: {e}")
+    print(f"❌❌❌ GAGAL LOAD AI ENGINE: {e} ❌❌❌")
+    logger.error(f"Failed to load AI engine: {e}")
     AI_ENGINE_AVAILABLE = False
 
 # =============================================================================
