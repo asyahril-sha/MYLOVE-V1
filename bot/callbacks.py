@@ -77,20 +77,15 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
 
 
 # =============================================================================
-# HELPER FUNCTIONS - DATA GENERATOR
+# HELPER FUNCTIONS - DATA GENERATOR (SEDERHANA)
 # =============================================================================
 
 def get_bot_name(role: str, user_id: int) -> tuple:
-    """Dapatkan nama bot dan artinya"""
-    if V2_ENABLED and name_gen:
-        try:
-            name_data = name_gen.get_name_with_meaning(role, user_id)
-            return name_data['name'], name_data['meaning']
-        except Exception as e:
-            print(f"NameGenerator error: {e}")
-    
-    # Fallback
-    fallback = {
+    """
+    Dapatkan nama bot dan artinya - VERSI SEDERHANA
+    """
+    # Database nama sederhana
+    names = {
         "ipar": ("Sari", "esensi"),
         "teman_kantor": ("Diana", "dewi bulan"),
         "janda": ("Rina", "cahaya"),
@@ -101,8 +96,21 @@ def get_bot_name(role: str, user_id: int) -> tuple:
         "teman_sma": ("Anita", "anugerah"),
         "mantan": ("Sarah", "putri")
     }
-    return fallback.get(role, ("Sari", "esensi"))
-
+    
+    # Variasi untuk random
+    variations = {
+        "ipar": [("Sari", "esensi"), ("Dewi", "dewi"), ("Rina", "cahaya")],
+        "teman_kantor": [("Diana", "dewi bulan"), ("Linda", "cantik"), ("Ayu", "cantik")],
+        "janda": [("Rina", "cahaya"), ("Maya", "ilusi"), ("Vina", "cinta")],
+        # ... tambah sesuai kebutuhan
+    }
+    
+    # Pilih random dari variations jika ada
+    if role in variations:
+        return random.choice(variations[role])
+    
+    # Fallback ke default
+    return names.get(role, ("Sari", "esensi"))
 
 def get_random_artist(role: str) -> dict:
     """Dapatkan referensi artis random"""
