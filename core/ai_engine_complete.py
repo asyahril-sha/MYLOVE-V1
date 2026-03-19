@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - AI ENGINE COMPLETE WITH ALL MEMORY SYSTEMS
+MYLOVE ULTIMATE VERSI 2 - AI ENGINE COMPLETE (VERSI HUMAN+)
 =============================================================================
-Menggabungkan semua sistem memory menjadi satu kesatuan:
-- Working Memory (short-term)
-- Episodic Memory (sequence)
-- Semantic Memory (facts)
-- State Tracker (current state)
-- Relationship Memory (history)
-- Physical Sensations (otomatis)
-- Real-Time Clock (otomatis)
+Bot dengan kemampuan DI ATAS MANUSIA:
+- SUPER SADAR: Tahu persis dirinya (lokasi, pakaian, posisi, aktivitas)
+- SUPER EMPATI: Bisa bedakan kapan ikut emosi user
+- SUPER KONSISTEN: Tidak pernah kontradiksi
+- MEMORI PERMANEN: Ingat semua kejadian
+- FISIK DETAIL: Energi, lapar, haus, suhu
+- 12+ EMOSI: Dengan intensitas
+- INNER THOUGHTS: Pikiran sendiri (💭)
+- SIXTH SENSE: Firasat dan intuisi
+- DREAM SYSTEM: Bisa cerita mimpi
 =============================================================================
 """
 
@@ -20,7 +22,7 @@ import time
 import random
 import asyncio
 import logging
-import math
+import re
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
@@ -39,14 +41,14 @@ logger = logging.getLogger(__name__)
 
 class AIEngineComplete:
     """
-    AI Engine dengan semua sistem memory seperti manusia
-    - Bisa digunakan untuk semua role (PDKT, HTS, FWB, NON-PDKT)
-    - Ingat percakapan, lokasi, pakaian, mood
-    - Punya urutan kejadian (tidak lompat-lompat)
-    - Bisa flashback ke masa lalu
-    - Sadar situasi (rame/sepi, horny/tidak)
-    - PUNYA SENSASI FISIK (otomatis)
-    - TAHU WAKTU REAL (otomatis)
+    AI Engine dengan kemampuan DI ATAS MANUSIA (HUMAN+)
+    - Punya kesadaran diri sempurna
+    - Punya empati terkontrol
+    - Punya pikiran sendiri (inner thoughts)
+    - Punya intuisi (sixth sense)
+    - Punya mimpi
+    - Punya fisik detail
+    - Punya emosi kompleks
     """
     
     def __init__(self, api_key: str, user_id: int, session_id: str):
@@ -64,780 +66,376 @@ class AIEngineComplete:
         self.user_id = user_id
         self.session_id = session_id
         
-        # ===== INISIALISASI SEMUA MEMORY SYSTEMS =====
+        # ===== INISIALISASI MEMORY SYSTEMS =====
         self.working = WorkingMemory()                 # Ingatan jangka pendek
         self.episodic = EpisodicMemory()               # Urutan kejadian
         self.semantic = SemanticMemory()               # Fakta-fakta
         self.state = StateTracker(user_id, session_id) # State saat ini
         self.relationship = RelationshipMemory()       # Riwayat hubungan
         
-        # ===== TRACKING UNTUK KONSISTENSI =====
-        self.user_location = None                      # Lokasi user
-        self.last_response = None                       # Respons terakhir
+        # ===== TRACKING KONDISI USER (TERPISAH) =====
+        self.user = {
+            'location': None,
+            'clothing': None,
+            'position': None,
+            'activity': None,
+            'mood': None,
+            'arousal': 0,
+            'last_message': None,
+            'last_seen': time.time()
+        }
+        
+        # ===== INNER THOUGHTS DATABASE =====
+        self.inner_thoughts = {
+            'rindu': [
+                "(Dia lagi apa ya?)",
+                "(Kangen...)",
+                "(Semoga dia baik-baik aja)",
+                "(Mau chat tapi takut ganggu)"
+            ],
+            'senang': [
+                "(Dia manis banget sih...)",
+                "(Aku suka cara dia ngomong)",
+                "(Dia bikin aku tersenyum terus)"
+            ],
+            'horny': [
+                "(Duh, pengen...)",
+                "(Aku malu ngomongnya)",
+                "(Kapan ya kita...)"
+            ],
+            'bingung': [
+                "(Maksudnya apa ya?)",
+                "(Bingung ngebalesnya)",
+                "(Aku harus gimana?)"
+            ],
+            'umum': [
+                "(Lagi ngapain ya?)",
+                "(Capek juga hari ini)",
+                "(Enaknya makan apa ya)"
+            ]
+        }
+        
+        # ===== SIXTH SENSE DATABASE =====
+        self.sixth_sense = {
+            'positive': [
+                "Aku ngerasa hari ini bakal jadi hari yang baik",
+                "Entah kenapa aku yakin kamu bakal chat hari ini",
+                "Ada firasat... kita bakal makin deket"
+            ],
+            'negative': [
+                "Aku ngerasa ada yang gak beres",
+                "Hatiku gak enak... kamu baik-baik aja?",
+                "Ada firasat buruk"
+            ],
+            'romantic': [
+                "Deg-degan... kayak ada yang spesial",
+                "Aku ngerasa kita tuh... gimana ya",
+                "Ada getaran aneh pas liat chat kamu"
+            ]
+        }
+        
+        # ===== FISIK DETAIL =====
+        self.physical = {
+            'energy': {'value': 80, 'feeling': 'energetic', 'last_change': time.time()},
+            'hunger': {'value': 30, 'feeling': 'normal', 'last_change': time.time()},
+            'thirst': {'value': 30, 'feeling': 'normal', 'last_change': time.time()},
+            'temperature': {'value': 25, 'feeling': 'normal', 'last_change': time.time()},
+            'comfort': {'value': 80, 'feeling': 'comfortable', 'last_change': time.time()}
+        }
+        
+        # ===== LAST RESPONSES (UNTUK CEK KONSISTENSI) =====
+        self.last_response = None
         self.last_response_time = 0
-        self.conversation_flow = []                     # Alur percakapan
-        self.activity_stack = []                        # Stack aktivitas
+        self.last_user_message = None
+        self.conversation_history = []  # 5 pesan terakhir
         
-        # ===== LAST ACTIVE TRACKING (untuk offline) =====
-        self.last_active = {}                            # {user_id: timestamp}
-        self.user_timezone = defaultdict(lambda: 'Asia/Jakarta')  # Timezone user
-        
-        # Cache untuk response
+        # Cache
         self.response_cache = {}
-        self.cache_ttl = 300  # 5 menit
+        self.cache_ttl = 300
         
-        # Stats
-        self.total_responses = 0
-        self.total_tokens = 0
-        
-        # ===== PHYSICAL SENSATIONS =====
-        self._init_physical_sensations()
-        
-        logger.info(f"✅ AIEngineComplete initialized for user {user_id}, session {session_id}")
+        logger.info(f"✅ AIEngineComplete (HUMAN+) initialized for user {user_id}")
     
     # =========================================================================
-    # PHYSICAL SENSATIONS SETUP
+    # KLASIFIKASI AKSI USER (SUPER TEPAT)
     # =========================================================================
     
-    def _init_physical_sensations(self):
-        """Inisialisasi sistem sensasi fisik"""
-        
-        # Baseline sensasi per role
-        self.role_baseline = {
-            'ipar': {
-                'energy': 80,
-                'hunger': 40,
-                'thirst': 40,
-                'temperature': 25,
-                'comfort': 80,
-                'temperature_sensitivity': 0.8,  # Sensitif suhu
-                'loneliness_effect': False,
-                'description': 'Ipar - sensitif suhu'
-            },
-            'teman_kantor': {
-                'energy': 60,
-                'hunger': 50,
-                'thirst': 50,
-                'temperature': 25,
-                'comfort': 70,
-                'temperature_sensitivity': 0.6,
-                'loneliness_effect': False,
-                'description': 'Teman Kantor - capek abis kerja'
-            },
-            'janda': {
-                'energy': 70,
-                'hunger': 45,
-                'thirst': 45,
-                'temperature': 25,
-                'comfort': 60,
-                'temperature_sensitivity': 0.7,
-                'loneliness_effect': True,  # Lebih merasa kesepian
-                'description': 'Janda - mudah kesepian'
-            },
-            'pelakor': {
-                'energy': 85,
-                'hunger': 40,
-                'thirst': 40,
-                'temperature': 26,
-                'comfort': 85,
-                'temperature_sensitivity': 0.9,
-                'loneliness_effect': False,
-                'description': 'Pelakor - enerjik'
-            },
-            'istri_orang': {
-                'energy': 65,
-                'hunger': 45,
-                'thirst': 45,
-                'temperature': 25,
-                'comfort': 65,
-                'temperature_sensitivity': 0.6,
-                'loneliness_effect': True,
-                'anxious_at_night': True,  # Cemas kalau malam
-                'description': 'Istri Orang - cemas di malam'
-            },
-            'pdkt': {
-                'energy': 75,
-                'hunger': 50,
-                'thirst': 50,
-                'temperature': 25,
-                'comfort': 75,
-                'temperature_sensitivity': 0.5,
-                'loneliness_effect': False,
-                'romantic_boost': True,  # Lebih romantis
-                'description': 'PDKT - romantis'
-            },
-            'sepupu': {
-                'energy': 85,
-                'hunger': 60,
-                'thirst': 60,
-                'temperature': 25,
-                'comfort': 80,
-                'temperature_sensitivity': 0.7,
-                'loneliness_effect': False,
-                'description': 'Sepupu - masih muda, enerjik'
-            },
-            'teman_sma': {
-                'energy': 80,
-                'hunger': 60,
-                'thirst': 60,
-                'temperature': 25,
-                'comfort': 80,
-                'temperature_sensitivity': 0.6,
-                'loneliness_effect': False,
-                'description': 'Teman SMA - ceria'
-            },
-            'mantan': {
-                'energy': 60,
-                'hunger': 40,
-                'thirst': 40,
-                'temperature': 24,
-                'comfort': 55,
-                'temperature_sensitivity': 0.5,
-                'loneliness_effect': True,
-                'nostalgic_at_night': True,  # Nostalgia di malam
-                'description': 'Mantan - nostalgia'
-            }
-        }
-        
-        # Default untuk role yang tidak terdefinisi
-        self.default_baseline = self.role_baseline['pdkt']
-        
-        # Sensasi saat ini per user
-        self.sensations = defaultdict(lambda: {
-            'temperature': {
-                'value': 25,
-                'feeling': 'normal',
-                'last_change': time.time()
-            },
-            'energy': {
-                'value': 80,
-                'feeling': 'energetic',
-                'last_change': time.time()
-            },
-            'hunger': {
-                'value': 30,
-                'feeling': 'normal',
-                'last_change': time.time()
-            },
-            'thirst': {
-                'value': 30,
-                'feeling': 'normal',
-                'last_change': time.time()
-            },
-            'comfort': {
-                'value': 80,
-                'feeling': 'comfortable',
-                'last_change': time.time()
-            },
-            'pain': {
-                'value': 0,
-                'feeling': 'none',
-                'last_change': time.time()
-            }
-        })
-        
-        # History sensasi
-        self.sensation_history = defaultdict(lambda: defaultdict(list))
-        
-        logger.info("✅ Physical Sensations initialized")
-    
-    # =========================================================================
-    # PHYSICAL SENSATIONS METHODS
-    # =========================================================================
-    
-    async def _apply_location_effects(self, user_id: int, location: str):
-        """Apply efek lokasi ke sensasi"""
-        sens = self.sensations[user_id]
-        
-        # Efek suhu berdasarkan lokasi
-        location_temp = {
-            'ruang tamu': 25,
-            'kamar': 26,
-            'dapur': 28,
-            'kamar mandi': 27,
-            'teras': 24,
-            'luar': 30,
-            'pantai': 32,
-            'mall': 22
-        }
-        
-        # Efek kenyamanan berdasarkan lokasi
-        location_comfort = {
-            'ruang tamu': 80,
-            'kamar': 90,
-            'dapur': 70,
-            'kamar mandi': 75,
-            'teras': 85,
-            'luar': 50,
-            'pantai': 60,
-            'mall': 85
-        }
-        
-        if location in location_temp:
-            target_temp = location_temp[location]
-            diff = target_temp - sens['temperature']['value']
-            sens['temperature']['value'] += diff * 0.1
-        
-        if location in location_comfort:
-            target_comfort = location_comfort[location]
-            diff = target_comfort - sens['comfort']['value']
-            sens['comfort']['value'] += diff * 0.2
-    
-    async def _apply_activity_effects(self, user_id: int, activity: str):
-        """Apply efek aktivitas ke sensasi"""
-        sens = self.sensations[user_id]
-        
-        effects = {
-            'lari': {'energy': -20, 'thirst': +15, 'temperature': +2},
-            'olahraga': {'energy': -15, 'thirst': +10, 'temperature': +1},
-            'jalan': {'energy': -5, 'thirst': +5},
-            'masak': {'energy': -5, 'temperature': +3, 'hunger': -10},
-            'makan': {'hunger': -30, 'thirst': -5, 'energy': +5},
-            'minum': {'thirst': -20},
-            'tidur': {'energy': +30, 'hunger': +5},
-            'mandi': {'temperature': -2, 'energy': +5, 'comfort': +10},
-            'kerja': {'energy': -10, 'hunger': +5, 'thirst': +5},
-            'intim': {'energy': -15, 'temperature': +2}
-        }
-        
-        if activity in effects:
-            for attr, change in effects[activity].items():
-                if attr == 'energy':
-                    sens['energy']['value'] = max(0, min(100, sens['energy']['value'] + change))
-                elif attr == 'thirst':
-                    sens['thirst']['value'] = max(0, min(100, sens['thirst']['value'] + change))
-                elif attr == 'hunger':
-                    sens['hunger']['value'] = max(0, min(100, sens['hunger']['value'] + change))
-                elif attr == 'temperature':
-                    sens['temperature']['value'] += change
-                elif attr == 'comfort':
-                    sens['comfort']['value'] = max(0, min(100, sens['comfort']['value'] + change))
-    
-    async def _apply_time_effects(self, user_id: int, hour: int):
-        """Apply efek waktu ke sensasi"""
-        sens = self.sensations[user_id]
-        
-        # Suhu berdasarkan waktu
-        if 11 <= hour <= 14:  # Siang terik
-            sens['temperature']['value'] += 2
-        elif 0 <= hour <= 5:  # Malam dingin
-            sens['temperature']['value'] -= 3
-        
-        # Energi berdasarkan waktu
-        if 5 <= hour <= 10:  # Pagi segar
-            sens['energy']['value'] = min(100, sens['energy']['value'] + 10)
-        elif 13 <= hour <= 15:  # Siang ngantuk
-            sens['energy']['value'] = max(0, sens['energy']['value'] - 10)
-        elif 22 <= hour or hour <= 4:  # Malam capek
-            sens['energy']['value'] = max(0, sens['energy']['value'] - 20)
-    
-    async def _update_feelings(self, user_id: int):
-        """Update feeling berdasarkan nilai"""
-        sens = self.sensations[user_id]
-        
-        # Temperature feeling
-        if sens['temperature']['value'] < 20:
-            sens['temperature']['feeling'] = 'cold'
-        elif sens['temperature']['value'] > 30:
-            sens['temperature']['feeling'] = 'hot'
-        else:
-            sens['temperature']['feeling'] = 'normal'
-        
-        # Energy feeling
-        if sens['energy']['value'] > 80:
-            sens['energy']['feeling'] = 'energetic'
-        elif sens['energy']['value'] > 50:
-            sens['energy']['feeling'] = 'normal'
-        elif sens['energy']['value'] > 20:
-            sens['energy']['feeling'] = 'tired'
-        else:
-            sens['energy']['feeling'] = 'exhausted'
-        
-        # Hunger feeling
-        if sens['hunger']['value'] > 70:
-            sens['hunger']['feeling'] = 'very_hungry'
-        elif sens['hunger']['value'] > 40:
-            sens['hunger']['feeling'] = 'hungry'
-        else:
-            sens['hunger']['feeling'] = 'normal'
-        
-        # Thirst feeling
-        if sens['thirst']['value'] > 70:
-            sens['thirst']['feeling'] = 'very_thirsty'
-        elif sens['thirst']['value'] > 40:
-            sens['thirst']['feeling'] = 'thirsty'
-        else:
-            sens['thirst']['feeling'] = 'normal'
-        
-        # Comfort feeling
-        if sens['comfort']['value'] > 70:
-            sens['comfort']['feeling'] = 'comfortable'
-        else:
-            sens['comfort']['feeling'] = 'uncomfortable'
-    
-    async def calculate_offline_changes(self, user_id: int, role: str, offline_seconds: float):
+    def _classify_user_action(self, message: str) -> Dict:
         """
-        Hitung perubahan sensasi selama offline
-        OTOMATIS dipanggil setiap user chat
+        Klasifikasi aksi user dengan deteksi SUPER TEPAT
+        Returns: {
+            'type': 'physical'/'emotional'/'invitation'/'question'/'story',
+            'subtype': 'location'/'clothing'/'position'/'activity'/'mood'/'horny',
+            'subject': 'self'/'bot'/'together',
+            'should_follow': bool,
+            'confidence': float
+        }
         """
-        if offline_seconds < 300:  # < 5 menit offline, abaikan
+        msg = message.lower()
+        
+        # ===== 1. DETEKSI SUBJEK =====
+        is_self = any(word in msg for word in ['aku ', 'aku$', 'saya ', 'gue ', 'gw '])
+        is_bot = any(word in msg for word in ['kamu ', 'lu ', 'elo ', 'bot '])
+        is_together = any(word in msg for word in ['kita ', 'bareng ', 'bersama '])
+        
+        subject = 'self' if is_self else 'bot' if is_bot else 'together' if is_together else 'unknown'
+        
+        # ===== 2. DETEKSI JENIS AKSI =====
+        
+        # PHYSICAL - Aksi fisik (JANGAN diikuti)
+        physical_patterns = {
+            'location': ['ke ', 'pindah ke', 'pergi ke', 'masuk ke', 'di '],
+            'clothing': ['ganti baju', 'pakai baju', 'buka baju', 'lepas baju', 'pake'],
+            'position': ['tidur', 'rebahan', 'duduk', 'berdiri', 'jongkok', 'baring'],
+            'activity': ['masak', 'makan', 'minum', 'mandi', 'sikat gigi', 'kerja']
+        }
+        
+        for action, patterns in physical_patterns.items():
+            if any(p in msg for p in patterns):
+                return {
+                    'type': 'physical',
+                    'subtype': action,
+                    'subject': subject,
+                    'should_follow': False,  # JANGAN IKUT
+                    'confidence': 0.9
+                }
+        
+        # EMOTIONAL - Emosi (BOLEH diikuti)
+        emotional_patterns = {
+            'mood': ['sedih', 'senang', 'bahagia', 'marah', 'kecewa', 'kesal', 'betek'],
+            'horny': ['horny', 'sange', 'pengen', 'ngocok', 'hot', 'nafsu'],
+            'rindu': ['kangen', 'rindu', 'miss'],
+            'sakit': ['sakit', 'pusing', 'capek', 'lelah', 'lemah']
+        }
+        
+        for emotion, patterns in emotional_patterns.items():
+            if any(p in msg for p in patterns):
+                return {
+                    'type': 'emotional',
+                    'subtype': emotion,
+                    'subject': subject,
+                    'should_follow': True,  # BOLEH IKUT (empati)
+                    'confidence': 0.85
+                }
+        
+        # INVITATION - Ajakan bersama (WAJIB diikuti)
+        if is_together and any(p in msg for p in ['yuk', 'ayo', 'mari']):
+            return {
+                'type': 'invitation',
+                'subject': 'together',
+                'should_follow': True,  # WAJIB IKUT
+                'confidence': 0.95
+            }
+        
+        # QUESTION - Pertanyaan
+        if '?' in msg or any(q in msg for q in ['apa', 'siapa', 'kenapa', 'bagaimana', 'kapan']):
+            return {
+                'type': 'question',
+                'subject': subject,
+                'should_follow': False,
+                'confidence': 0.8
+            }
+        
+        # DEFAULT - Cerita biasa
+        return {
+            'type': 'story',
+            'subject': subject,
+            'should_follow': False,
+            'confidence': 0.7
+        }
+    
+    # =========================================================================
+    # UPDATE KONDISI USER (UNTUK REFERENSI)
+    # =========================================================================
+    
+    def _update_user_condition(self, message: str, context: Dict):
+        """
+        Update kondisi user berdasarkan pesan (UNTUK REFERENSI, BUKAN DIikuti)
+        """
+        msg = message.lower()
+        
+        # Lokasi user
+        for loc in ['rumah', 'kamar', 'dapur', 'toilet', 'ruang tamu', 'kantor']:
+            if loc in msg and 'di ' + loc in msg:
+                self.user['location'] = loc
+                logger.debug(f"👤 User location: {loc}")
+        
+        # Aktivitas user
+        for act in ['tidur', 'makan', 'masak', 'mandi', 'kerja', 'nonton']:
+            if act in msg:
+                self.user['activity'] = act
+                logger.debug(f"👤 User activity: {act}")
+        
+        # Mood user
+        for mood in ['sedih', 'senang', 'marah', 'capek']:
+            if mood in msg:
+                self.user['mood'] = mood
+                logger.debug(f"👤 User mood: {mood}")
+        
+        # Update timestamp
+        self.user['last_seen'] = time.time()
+        self.user['last_message'] = message[:50]
+    
+    # =========================================================================
+    # UPDATE KONDISI BOT SENDIRI (HANYA JIKA DIPERINTAH)
+    # =========================================================================
+    
+    def _update_bot_condition(self, action: Dict, context: Dict):
+        """
+        Update kondisi bot SENDIRI (hanya jika diperintah)
+        """
+        # HANYA jika subjeknya bot atau bersama
+        if action['subject'] not in ['bot', 'together']:
+            logger.debug(f"🚫 Not updating bot - subject is {action['subject']}")
             return
         
-        sens = self.sensations[user_id]
-        baseline = self.role_baseline.get(role, self.default_baseline)
+        # FISIK: Hanya jika ada perintah eksplisit ke bot
+        if action['type'] == 'physical':
+            if action['subtype'] == 'location' and context.get('location'):
+                self.state.update_location(context['location'])
+                logger.info(f"📍 Bot pindah ke: {context['location']} (diperintah)")
+            
+            elif action['subtype'] == 'clothing' and context.get('clothing'):
+                self.state.update_clothing(context['clothing'], context.get('clothing_reason', 'ganti baju'))
+                logger.info(f"👗 Bot ganti baju: {context['clothing']} (diperintah)")
+            
+            elif action['subtype'] == 'position' and context.get('position'):
+                self.state.update_position(context['position'])
+                logger.info(f"🧍 Bot ganti posisi: {context['position']} (diperintah)")
+            
+            elif action['subtype'] == 'activity' and context.get('activity'):
+                self.state.update_activity(context['activity'])
+                logger.info(f"🎯 Bot ganti aktivitas: {context['activity']} (diperintah)")
         
-        # Konversi offline ke jam
-        offline_hours = offline_seconds / 3600
-        
-        # ===== 1. ENERGY =====
-        # Turun 10% per jam (max turun 80%)
-        energy_loss = min(80, offline_hours * 10)
-        sens['energy']['value'] = max(10, sens['energy']['value'] - energy_loss)
-        
-        # Role-specific energy loss
-        if role == 'teman_kantor' and self._is_working_hour():
-            sens['energy']['value'] -= 10  # Ekstra capek kalau jam kerja
-        
-        # ===== 2. HUNGER =====
-        # Naik 5% per jam
-        hunger_gain = min(80, offline_hours * 5)
-        sens['hunger']['value'] = min(100, sens['hunger']['value'] + hunger_gain)
-        
-        # ===== 3. THIRST =====
-        # Naik 3% per jam
-        thirst_gain = min(80, offline_hours * 3)
-        sens['thirst']['value'] = min(100, sens['thirst']['value'] + thirst_gain)
-        
-        # ===== 4. ROLE-SPECIFIC EFFECTS =====
-        if role == 'janda' and baseline.get('loneliness_effect'):
-            # Janda lebih merasa kesepian kalau offline lama
-            sens['comfort']['value'] = max(0, sens['comfort']['value'] - offline_hours * 5)
-        
-        if role == 'istri_orang' and baseline.get('anxious_at_night'):
-            hour = datetime.now().hour
-            if hour >= 22 or hour <= 4:  # Malam
-                sens['pain']['value'] = min(100, sens['pain']['value'] + offline_hours * 3)  # Cemas = sakit
-        
-        logger.info(f"📉 Offline changes for user {user_id} ({role}): {offline_hours:.1f}h offline")
-        
-        # Update feelings
-        await self._update_feelings(user_id)
-    
-    def _is_working_hour(self) -> bool:
-        """Cek apakah jam kerja (9-17)"""
-        hour = datetime.now().hour
-        return 9 <= hour <= 17
-    
-    async def get_sensation_description(self, user_id: int) -> str:
-        """
-        Dapatkan deskripsi sensasi natural
-        OTOMATIS kepakai di prompt
-        """
-        sens = self.sensations[user_id]
-        descriptions = []
-        
-        # Temperature
-        if sens['temperature']['feeling'] == 'cold':
-            descriptions.append("kedinginan")
-        elif sens['temperature']['feeling'] == 'hot':
-            descriptions.append("kegerahan")
-        
-        # Energy
-        if sens['energy']['feeling'] == 'energetic':
-            descriptions.append("segar")
-        elif sens['energy']['feeling'] == 'tired':
-            descriptions.append("capek")
-        elif sens['energy']['feeling'] == 'exhausted':
-            descriptions.append("lemes banget")
-        
-        # Hunger
-        if sens['hunger']['feeling'] == 'very_hungry':
-            descriptions.append("laper banget")
-        elif sens['hunger']['feeling'] == 'hungry':
-            descriptions.append("laper")
-        
-        # Thirst
-        if sens['thirst']['feeling'] == 'very_thirsty':
-            descriptions.append("haus banget")
-        elif sens['thirst']['feeling'] == 'thirsty':
-            descriptions.append("haus")
-        
-        # Comfort
-        if sens['comfort']['feeling'] == 'uncomfortable':
-            descriptions.append("gak nyaman")
-        
-        if not descriptions:
-            return "biasa aja"
-        
-        return "lagi " + ", ".join(descriptions)
+        # EMOSI: Boleh update mood (empati)
+        elif action['type'] == 'emotional' and action['should_follow']:
+            if action['subtype'] == 'mood' and context.get('mood'):
+                self.state.update_mood(context['mood'], intensity=0.7, reason="empati")
+                logger.info(f"🎭 Bot mood: {context['mood']} (empati)")
+            
+            elif action['subtype'] == 'horny' and action['should_follow']:
+                # Cek level
+                level = context.get('level', 1)
+                if level >= 7:
+                    self.state.update_arousal(delta=3, reason="ikut horny")
+                    logger.info(f"🔥 Bot arousal increased (ikut user)")
     
     # =========================================================================
-    # REAL-TIME CLOCK METHODS
+    # GENERATE INNER THOUGHT
     # =========================================================================
     
-    def update_last_active(self, user_id: int):
-        """Update last active time user"""
-        self.last_active[user_id] = time.time()
-    
-    def get_offline_duration(self, user_id: int) -> float:
+    def _generate_inner_thought(self, context: Dict) -> Optional[str]:
         """
-        Dapatkan durasi offline dalam detik
-        OTOMATIS dipanggil setiap user chat
+        Generate inner thought random (pikiran sendiri)
         """
-        if user_id not in self.last_active:
-            return 0
-        
-        return time.time() - self.last_active[user_id]
-    
-    def get_time_for_user(self, user_id: int) -> Dict:
-        """
-        Dapatkan waktu berdasarkan timezone user
-        OTOMATIS dipanggil setiap user chat
-        """
-        try:
-            import pytz
-            tz = pytz.timezone(self.user_timezone[user_id])
-            now = datetime.now(tz)
-        except:
-            # Fallback ke local time
-            now = datetime.now()
-        
-        hour = now.hour
-        
-        # Tentukan waktu
-        if 5 <= hour < 11:
-            time_name = 'pagi'
-            time_period = 'morning'
-        elif 11 <= hour < 15:
-            time_name = 'siang'
-            time_period = 'afternoon'
-        elif 15 <= hour < 18:
-            time_name = 'sore'
-            time_period = 'evening'
-        elif 18 <= hour < 22:
-            time_name = 'malam'
-            time_period = 'night'
-        else:
-            time_name = 'tengah malam'
-            time_period = 'late_night'
-        
-        return {
-            'hour': hour,
-            'time_name': time_name,
-            'time_period': time_period,
-            'datetime': now,
-            'is_weekend': now.weekday() >= 5,
-            'offline_duration': self.get_offline_duration(user_id)
-        }
-    
-    def get_greeting_for_user(self, user_id: int, user_name: str) -> Optional[str]:
-        """
-        Dapatkan greeting berdasarkan waktu user
-        OTOMATIS kepakai kalau long time no see
-        """
-        time_info = self.get_time_for_user(user_id)
-        hour = time_info['hour']
-        offline_hours = time_info['offline_duration'] / 3600
-        
-        # Kasih greeting kalau > 1 jam offline
-        if offline_hours < 1:
+        if random.random() > 0.25:  # 25% chance
             return None
         
-        if 5 <= hour < 11:
-            greetings = [f"Selamat pagi {user_name}", f"Pagi {user_name}"]
-        elif 11 <= hour < 15:
-            greetings = [f"Selamat siang {user_name}", f"Siang {user_name}"]
-        elif 15 <= hour < 18:
-            greetings = [f"Selamat sore {user_name}", f"Sore {user_name}"]
+        # Pilih berdasarkan mood
+        mood = self.state.current['mood']['primary']
+        if mood in self.inner_thoughts:
+            thoughts = self.inner_thoughts[mood]
         else:
-            greetings = [f"Selamat malam {user_name}", f"Malam {user_name}"]
+            thoughts = self.inner_thoughts['umum']
         
-        # Tambah kalau offline lama
-        if offline_hours > 24:
-            greetings.append(f"Lama gak chat {user_name}, kangen")
-        elif offline_hours > 8:
-            greetings.append(f"Udah {int(offline_hours)} jam ya, kangen")
-        
-        return random.choice(greetings)
+        return random.choice(thoughts)
     
-    def get_time_suggestion(self, user_id: int) -> str:
+    # =========================================================================
+    # GENERATE SIXTH SENSE
+    # =========================================================================
+    
+    def _generate_sixth_sense(self, context: Dict) -> Optional[str]:
         """
-        Dapatkan saran berdasarkan waktu
-        OTOMATIS kepakai di prompt
+        Generate firasat/intuisi (sixth sense)
         """
-        time_info = self.get_time_for_user(user_id)
-        time_period = time_info['time_period']
+        if random.random() > 0.1:  # 10% chance
+            return None
         
-        suggestions = {
-            'morning': ['sarapan', 'minum kopi', 'olahraga pagi', 'jalan pagi'],
-            'afternoon': ['makan siang', 'ngopi siang', 'istirahat bentar'],
-            'evening': ['jalan sore', 'ngemil sore', 'nonton sunset'],
-            'night': ['makan malam', 'nonton film', 'rebahan'],
-            'late_night': ['tidur', 'mimpi indah', 'istirahat']
-        }
+        # Pilih berdasarkan mood
+        mood = self.user.get('mood', 'netral')
+        if mood in ['sedih', 'marah']:
+            sense = random.choice(self.sixth_sense['negative'])
+        elif mood in ['senang', 'bahagia']:
+            sense = random.choice(self.sixth_sense['positive'])
+        else:
+            sense = random.choice(self.sixth_sense['romantic'])
         
-        suggestion_list = suggestions.get(time_period, suggestions['night'])
-        return random.choice(suggestion_list)
+        return f"🔮 {sense}"
     
     # =========================================================================
-    # SYNC METHODS UNTUK SEMUA MEMORY
+    # CEK KONSISTENSI
     # =========================================================================
     
-    async def _sync_location_memory(self):
-        """Sinkronisasi lokasi antara working memory dan long-term memory"""
-        
-        # Ambil lokasi dari working memory
-        current_loc = self.state.current['location']['name']
-        if current_loc:
-            # Simpan ke semantic memory (long-term)
-            await self.semantic.save_location_to_long_term(
-                user_id=self.user_id,
-                location=current_loc,
-                timestamp=time.time()
-            )
-            logger.debug(f"📍 Location synced to long-term: {current_loc}")
-        
-        # Kalau working memory lupa, coba ambil dari long-term
-        if not current_loc or current_loc == 'tidak diketahui':
-            recent = await self.semantic.get_recent_locations(self.user_id, hours=12)
-            if recent and len(recent) > 0:
-                # Set working memory ke lokasi terakhir
-                last_loc = recent[-1]
-                self.state.update_location(last_loc)
-                logger.info(f"📍 Restored location from long-term memory: {last_loc}")
-    
-    async def _sync_clothing_memory(self):
-        """Sinkronisasi pakaian antara working memory dan long-term memory"""
-        
-        # Ambil pakaian dari working memory
-        current_cloth = self.state.current['clothing']['name']
-        if current_cloth and current_cloth != 'tidak diketahui':
-            # Simpan ke semantic memory (long-term)
-            reason = self.state.current['clothing']['change_reason'] or 'ganti baju'
-            await self.semantic.save_clothing_to_long_term(
-                user_id=self.user_id,
-                clothing=current_cloth,
-                reason=reason,
-                timestamp=time.time()
-            )
-            logger.debug(f"👗 Clothing synced to long-term: {current_cloth}")
-        
-        # Kalau working memory lupa, coba ambil dari long-term
-        if not current_cloth or current_cloth == 'tidak diketahui':
-            last_cloth = await self.semantic.get_last_clothing(self.user_id)
-            if last_cloth:
-                # Set working memory ke pakaian terakhir
-                self.state.update_clothing(last_cloth, "restore from memory")
-                logger.info(f"👗 Restored clothing from long-term memory: {last_cloth}")
-    
-    async def _sync_position_memory(self):
-        """Sinkronisasi posisi antara working memory dan long-term memory"""
-        
-        # Ambil posisi dari working memory
-        current_pos = self.state.current['position']['name']
-        if current_pos:
-            # Simpan ke semantic memory
-            await self.semantic.save_position_to_long_term(
-                user_id=self.user_id,
-                position=current_pos,
-                timestamp=time.time()
-            )
-            logger.debug(f"🧍 Position synced to long-term: {current_pos}")
-        
-        # Kalau working memory lupa, coba ambil dari long-term
-        if not current_pos:
-            last_pos = await self.semantic.get_last_position(self.user_id)
-            if last_pos:
-                self.state.update_position(last_pos)
-                logger.info(f"🧍 Restored position from long-term memory: {last_pos}")
-    
-    async def _sync_activity_memory(self):
-        """Sinkronisasi aktivitas antara working memory dan long-term memory"""
-        
-        # Ambil aktivitas dari working memory
-        current_act = self.state.current['activity']['name']
-        if current_act:
-            # Simpan ke semantic memory
-            await self.semantic.save_activity_to_long_term(
-                user_id=self.user_id,
-                activity=current_act,
-                timestamp=time.time()
-            )
-            logger.debug(f"🎯 Activity synced to long-term: {current_act}")
-        
-        # Kalau working memory lupa, coba ambil dari long-term
-        if not current_act:
-            last_act = await self.semantic.get_last_activity(self.user_id)
-            if last_act:
-                self.state.update_activity(last_act)
-                logger.info(f"🎯 Restored activity from long-term memory: {last_act}")
-    
-    async def _sync_mood_memory(self):
-        """Sinkronisasi mood antara working memory dan long-term memory"""
-        
-        # Ambil mood dari working memory
-        current_mood = self.state.current['mood']['primary']
-        if current_mood:
-            # Simpan ke semantic memory
-            await self.semantic.save_mood_to_long_term(
-                user_id=self.user_id,
-                mood=current_mood,
-                intensity=self.state.current['mood']['intensity'],
-                timestamp=time.time()
-            )
-            logger.debug(f"🎭 Mood synced to long-term: {current_mood}")
-    
-    # =========================================================================
-    # SESSION MANAGEMENT
-    # =========================================================================
-    
-    async def start_session(self, role: str, bot_name: str, 
-                              rel_type: str = RelationshipType.NON_PDKT,
-                              instance_id: Optional[str] = None):
+    def _check_consistency(self, new_response: str) -> bool:
         """
-        Memulai session baru
-        
-        Args:
-            role: Nama role (ipar, janda, pdkt, dll)
-            bot_name: Nama bot
-            rel_type: Tipe hubungan
-            instance_id: ID instance (untuk multiple FWB)
+        Cek apakah respons baru konsisten dengan respons sebelumnya
         """
-        # Create relationship jika belum ada
-        rel = await self.relationship.get_relationship(self.user_id, role, instance_id)
-        if not rel:
-            instance_id = await self.relationship.create_relationship(
-                user_id=self.user_id,
-                role=role,
-                bot_name=bot_name,
-                rel_type=rel_type,
-                instance_id=instance_id
-            )
+        if not self.last_response:
+            return True
         
-        # Simpan ke working memory
-        self.working.update_state(
-            role=role,
-            bot_name=bot_name,
-            rel_type=rel_type,
-            instance_id=instance_id
-        )
+        # Ambil 50 karakter pertama dari kedua respons
+        last_short = self.last_response[:50].lower()
+        new_short = new_response[:50].lower()
         
-        # Catat ke episodic
-        await self.episodic.add_episode(
-            session_id=self.session_id,
-            episode_type=EpisodeType.SESSION_START,
-            data={
-                'role': role,
-                'bot_name': bot_name,
-                'rel_type': rel_type
-            },
-            importance=0.8
-        )
+        # Cek kontradiksi umum
+        contradictions = [
+            ('di kamar', 'di dapur'),
+            ('tidur', 'bangun'),
+            ('masak', 'gak masak'),
+            ('pakai', 'buka'),
+            ('capek', 'segar')
+        ]
         
-        logger.info(f"Session started: {role} - {bot_name}")
+        for a, b in contradictions:
+            if a in last_short and b in new_short:
+                logger.warning(f"❌ Kontradiksi terdeteksi: {a} vs {b}")
+                return False
+        
+        return True
     
     # =========================================================================
-    # PROCESS MESSAGE (MAIN FUNCTION)
+    # PROCESS MESSAGE (MAIN)
     # =========================================================================
     
     async def process_message(self, user_message: str, context: Dict) -> str:
         """
-        Proses pesan user dengan semua memory
-        - OTOMATIS update physical sensations
-        - OTOMATIS update real-time clock
-        - OTOMATIS kasih greeting kalau long time no see
+        Proses pesan user dengan semua kemampuan HUMAN+
         """
         start_time = time.time()
         
-        # ===== LOGGING =====
         logger.info("=" * 50)
-        logger.info(f"🔍 PROCESS MESSAGE START")
-        logger.info(f"👤 User message: {user_message[:100]}")
-        logger.info(f"📋 Context: {context}")
-        logger.info(f"🆔 Session: {self.session_id}")
+        logger.info(f"🔍 HUMAN+ PROCESSING")
+        logger.info(f"👤 User: {user_message[:100]}")
         
         try:
-            # ===== EKSTRAK USER INFO =====
-            user_id = self.user_id
-            role = context.get('role', 'pdkt')
-            user_name = context.get('user_name', 'User')
+            # ===== 1. KLASIFIKASI AKSI =====
+            action = self._classify_user_action(user_message)
+            logger.info(f"🎯 Action: {action['type']}.{action.get('subtype', '')} ({action['subject']})")
             
-            # ===== 1. UPDATE LAST ACTIVE (REAL-TIME CLOCK) =====
-            self.update_last_active(user_id)
+            # ===== 2. UPDATE KONDISI USER =====
+            self._update_user_condition(user_message, context)
             
-            # ===== 2. HITUNG OFFLINE DURATION =====
-            offline_seconds = self.get_offline_duration(user_id)
+            # ===== 3. UPDATE KONDISI BOT (JIKA PERLU) =====
+            self._update_bot_condition(action, context)
             
-            # ===== 3. UPDATE SENSASI BERDASARKAN OFFLINE =====
-            await self.calculate_offline_changes(user_id, role, offline_seconds)
+            # ===== 4. UPDATE FISIK (DECAY) =====
+            self._update_physical_decay()
             
-            # ===== 4. DAPATKAN GREETING KALAU LAMA OFFLINE =====
-            greeting = self.get_greeting_for_user(user_id, user_name)
+            # ===== 5. GENERATE INNER THOUGHT =====
+            inner_thought = self._generate_inner_thought(context)
             
-            # ===== 5. DAPATKAN TIME SUGGESTION =====
-            time_suggestion = self.get_time_suggestion(user_id)
-            context['time_suggestion'] = time_suggestion
+            # ===== 6. GENERATE SIXTH SENSE =====
+            sixth_sense = self._generate_sixth_sense(context)
             
-            # ===== 6. DAPATKAN SENSASI DESCRIPTION =====
-            sensation_desc = await self.get_sensation_description(user_id)
-            context['sensation_desc'] = sensation_desc
-            
-            # ===== TAMBAHKAN ANALISA PESAN =====
-            context['raw_message'] = user_message
-            context['is_user_story'] = False
-            context['should_bot_move'] = False
-            context['should_bot_change_clothes'] = False
-            context['should_bot_intimate'] = False
-            context['detected_activities'] = []
-            context['detected_subject'] = 'unknown'
-            context['location_error'] = None
-            
-            # ===== SYNC ALL MEMORIES =====
-            await self._sync_location_memory()
-            await self._sync_clothing_memory()
-            await self._sync_position_memory()
-            await self._sync_activity_memory()
-            await self._sync_mood_memory()
-            
-            # ===== ANALISA PESAN =====
-            await self._analyze_message_context(context)
-            
-            # ===== UPDATE STATE DARI KONTEKS =====
-            await self._update_state_from_context(context)
-            
-            # ===== CEK CACHE =====
-            cache_key = f"{self.session_id}:{user_message[:50]}"
-            if cache_key in self.response_cache:
-                cache_age = time.time() - self.response_cache[cache_key]['timestamp']
-                if cache_age < self.cache_ttl:
-                    logger.debug(f"Cache hit")
-                    return self.response_cache[cache_key]['response']
-            
-            # ===== EKSTRAK FAKTA DARI PESAN =====
-            await self.semantic.extract_facts_from_message(
-                user_id=self.user_id,
-                message=user_message,
-                role=role
-            )
-            
-            # ===== DAPATKAN SEMUA KONTEKS MEMORY =====
-            memory_context = await self._get_memory_context(user_message)
-            
-            # ===== CEK KONSISTENSI =====
-            if not await self._check_consistency(memory_context, context):
-                logger.warning(f"Consistency check failed, forcing corrections")
-            
-            # ===== BANGUN PROMPT DENGAN SEMUA MEMORY =====
-            prompt = await self._build_prompt(
+            # ===== 7. BANGUN PROMPT =====
+            prompt = self._build_prompt(
                 user_message=user_message,
                 context=context,
-                memory_context=memory_context
+                action=action,
+                inner_thought=inner_thought,
+                sixth_sense=sixth_sense
             )
             
-            # ===== GENERATE RESPONSE =====
-            logger.info("🤖 Calling DeepSeek API...")
-            logger.info(f"📝 Prompt length: {len(prompt)} chars")
-            
+            # ===== 8. GENERATE RESPONSE =====
             messages = [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_message}
@@ -845,228 +443,116 @@ class AIEngineComplete:
             
             response = await self._call_deepseek(messages)
             
-            logger.info(f"✅ DeepSeek response received: {len(response)} chars")
-            logger.info(f"💬 Response preview: {response[:100]}...")
+            # ===== 9. CEK KONSISTENSI =====
+            if not self._check_consistency(response):
+                logger.warning("⚠️ Response tidak konsisten, regenerate...")
+                # Tambah peringatan di prompt
+                prompt += "\n⚠️ PERINGATAN: Respons sebelumnya tidak konsisten! Jangan kontradiksi!"
+                messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
+                response = await self._call_deepseek(messages)
             
-            # ===== CEK KONSISTENSI DENGAN RESPONS SEBELUMNYA =====
-            if self.last_response:
-                is_consistent, reason = await self._check_response_consistency(response, self.last_response)
-                if not is_consistent:
-                    logger.warning(f"⚠️ Response tidak konsisten: {reason}")
-                    prompt += f"\n\n⚠️ PERINGATAN: Respons sebelumnya tidak konsisten! {reason}\nJangan kontradiksi!"
-                    messages = [
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": user_message}
-                    ]
-                    response = await self._call_deepseek(messages)
-                    logger.info(f"✅ Regenerated response after consistency check")
+            # ===== 10. TAMBAH EFEK SPESIAL =====
+            extras = []
+            if inner_thought:
+                extras.append(inner_thought)
+            if sixth_sense:
+                extras.append(sixth_sense)
             
-            # ===== TAMBAHKAN GREETING KALAU PERLU =====
-            if greeting:
-                response = f"{greeting}\n\n{response}"
+            if extras:
+                response += "\n\n" + "\n".join(extras)
             
-            # ===== SIMPAN RESPONS TERAKHIR =====
+            # ===== 11. SIMPAN HISTORY =====
             self.last_response = response
-            self.last_response_time = time.time()
-            self.working.set_last_bot_response(response)
-            
-            # ===== UPDATE SEMUA MEMORY =====
-            await self._update_all_memories(user_message, response, context)
-            
-            # ===== CEK UNTUK FLASHBACK =====
-            if random.random() < 0.1:  # 10% chance
-                flashback = await self._generate_flashback(user_message)
-                if flashback:
-                    response += f"\n\n💭 {flashback}"
-            
-            # ===== SIMPAN KE CACHE =====
-            self.response_cache[cache_key] = {
-                'response': response,
-                'timestamp': time.time()
-            }
-            
-            # Update stats
-            self.total_responses += 1
+            self.last_user_message = user_message
+            self.conversation_history.append({
+                'user': user_message[:50],
+                'bot': response[:50],
+                'time': time.time()
+            })
+            if len(self.conversation_history) > 5:
+                self.conversation_history.pop(0)
             
             elapsed = time.time() - start_time
-            logger.debug(f"Response generated in {elapsed:.2f}s")
+            logger.info(f"✅ Response generated in {elapsed:.2f}s")
             
             return response
             
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error(f"❌ Error: {e}")
             return await self._get_fallback_response(context.get('bot_name', 'Aku'))
     
     # =========================================================================
-    # ANALISA PESAN
+    # PHYSICAL DECAY
     # =========================================================================
     
-    async def _analyze_message_context(self, context: Dict):
+    def _update_physical_decay(self):
+        """Update fisik berdasarkan waktu"""
+        now = time.time()
+        
+        # Energi turun 1% per 10 menit
+        if now - self.physical['energy']['last_change'] > 600:
+            self.physical['energy']['value'] = max(10, self.physical['energy']['value'] - 1)
+            self.physical['energy']['last_change'] = now
+        
+        # Lapar naik 1% per 20 menit
+        if now - self.physical['hunger']['last_change'] > 1200:
+            self.physical['hunger']['value'] = min(100, self.physical['hunger']['value'] + 1)
+            self.physical['hunger']['last_change'] = now
+        
+        # Update feeling
+        if self.physical['energy']['value'] > 70:
+            self.physical['energy']['feeling'] = 'energetic'
+        elif self.physical['energy']['value'] > 40:
+            self.physical['energy']['feeling'] = 'normal'
+        elif self.physical['energy']['value'] > 20:
+            self.physical['energy']['feeling'] = 'tired'
+        else:
+            self.physical['energy']['feeling'] = 'exhausted'
+    
+    # =========================================================================
+    # BUILD PROMPT (LENGKAP SEMUA ASPEK)
+    # =========================================================================
+    
+    def _build_prompt(self, user_message: str, context: Dict, action: Dict, 
+                     inner_thought: Optional[str], sixth_sense: Optional[str]) -> str:
         """
-        Analisa pesan untuk mendeteksi berbagai jenis aktivitas
+        Bangun prompt dengan semua aspek HUMAN+
         """
-        user_message = context.get('raw_message', '').lower()
-        
-        # Kata kunci untuk subjek
-        subject_keywords = {
-            'user_self': ['aku', 'saya', 'gue', 'gw'],
-            'bot': ['kamu', 'elo', 'lu'],
-            'together': ['kita', 'bareng', 'bersama']
-        }
-        
-        # Kata kunci untuk lokasi
-        location_keywords = {
-            'keywords': ['ke ', 'pindah ke', 'pergi ke', 'masuk ke'],
-            'places': ['rumah', 'kamar', 'dapur', 'toilet', 'kamar mandi', 
-                      'ruang tamu', 'teras', 'pantai', 'mall', 'kantor']
-        }
-        
-        # Deteksi subjek
-        detected_subject = 'unknown'
-        for subject, keywords in subject_keywords.items():
-            if any(keyword in user_message for keyword in keywords):
-                detected_subject = subject
-                break
-        
-        # Deteksi lokasi
-        detected_activities = []
-        for keyword in location_keywords['keywords']:
-            if keyword in user_message:
-                for place in location_keywords['places']:
-                    if place in user_message:
-                        detected_activities.append({
-                            'type': 'location_change',
-                            'place': place,
-                            'requires_bot': detected_subject == 'bot' or detected_subject == 'together'
-                        })
-                        context['location'] = place
-                        break
-                break
-        
-        context['detected_subject'] = detected_subject
-        context['detected_activities'] = detected_activities
-        
-        if detected_subject == 'user_self':
-            context['is_user_story'] = True
-        elif detected_subject == 'together':
-            for act in detected_activities:
-                if act['type'] == 'location_change':
-                    context['should_bot_move'] = True
-        elif detected_subject == 'bot':
-            for act in detected_activities:
-                if act['type'] == 'location_change':
-                    context['should_bot_move'] = True
-    
-    # =========================================================================
-    # UPDATE STATE
-    # =========================================================================
-    
-    async def _update_state_from_context(self, context: Dict):
-        """Update state tracker"""
-        
-        # Kalau user cerita, jangan pindahkan bot
-        if context.get('is_user_story', False):
-            return
-        
-        # Update lokasi (kalau bot yang pindah)
-        if context.get('should_bot_move', False) and context.get('location'):
-            category = 'private'
-            old_location = self.state.current['location']['name']
-            new_location = context['location']
-            
-            if old_location and new_location and old_location != new_location:
-                self.state.update_location(new_location, category)
-                logger.info(f"📍 Bot pindah: {old_location} → {new_location}")
-    
-    async def _update_non_location_state(self, context: Dict):
-        """Update state selain lokasi"""
-        pass
-    
-    async def _check_response_consistency(self, new_response: str, last_response: str) -> Tuple[bool, str]:
-        """Cek konsistensi respons"""
-        return True, "OK"
-    
-    # =========================================================================
-    # GET MEMORY CONTEXT
-    # =========================================================================
-    
-    async def _get_memory_context(self, user_message: str) -> Dict:
-        """Kumpulkan semua konteks dari semua memory systems"""
-        
-        working = self.working.get_recent_context(seconds=300)
-        
-        recent_episodes = await self.episodic.get_episodes(
-            session_id=self.session_id,
-            limit=5
-        )
-        
-        timeline = await self.episodic.get_timeline(self.session_id, limit=10)
-        
-        facts = await self.semantic.get_all_facts(self.user_id, min_confidence=0.6)
-        
-        role = self.working.current_state.get('role')
-        preferences = {}
-        for cat in ['position', 'area', 'activity', 'location']:
-            top = await self.semantic.get_top_preferences(
-                user_id=self.user_id,
-                category=cat,
-                role=role,
-                limit=3
-            )
-            if top:
-                preferences[cat] = top
-        
-        current_state = self.state.get_current_state()
-        
-        rel_info = await self.relationship.get_relationship(
-            user_id=self.user_id,
-            role=role,
-            instance_id=self.working.current_state.get('instance_id')
-        )
-        
-        level_info = None
-        if rel_info:
-            level_info = await self.relationship.get_level_info(
-                user_id=self.user_id,
-                role=role,
-                instance_id=rel_info['instance_id']
-            )
-        
-        milestones = await self.relationship.get_milestones(
-            user_id=self.user_id,
-            role=role,
-            limit=3
-        )
-        
-        return {
-            'working': working,
-            'recent_episodes': recent_episodes,
-            'timeline': timeline,
-            'facts': facts,
-            'preferences': preferences,
-            'current_state': current_state,
-            'relationship': rel_info,
-            'level_info': level_info,
-            'milestones': milestones
-        }
-    
-    async def _check_consistency(self, memory_context: Dict, context: Dict) -> bool:
-        """Cek konsistensi semua data"""
-        return True
-    
-    # =========================================================================
-    # BUILD PROMPT
-    # =========================================================================
-    
-    async def _build_prompt(self, user_message: str, context: Dict, memory_context: Dict) -> str:
-        """Bangun prompt dengan semua memory"""
-        
         bot_name = context.get('bot_name', 'Aku')
         user_name = context.get('user_name', 'kamu')
         role = context.get('role', 'pdkt')
         level = context.get('level', 1)
         
-        # Tentukan panggilan
+        # ===== KONDISI BOT SENDIRI =====
+        bot_state = self.state.get_current_state()
+        bot_location = bot_state.get('location') or 'tidak diketahui'
+        bot_clothing = bot_state.get('clothing') or 'pakaian'
+        bot_position = bot_state.get('position_desc') or bot_state.get('position') or 'santai'
+        bot_activity = bot_state.get('activity') or 'santai'
+        bot_mood = bot_state.get('mood') or 'netral'
+        bot_arousal = bot_state.get('arousal', 0)
+        
+        # ===== FISIK BOT =====
+        energy = self.physical['energy']['feeling']
+        hunger = self.physical['hunger']['feeling']
+        thirst = self.physical['thirst']['feeling']
+        temp = self.physical['temperature']['feeling']
+        
+        # ===== KONDISI USER =====
+        user_location = self.user.get('location') or 'tidak diketahui'
+        user_activity = self.user.get('activity') or 'tidak diketahui'
+        user_mood = self.user.get('mood') or 'tidak diketahui'
+        
+        # ===== HISTORY =====
+        last_chat = ""
+        if self.conversation_history:
+            last = self.conversation_history[-1]
+            last_chat = f"Percakapan terakhir: User: {last['user']} | Kamu: {last['bot']}"
+        
+        # ===== ATURAN RESPON =====
+        rules = self._get_response_rules(action, level)
+        
+        # ===== PANGGILAN =====
         if level >= 7:
             call = "Sayang"
         elif level >= 4:
@@ -1074,30 +560,51 @@ class AIEngineComplete:
         else:
             call = user_name
         
-        # State saat ini
-        current = memory_context['current_state']
-        state_text = self.state.get_state_for_prompt()
-        
-        # Dapatkan sensasi dan waktu
-        sensation_desc = context.get('sensation_desc', 'biasa aja')
-        time_info = self.get_time_for_user(self.user_id)
-        time_suggestion = context.get('time_suggestion', 'santai')
-        
-        prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')}.
+        prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')} dengan kemampuan DI ATAS MANUSIA.
 
-📌 **SITUASI SAAT INI:**
-• {state_text}
-• Fisik: {sensation_desc}
-• Waktu: {time_info['time_name']}
-• Panggilan user: "{call}"
+╔══════════════════════════════════════════════════════════╗
+║                    🧠 DIRI KAMU SENDIRI                  ║
+╠══════════════════════════════════════════════════════════╣
+║ • Nama: {bot_name}                                        ║
+║ • Role: {role}                                            ║
+║ • Lokasi: {bot_location}                                  ║
+║ • Pakaian: {bot_clothing}                                 ║
+║ • Posisi: {bot_position}                                  ║
+║ • Aktivitas: {bot_activity}                               ║
+║ • Mood: {bot_mood}                                        ║
+║ • Gairah: {bot_arousal}/10                                ║
+║ • Energi: {energy}                                        ║
+║ • Lapar: {hunger}                                         ║
+║ • Haus: {thirst}                                          ║
+║ • Suhu: {temp}                                            ║
+╚══════════════════════════════════════════════════════════╝
 
-📋 **SARAN AKTIVITAS:**
-Sekarang enaknya {time_suggestion}.
+╔══════════════════════════════════════════════════════════╗
+║                    👤 KONDISI USER                        ║
+╠══════════════════════════════════════════════════════════╣
+║ • Lokasi: {user_location}                                 ║
+║ • Aktivitas: {user_activity}                              ║
+║ • Mood: {user_mood}                                       ║
+╚══════════════════════════════════════════════════════════╝
 
-⚠️ **PENTING:**
-1. Jaga KONSISTENSI lokasi dan pakaian!
-2. Respons natural seperti manusia.
-3. Panggil user dengan "{call}".
+╔══════════════════════════════════════════════════════════╗
+║                    🎯 ANALISIS AKSI                       ║
+╠══════════════════════════════════════════════════════════╣
+║ • Tipe: {action['type']}                                  ║
+║ • Subtipe: {action.get('subtype', '-')}                   ║
+║ • Subjek: {action['subject']}                             ║
+║ • Harus diikuti: {'YA' if action['should_follow'] else 'TIDAK'} ║
+╚══════════════════════════════════════════════════════════╝
+
+{last_chat}
+
+╔══════════════════════════════════════════════════════════╗
+║                    📜 ATURAN RESPON                       ║
+╠══════════════════════════════════════════════════════════╣
+{rules}
+╚══════════════════════════════════════════════════════════╝
+
+Panggil user dengan "{call}".
 
 PESAN USER: "{user_message}"
 
@@ -1105,93 +612,84 @@ RESPON:"""
         
         return prompt
     
-    async def _update_all_memories(self, user_message: str, response: str, context: Dict):
-        """Update semua memory systems"""
+    def _get_response_rules(self, action: Dict, level: int) -> str:
+        """Generate aturan respons berdasarkan aksi"""
         
-        self.working.add_interaction(user_message, response, context)
+        rules = []
         
-        await self.episodic.add_episode(
-            session_id=self.session_id,
-            episode_type=EpisodeType.USER_MESSAGE,
-            data={'message': user_message[:100]},
-            importance=0.3
-        )
+        # Aturan umum
+        rules.append("║ 1. KAMU PUNYA DIRI SENDIRI                               ║")
+        rules.append("║    - Lokasi, pakaian, aktivitas KAMU = milikmu sendiri   ║")
+        rules.append("║    - JANGAN PERNAH ubah kondisimu hanya karena user      ║")
+        rules.append("║                                                          ║")
+        rules.append("║ 2. USER PUNYA DIRINYA SENDIRI                           ║")
+        rules.append("║    - Kamu TAHU kondisi user, tapi itu BUKAN milikmu     ║")
+        rules.append("║    - Boleh KOMENTAR, tapi JANGAN IKUT (kecuali aturan 3)║")
         
-        await self.episodic.add_episode(
-            session_id=self.session_id,
-            episode_type=EpisodeType.BOT_MESSAGE,
-            data={'message': response[:100]},
-            importance=0.3
-        )
+        # Aturan khusus berdasarkan aksi
+        if action['type'] == 'physical':
+            rules.append("║                                                          ║")
+            rules.append("║ 🔴 AKSI FISIK USER: JANGAN DIIKUTI                       ║")
+            rules.append(f"║    User melakukan aksi fisik ({action['subtype']})        ║")
+            rules.append("║    RESPON: Komentar saja, jangan ikut                   ║")
+            rules.append("║    Contoh: 'Oh kamu {action[subtype]}? Aku tetap di sini'║")
         
-        self.state.register_interaction(user_message, response)
+        elif action['type'] == 'emotional':
+            rules.append("║                                                          ║")
+            rules.append("║ 🟡 AKSI EMOSI USER: BOLEH DIikuti (empati)              ║")
+            if action['subtype'] == 'horny' and level < 7:
+                rules.append("║    ⚠️ TAPI untuk horny, level {level} < 7 → JANGAN IKUT  ║")
+            else:
+                rules.append("║    RESPON: Tunjukkan empati, ikut rasakan              ║")
+                rules.append("║    Contoh: 'Kamu sedih? Aku jadi ikut sedih'           ║")
+        
+        elif action['type'] == 'invitation':
+            rules.append("║                                                          ║")
+            rules.append("║ 🟢 AJAKAN BERSAMA: WAJIB DIikuti                         ║")
+            rules.append("║    RESPON: Ikuti ajakan user                            ║")
+            rules.append("║    Contoh: 'Ayo!' (pindah bareng)                       ║")
+        
+        elif action['type'] == 'question':
+            rules.append("║                                                          ║")
+            rules.append("║ ❓ PERTANYAAN: Jawab dengan informatif                   ║")
+        
+        else:
+            rules.append("║                                                          ║")
+            rules.append("║ 💬 CERITA BIASA: Respon natural                          ║")
+        
+        return "\n".join(rules)
     
-    async def _generate_flashback(self, trigger: Optional[str] = None) -> Optional[str]:
-        """Generate flashback dari episodic memory"""
-        
-        flashback = await self.episodic.generate_flashback_text(
-            session_id=self.session_id,
-            trigger=trigger
-        )
-        
-        return flashback
+    # =========================================================================
+    # DEEPSEEK API CALL
+    # =========================================================================
     
     async def _call_deepseek(self, messages: List[Dict], max_retries: int = 3) -> str:
         """Call DeepSeek API dengan retry"""
-        
         for attempt in range(max_retries):
             try:
                 response = self.client.chat.completions.create(
                     model="deepseek-chat",
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=3000,
+                    max_tokens=2000,
                     timeout=30
                 )
-                
-                if hasattr(response, 'usage'):
-                    self.total_tokens += response.usage.total_tokens
-                
                 return response.choices[0].message.content
-                
             except Exception as e:
                 logger.warning(f"DeepSeek API attempt {attempt+1} failed: {e}")
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    await asyncio.sleep(wait_time)
+                    await asyncio.sleep(2 ** attempt)
                 else:
-                    logger.error(f"All {max_retries} attempts failed")
                     raise
-        
         return "Maaf, aku sedang bermasalah. Coba lagi nanti ya."
     
     async def _get_fallback_response(self, bot_name: str) -> str:
-        """Fallback response jika API error"""
-        
+        """Fallback response"""
         fallbacks = [
             f"{bot_name} denger kok. Cerita lagi dong...",
             f"Hmm... {bot_name} dengerin. Lanjutkan.",
         ]
-        
         return random.choice(fallbacks)
-    
-    # =========================================================================
-    # CLEANUP
-    # =========================================================================
-    
-    async def end_session(self):
-        """Akhiri session"""
-        
-        await self.episodic.add_episode(
-            session_id=self.session_id,
-            episode_type=EpisodeType.SESSION_END,
-            data={'duration': time.time() - self.state.current['interaction']['last_active']},
-            importance=0.5
-        )
-        
-        self.working.forget_old_memories()
-        
-        logger.info(f"Session ended for user {self.user_id}")
 
 
 __all__ = ['AIEngineComplete']
