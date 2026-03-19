@@ -151,7 +151,40 @@ class SemanticMemory:
                 (r'jam (\d+) (\w+)', 'routine')
             ]
         }
+        
+    async def save_location_to_long_term(self, user_id: int, location: str, timestamp: float):
+        """Simpan lokasi ke memori jangka panjang"""
+        fact_key = f"location_history.{timestamp}"
+        
+        await self.add_fact(
+            user_id=user_id,
+            category="location",
+            fact_type=f"at_{int(timestamp)}",
+            value=location,
+            confidence=0.9,
+            source="conversation"
+        )
+        logger.debug(f"📍 Location saved to long-term memory: {location}")
     
+    async def get_recent_locations(self, user_id: int, hours: int = 4) -> List[str]:
+        """Dapatkan lokasi dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        locations = []
+        
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('location.at_') and fact['timestamp'] > cutoff:
+                locations.append({
+                    'location': fact['value'],
+                    'time': fact['timestamp']
+                })
+        
+        # Sort by time
+        locations.sort(key=lambda x: x['time'])
+        return [loc['location'] for loc in locations]
+        
     # =========================================================================
     # ADD FACTS
     # =========================================================================
