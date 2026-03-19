@@ -75,7 +75,22 @@ class EpisodicMemory:
         self.important_moments = {}  # {session_id: list of episode_ids}
         
         logger.info(f"✅ EpisodicMemory initialized (max {max_episodes} episodes)")
-    
+        
+    async def add_location_episode(self, session_id: str, from_loc: str, to_loc: str):
+        """Catat perpindahan lokasi sebagai episode"""
+        
+        await self.add_episode(
+            session_id=session_id,
+            episode_type="location_change",
+            data={
+                'from': from_loc,
+                'to': to_loc,
+                'timestamp': time.time()
+            },
+            importance=0.6
+        )
+        logger.debug(f"📍 Location episode recorded: {from_loc} → {to_loc}")
+        
     # =========================================================================
     # ADD EPISODE
     # =========================================================================
