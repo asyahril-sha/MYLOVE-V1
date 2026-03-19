@@ -212,6 +212,61 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Gunakan /start untuk memulai."
         )
         return
+        
+async def progress_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menampilkan progress hubungan berdasarkan level"""
+    user_id = update.effective_user.id
+    session_id = context.user_data.get('current_session')
+    bot_name = context.user_data.get('bot_name', 'Bot')
+    level = context.user_data.get('intimacy_level', 1)
+    total_chats = context.user_data.get('total_chats', 0)
+    
+    if not session_id:
+        await update.message.reply_text(
+            "❌ Tidak ada session aktif.\n"
+            "Mulai dengan /start dulu ya!"
+        )
+        return
+    
+    # Hitung progress ke level berikutnya
+    if level < 12:
+        next_level = level + 1
+        # Estimasi kasar: 50 chat per level
+        chats_needed = 50
+        progress = (total_chats % 50) / 50 * 100
+        bar_length = 20
+        filled = int(progress / 100 * bar_length)
+        bar = "█" * filled + "░" * (bar_length - filled)
+        
+        progress_text = f"{bar} {progress:.0f}%"
+        next_text = f"{chats_needed - (total_chats % 50)} chat lagi ke Level {next_level}"
+    else:
+        progress_text = "█" * 20 + " MAX"
+        next_text = "✅ Level MAX! Butuh aftercare untuk reset."
+    
+    # Boost info sederhana
+    boost_info = (
+        "🔥 **ACTIVITY BOOST:**\n"
+        "• Chat biasa: 1.0x\n"
+        "• Godaan / Flirt: 1.3x\n"
+        "• Ciuman: 1.5x\n"
+        "• Intim: 2.0x\n"
+        "• Climax: 3.0x 🔥"
+    )
+    
+    response = (
+        f"📊 **PROGRESS HUBUNGAN dengan {bot_name}**\n\n"
+        f"Level {level} → Level {next_level if level < 12 else 'MAX'}\n"
+        f"{progress_text}\n"
+        f"{next_text}\n\n"
+        f"{boost_info}\n\n"
+        f"📈 **Statistik:**\n"
+        f"• Total Chat: {total_chats}\n"
+        f"• Level Saat Ini: {level}/12\n\n"
+        f"_Bot tidak tahu kamu lihat ini... 🤫_"
+    )
+    
+    await update.message.reply_text(response, parse_mode='Markdown')
     
     # ===== TAMBAHAN MYLOVE V2 =====
     # Get bot name
@@ -296,6 +351,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ketik /start untuk memulai lagi."
     )
 
+app.add_handler(CommandHandler("progress", progress_command))
 
 # =============================================================================
 # 2. RELATIONSHIP COMMANDS (5 commands)
