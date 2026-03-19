@@ -258,7 +258,14 @@ class AIEngineComplete:
         if context.get('location'):
             category = context.get('location_category', 'unknown')
             self.state.update_location(context['location'], category)
-        
+
+            new_location = context.get('location')
+            if old_location and new_location and old_location != new_location:
+                await self.episodic.add_location_episode(
+                    session_id=self.session_id,
+                    from_loc=old_location,
+                    to_loc=new_location
+                )
         # Update pakaian
         if context.get('clothing'):
             reason = context.get('clothing_reason', 'ganti baju')
