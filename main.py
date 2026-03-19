@@ -20,6 +20,14 @@ from telegram import Update
 from telegram.ext import Application, ContextTypes
 from telegram.request import HTTPXRequest
 
+# ===== AUTO MIGRATION (PAKE PYTHON) =====
+import os
+if os.path.exists("database/auto_migrate.py"):
+    print("🔄 Menjalankan auto migration...")
+    import database.auto_migrate
+    database.auto_migrate.migrate()
+# =====
+
 # Tambahkan path ke root project
 sys.path.insert(0, str(Path(__file__).parent))
 
