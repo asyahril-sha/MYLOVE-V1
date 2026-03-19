@@ -26,7 +26,7 @@ class WorkingMemory:
     Kapasitas terbatas, auto-expire
     """
     
-    def __init__(self, capacity: int = 7, expire_seconds: int = 14400):
+    def __init__(self, capacity: int = 7, expire_seconds: int = 43200):
         """
         Args:
             capacity: Jumlah item yang bisa diingat (default 7)
