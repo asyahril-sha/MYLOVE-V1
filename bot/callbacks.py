@@ -5,18 +5,18 @@
 MYLOVE ULTIMATE VERSI 2 - BOT CALLBACKS (FIX FULL)
 =============================================================================
 Semua callback handlers dengan:
-- Nama bot random
+- Nama bot random dari name_generator
 - Data role dinamis
 - Lokasi & pakaian random
 - Artis referensi random
-- Siap V2
+- FIX: Semua error tuple handling
 =============================================================================
 """
 
 import time
 import random
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
@@ -27,7 +27,7 @@ from utils.logger import logger
 # IMPORT V2 COMPONENTS
 # =============================================================================
 try:
-    from dynamics.name_generator import NameGenerator
+    from dynamics.name_generator import get_name_generator
     from dynamics.location import LocationSystem
     from dynamics.clothing import ClothingSystem
     from dynamics.position import PositionSystem
@@ -35,7 +35,7 @@ try:
     from session.unique_id_v2 import id_generator_v2
     
     V2_ENABLED = True
-    name_gen = NameGenerator()
+    name_gen = get_name_generator()
     loc_system = LocationSystem()
     cloth_system = ClothingSystem()
     pos_system = PositionSystem()
@@ -77,61 +77,60 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
 
 
 # =============================================================================
-# HELPER FUNCTIONS - DATA GENERATOR (SEDERHANA)
+# HELPER FUNCTIONS - DATA GENERATOR (FIX)
 # =============================================================================
 
-def get_bot_name(role: str, user_id: int) -> tuple:
+def get_bot_name(role: str, user_id: int) -> Tuple[str, str]:
     """
-    Dapatkan nama bot dan artinya - VERSI SEDERHANA
+    Dapatkan nama bot dan artinya
+    Returns: (bot_name, meaning)
     """
-    # Database nama sederhana
-    names = {
-        "ipar": ("Sari", "esensi"),
-        "teman_kantor": ("Diana", "dewi bulan"),
-        "janda": ("Rina", "cahaya"),
-        "pelakor": ("Vina", "cinta"),
-        "istri_orang": ("Dewi", "dewi"),
-        "pdkt": ("Aurora", "fajar"),
-        "sepupu": ("Putri", "putri"),
-        "teman_sma": ("Anita", "anugerah"),
-        "mantan": ("Sarah", "putri")
+    if V2_ENABLED and name_gen:
+        try:
+            name_data = name_gen.get_name_with_meaning(role, user_id)
+            if isinstance(name_data, dict) and 'name' in name_data and 'meaning' in name_data:
+                return name_data['name'], name_data['meaning']
+        except Exception as e:
+            print(f"NameGenerator error: {e}")
+    
+    # Fallback yang lebih bervariasi
+    fallback_names = {
+        "ipar": [("Sari", "esensi"), ("Dewi", "dewi"), ("Rina", "cahaya"), ("Maya", "ilusi")],
+        "teman_kantor": [("Diana", "dewi bulan"), ("Linda", "cantik"), ("Ayu", "cantik"), ("Dita", "anugerah")],
+        "janda": [("Rina", "cahaya"), ("Maya", "ilusi"), ("Vina", "cinta"), ("Susi", "bunga lili")],
+        "pelakor": [("Vina", "cinta"), ("Sasha", "pembela"), ("Bella", "cantik"), ("Mira", "laut")],
+        "istri_orang": [("Dewi", "dewi"), ("Sari", "esensi"), ("Linda", "cantik"), ("Maya", "ilusi")],
+        "pdkt": [("Aurora", "fajar"), ("Cinta", "cinta"), ("Kirana", "cahaya"), ("Nadia", "harapan")],
+        "sepupu": [("Putri", "putri"), ("Nadia", "harapan"), ("Dina", "adil"), ("Mila", "cinta")],
+        "teman_sma": [("Anita", "anugerah"), ("Bella", "cantik"), ("Cici", "kakak"), ("Dina", "adil")],
+        "mantan": [("Sarah", "putri"), ("Nadia", "harapan"), ("Maya", "ilusi"), ("Rina", "cahaya")]
     }
     
-    # Variasi untuk random
-    variations = {
-        "ipar": [("Sari", "esensi"), ("Dewi", "dewi"), ("Rina", "cahaya")],
-        "teman_kantor": [("Diana", "dewi bulan"), ("Linda", "cantik"), ("Ayu", "cantik")],
-        "janda": [("Rina", "cahaya"), ("Maya", "ilusi"), ("Vina", "cinta")],
-        # ... tambah sesuai kebutuhan
-    }
-    
-    # Pilih random dari variations jika ada
-    if role in variations:
-        return random.choice(variations[role])
-    
-    # Fallback ke default
-    return names.get(role, ("Sari", "esensi"))
+    choices = fallback_names.get(role, fallback_names["ipar"])
+    return random.choice(choices)
+
 
 def get_random_artist(role: str) -> dict:
     """Dapatkan referensi artis random"""
     try:
         if V2_ENABLED:
             artist = get_random_artist_for_role(role)
-            return {
-                'name': artist['nama'],
-                'age': artist['umur'],
-                'height': artist['tinggi'],
-                'weight': artist['berat'],
-                'chest': artist['dada'],
-                'ig': artist['instagram'].replace('@', ''),
-                'ciri': artist['ciri'],
-                'similarity': random.randint(75, 90)
-            }
+            if artist:
+                return {
+                    'name': artist['nama'],
+                    'age': artist['umur'],
+                    'height': artist['tinggi'],
+                    'weight': artist['berat'],
+                    'chest': artist['dada'],
+                    'ig': artist['instagram'].replace('@', ''),
+                    'ciri': artist['ciri'],
+                    'similarity': random.randint(75, 90)
+                }
     except Exception as e:
         print(f"Artist error: {e}")
     
-    # Fallback
-    fallback = {
+    # Fallback yang lebih bervariasi
+    fallback_artists = {
         'ipar': {
             'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
             'chest': '34B', 'ig': 'pevpearce', 'ciri': 'Aktris dengan wajah natural dan elegan'
@@ -169,19 +168,20 @@ def get_random_artist(role: str) -> dict:
             'chest': '34B', 'ig': 'natashawilona12', 'ciri': 'Artis muda sangat populer, wajah manis'
         }
     }
-    result = fallback.get(role, fallback['ipar']).copy()
+    result = fallback_artists.get(role, fallback_artists['ipar']).copy()
     result['similarity'] = random.randint(75, 90)
     return result
 
 
-def get_random_location() -> tuple:
+def get_random_location() -> Tuple[str, str]:
     """Dapatkan lokasi random"""
     try:
         if V2_ENABLED and loc_system:
             loc = loc_system.get_random_location()
-            location_text = f"📍 Aku di **{loc['name']}**. {loc['description']}"
-            activity = random.choice(loc.get('activities', ['santai']))
-            return location_text, activity
+            if loc and isinstance(loc, dict):
+                location_text = f"📍 Aku di **{loc.get('name', 'tempat')}**. {loc.get('description', '')}"
+                activity = random.choice(loc.get('activities', ['santai']))
+                return location_text, activity
     except Exception as e:
         print(f"Location error: {e}")
     
@@ -204,7 +204,8 @@ def get_random_clothing() -> str:
     try:
         if V2_ENABLED and cloth_system:
             cloth = cloth_system.get_random_clothing()
-            return f"👗 Aku pakai **{cloth['name']}**. {cloth['description']}"
+            if cloth and isinstance(cloth, dict):
+                return f"👗 Aku pakai **{cloth.get('name', 'baju')}**. {cloth.get('description', '')}"
     except Exception as e:
         print(f"Clothing error: {e}")
     
@@ -217,6 +218,8 @@ def get_random_clothing() -> str:
         "👚 Aku pakai **kemeja putih** dan **rok span hitam**.",
         "👖 Aku pakai **jeans** dan **kaos** santai.",
         "🧥 Aku pakai **sweater hangat** buat malem-malem.",
+        "🩱 Aku pakai **bikini** buat berenang.",
+        "🧖‍♀️ Aku pakai **handuk** abis mandi.",
     ]
     return random.choice(clothes)
 
@@ -226,12 +229,13 @@ def get_random_position() -> str:
     try:
         if V2_ENABLED and pos_system:
             pos = pos_system.get_random_position()
-            return f"**{pos['description']}**"
+            if pos and isinstance(pos, dict):
+                return f"**{pos.get('description', 'santai')}**"
     except Exception as e:
         print(f"Position error: {e}")
     
     # Fallback
-    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok", "miring"]
+    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok", "miring", "telentang"]
     return f"**{random.choice(positions)}**"
 
 
@@ -476,94 +480,98 @@ async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # =============================================================================
-# 4. GENERIC ROLE CALLBACK
+# 4. GENERIC ROLE CALLBACK (FIX)
 # =============================================================================
 async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role_key: str) -> int:
-    """Generic role callback handler"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = update.effective_user
-    user_id = user.id
-    user_name = user.first_name or "User"
-    
-    print(f"🔵 Processing role: {role_key} for user {user_id}")
-    
-    # ===== 1. DAPATKAN NAMA =====
-    name_data = get_bot_name(role_key, user_id)  # ← fungsi ini harus return dict
-    bot_name = name_data['name']
-    meaning = name_data['meaning']
-    print(f"  • Bot name: {bot_name} ({meaning})")
-    
-    # ===== 2. DAPATKAN DATA ROLE =====
-    role_info = ROLE_DATA.get(role_key, ROLE_DATA['ipar'])
-    role_desc = random.choice(role_info['deskripsi'])
-    role_age = random.randint(role_info['umur_range'][0], role_info['umur_range'][1])
-    role_height = random.randint(role_info['tinggi_range'][0], role_info['tinggi_range'][1])
-    role_weight = random.randint(role_info['berat_range'][0], role_info['berat_range'][1])
-    role_chest = random.choice(role_info['dada'])
-    
-    # ===== 3. DAPATKAN ARTIS =====
-    artist = get_random_artist(role_key)
-    
-    # ===== 4. DAPATKAN LOKASI =====
-    location_text, activity = get_random_location()
-    
-    # ===== 5. DAPATKAN PAKAIAN =====
-    clothing_text = get_random_clothing()
-    
-    # ===== 6. DAPATKAN POSISI =====
-    position_text = get_random_position()
-    
-    # ===== 7. SET DATA =====
-    context.user_data['current_role'] = role_key
-    context.user_data['bot_name'] = bot_name
-    context.user_data['intimacy_level'] = 1
-    context.user_data['total_chats'] = 0
-    context.user_data['current_location'] = location_text
-    context.user_data['current_clothing'] = clothing_text
-    
-    # ===== 8. GENERATE ID =====
-    session_id = generate_session_id(bot_name, role_key, user_id)
-    context.user_data['current_session'] = session_id
-    
-    # ===== 9. PILIH PEMBUKA =====
-    opening = random.choice(role_info['pembuka'])
-    
-    # ===== 10. PESAN PERKENALAN =====
-    response_lines = [
-        f"💕 **Halo {user_name}!**\n",
-        f"Aku **{bot_name}**, {role_info['name']}. Namaku artinya '{meaning}' - "
-        f"{role_desc}\n",
-        f"**Tentang aku:**",
-        f"• Umur: {role_age} tahun",
-        f"• Tinggi: {role_height} cm | Berat: {role_weight} kg | Dada: {role_chest}",
-        f"• {role_desc}\n",
-        f"**Mirip artis:**",
-        f"• **{artist['name']}** ({artist['similarity']}% mirip) - {artist['age']}th, {artist['height']}cm, {artist['weight']}kg, {artist['chest']}",
-        f"  {artist['ciri']}",
-        f"  IG: @{artist['ig']}\n",
-        f"**Lokasi saat ini:**",
-        f"{location_text}",
-        f"Aku lagi **{activity}** sambil {position_text}.\n",
-        f"**Pakaian hari ini:**",
-        f"{clothing_text}\n",
-        f"**Progress leveling:**",
-        f"📊 Level 1 → Level 7 dalam 60 menit",
-        f"• Level 4+: Panggil kamu 'kak'",
-        f"• Level 7+: Panggil kamu 'sayang'\n",
-        f"**ID Session kamu:**",
-        f"`{session_id}`\n",
-        f"💬 **Ayo mulai ngobrol, {user_name}!**",
-        opening
-    ]
-    
-    response = "\n".join(response_lines)
-    
-    logger.info(f"User {user.id} selected role: {role_key} dengan nama {bot_name}")
-    
-    await query.edit_message_text(response, parse_mode='Markdown')
-    return ConversationHandler.END
+    """Generic role callback handler - FIXED"""
+    try:
+        query = update.callback_query
+        await query.answer()
+        
+        user = update.effective_user
+        user_id = user.id
+        user_name = user.first_name or "User"
+        
+        print(f"🔵 Processing role: {role_key} for user {user_id}")
+        
+        # ===== 1. DAPATKAN NAMA (SUDAH FIX) =====
+        bot_name, meaning = get_bot_name(role_key, user_id)
+        print(f"  • Bot name: {bot_name} ({meaning})")
+        
+        # ===== 2. DAPATKAN DATA ROLE =====
+        role_info = ROLE_DATA.get(role_key, ROLE_DATA['ipar'])
+        role_desc = random.choice(role_info['deskripsi'])
+        role_age = random.randint(role_info['umur_range'][0], role_info['umur_range'][1])
+        role_height = random.randint(role_info['tinggi_range'][0], role_info['tinggi_range'][1])
+        role_weight = random.randint(role_info['berat_range'][0], role_info['berat_range'][1])
+        role_chest = random.choice(role_info['dada'])
+        
+        # ===== 3. DAPATKAN ARTIS =====
+        artist = get_random_artist(role_key)
+        
+        # ===== 4. DAPATKAN LOKASI =====
+        location_text, activity = get_random_location()
+        
+        # ===== 5. DAPATKAN PAKAIAN =====
+        clothing_text = get_random_clothing()
+        
+        # ===== 6. DAPATKAN POSISI =====
+        position_text = get_random_position()
+        
+        # ===== 7. SET DATA =====
+        context.user_data['current_role'] = role_key
+        context.user_data['bot_name'] = bot_name
+        context.user_data['intimacy_level'] = 1
+        context.user_data['total_chats'] = 0
+        context.user_data['current_location'] = location_text
+        context.user_data['current_clothing'] = clothing_text
+        
+        # ===== 8. GENERATE ID =====
+        session_id = generate_session_id(bot_name, role_key, user_id)
+        context.user_data['current_session'] = session_id
+        
+        # ===== 9. PILIH PEMBUKA =====
+        opening = random.choice(role_info['pembuka'])
+        
+        # ===== 10. PESAN PERKENALAN =====
+        response_lines = [
+            f"💕 **Halo {user_name}!**\n",
+            f"Aku **{bot_name}**, {role_info['name']}. Namaku artinya '{meaning}' - "
+            f"{role_desc}\n",
+            f"**Tentang aku:**",
+            f"• Umur: {role_age} tahun",
+            f"• Tinggi: {role_height} cm | Berat: {role_weight} kg | Dada: {role_chest}",
+            f"• {role_desc}\n",
+            f"**Mirip artis:**",
+            f"• **{artist['name']}** ({artist['similarity']}% mirip) - {artist['age']}th, {artist['height']}cm, {artist['weight']}kg, {artist['chest']}",
+            f"  {artist['ciri']}",
+            f"  IG: @{artist['ig']}\n",
+            f"**Lokasi saat ini:**",
+            f"{location_text}",
+            f"Aku lagi **{activity}** sambil {position_text}.\n",
+            f"**Pakaian hari ini:**",
+            f"{clothing_text}\n",
+            f"**Progress leveling:**",
+            f"📊 Level 1 → Level 7 dalam 60 menit",
+            f"• Level 4+: Panggil kamu 'kak'",
+            f"• Level 7+: Panggil kamu 'sayang'\n",
+            f"**ID Session kamu:**",
+            f"`{session_id}`\n",
+            f"💬 **Ayo mulai ngobrol, {user_name}!**",
+            opening
+        ]
+        
+        response = "\n".join(response_lines)
+        
+        logger.info(f"User {user.id} selected role: {role_key} dengan nama {bot_name}")
+        
+        await query.edit_message_text(response, parse_mode='Markdown')
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"Error in role_callback: {e}")
+        await query.edit_message_text("❌ Terjadi kesalahan. Silakan coba lagi.")
+        return ConversationHandler.END
 
 
 # =============================================================================
