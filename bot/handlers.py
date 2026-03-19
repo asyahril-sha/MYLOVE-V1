@@ -30,22 +30,26 @@ from session.unique_id import id_generator
 from database.models import Constants
 
 # =============================================================================
-# IMPORT AI ENGINE V2
+# PAKSA IMPORT AI ENGINE
 # =============================================================================
+AI_ENGINE_AVAILABLE = False
+AIEngineV2 = None
+
 try:
-    # Coba import yang simple dulu
-    from core.ai_engine_simple import AIEngineSimple as AIEngineV2
+    # Coba import langsung
+    import sys
+    import os
+    
+    # Tambah path jika perlu
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    
+    from core.ai_engine_simple import AIEngineSimple
+    AIEngineV2 = AIEngineSimple
     AI_ENGINE_AVAILABLE = True
-    logger.info("✅ AI Engine Simple loaded")
-except ImportError as e:
-    try:
-        # Fallback ke yang lama
-        from core.ai_engine_v2 import AIEngineV2
-        AI_ENGINE_AVAILABLE = True
-        logger.info("✅ AI Engine V2 loaded")
-    except ImportError:
-        AI_ENGINE_AVAILABLE = False
-        logger.warning("⚠️ AI Engine not available, using fallback")
+    print("🔥 AI Engine Simple LOADED!")
+except Exception as e:
+    print(f"❌ Gagal load AI engine: {e}")
+    AI_ENGINE_AVAILABLE = False
 
 # =============================================================================
 # 1. COMMAND HANDLERS
@@ -285,12 +289,16 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handler untuk semua pesan teks
-    - Menggunakan AI Engine V2 untuk respons natural
-    - Fallback ke respons sederhana jika AI tidak tersedia
-    """
+    """Handler untuk semua pesan teks"""
     try:
+        # ===== DEBUG: CEK AI ENGINE =====
+        print(f"🤖 AI_ENGINE_AVAILABLE = {AI_ENGINE_AVAILABLE}")
+        if AI_ENGINE_AVAILABLE:
+            print("📢 Using AI engine for response")
+        else:
+            print("📢 Using fallback response")
+        # =====
+        
         user = update.effective_user
         user_message = update.message.text
         user_id = user.id
@@ -299,7 +307,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Cek pause
         if context.user_data.get('paused', False):
-            await update.message.reply_text("⏸️ Sesi sedang dijeda. Ketik /unpause untuk melanjutkan.")
+            await update.message.reply_text("⏸️ Sesi sedang dijeda.")
             return
         
         # Ambil data dari context
@@ -315,6 +323,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if AI_ENGINE_AVAILABLE and settings.deepseek_api_key:
             try:
+                print(f"✅ Creating AI engine instance with API key: {settings.deepseek_api_key[:5]}...")
+                
                 # Inisialisasi AI engine
                 ai_engine = AIEngineV2(api_key=settings.deepseek_api_key)
                 
@@ -330,6 +340,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'total_chats': total_chats
                 }
                 
+                print(f"📤 Sending to AI engine...")
+                
                 # Generate response dari AI
                 response = await ai_engine.generate_response(
                     user_id=user_id,
@@ -338,22 +350,18 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     context=context_data
                 )
                 
-                logger.info(f"✅ AI response generated ({len(response)} chars)")
+                print(f"✅ AI response generated ({len(response)} chars)")
+                logger.info(f"✅ AI response generated")
                 
             except Exception as e:
+                print(f"❌ AI Engine error: {e}")
                 logger.error(f"AI Engine error: {e}")
                 # Fallback ke response manual
         
         # ===== FALLBACK RESPONSE JIKA AI GAGAL =====
         if not response:
+            print(f"📢 Using fallback response")
             # Template fallback sederhana
-            fallbacks = [
-                f"{bot_name} dengar kok. Kamu bilang: {user_message[:50]}...",
-                f"Hmm... {bot_name} mikir dulu ya. Kamu tadi bilang apa?",
-                f"{user_name}, {bot_name} lagi dengerin. Lanjutkan...",
-                f"{bot_name} ngerti. Cerita lagi dong...",
-            ]
-            response = random.choice(fallbacks)
         
         # ===== UPDATE STATISTIK =====
         context.user_data['total_chats'] = total_chats + 1
