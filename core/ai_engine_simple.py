@@ -184,7 +184,7 @@ RESPON:"""
                     model="deepseek-chat",
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=500,
+                    max_tokens=1000,
                     timeout=30
                 )
                 return response.choices[0].message.content
