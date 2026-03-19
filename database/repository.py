@@ -18,11 +18,19 @@ from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timedelta
 
 from .connection import get_db
+
+# Import dari V1 models
 from .models import (
     User, Session, Conversation, Memory, Relationship,
-    Preference, Milestone, Backup, RelationshipStatus,
-    MemoryType, MilestoneType, BackupType, BackupStatus,
-    PDKTStatus, PDKTDirection, PDKTStage
+    Preference, Milestone, Backup
+)
+
+# Import dari V2 models
+from .models_v2 import (
+    PDKTSession, PDKTInnerThought, Mantan, FWBRequest,
+    FWBRelation, HTSRelation, MemoryV2,
+    PDKTStatus, PDKTDirection, ChemistryLevel, MoodType,
+    MantanStatus, FWBStatus, HTSStatus
 )
 
 logger = logging.getLogger(__name__)
@@ -398,7 +406,7 @@ class Repository:
     # PDKT REPOSITORY (BARU)
     # =========================================================================
     
-    async def create_pdkt(self, pdkt: PDKT) -> str:
+    async def create_pdkt(self, pdkt: PDKTSession) -> str:
         """Create new PDKT"""
         db = await self._get_db()
         await db.execute(
@@ -425,7 +433,7 @@ class Repository:
         logger.info(f"✅ Created PDKT: {pdkt.id} for user {pdkt.user_id}")
         return pdkt.id
         
-    async def get_pdkt(self, pdkt_id: str) -> Optional[PDKT]:
+    async def get_pdkt(self, pdkt_id: str) -> Optional[PDKTSession]:
         """Get PDKT by ID"""
         db = await self._get_db()
         result = await db.fetch_one(
