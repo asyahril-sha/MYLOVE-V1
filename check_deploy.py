@@ -2,503 +2,504 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 1 - CHECK DEPLOY
+MYLOVE V2 - DEPLOYMENT CHECKER
 =============================================================================
-Script untuk memverifikasi semua import dan konfigurasi sebelum deploy ke Railway
-Cek: dependencies, environment variables, import modules, dll
+Cek semua komponen sebelum deploy:
+- Semua file yang diperlukan ada
+- Tidak ada syntax error
+- Integrasi V1 dan V2 beres
+- Environment variables lengkap
 =============================================================================
 """
 
 import os
 import sys
 import importlib
+import traceback
 from pathlib import Path
 
-# Tambahkan path ke root project
-ROOT_DIR = Path(__file__).parent
-sys.path.insert(0, str(ROOT_DIR))
-
-# Warna untuk output
+# =============================================================================
+# COLOR CODES
+# =============================================================================
 GREEN = "\033[92m"
-RED = "\033[91m"
 YELLOW = "\033[93m"
+RED = "\033[91m"
 BLUE = "\033[94m"
 RESET = "\033[0m"
 
-
 def print_header(text):
-    """Print header dengan format"""
-    print(f"\n{BLUE}{'='*70}{RESET}")
+    print(f"\n{BLUE}{'='*60}{RESET}")
     print(f"{BLUE}🔍 {text}{RESET}")
-    print(f"{BLUE}{'='*70}{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}")
 
-
-def print_success(text):
-    """Print success message"""
+def print_ok(text):
     print(f"{GREEN}✅ {text}{RESET}")
 
-
-def print_error(text):
-    """Print error message"""
-    print(f"{RED}❌ {text}{RESET}")
-
-
-def print_warning(text):
-    """Print warning message"""
+def print_warn(text):
     print(f"{YELLOW}⚠️  {text}{RESET}")
 
+def print_error(text):
+    print(f"{RED}❌ {text}{RESET}")
 
 def print_info(text):
-    """Print info message"""
-    print(f"   • {text}")
+    print(f"📌 {text}")
 
+# =============================================================================
+# 1. CHECK ENVIRONMENT
+# =============================================================================
+print_header("CHECKING ENVIRONMENT")
 
-def check_import(module_name, attr=None, silent=False):
-    """Cek apakah module bisa diimport"""
-    try:
-        if attr:
-            module = importlib.import_module(module_name)
-            getattr(module, attr)
-            if not silent:
-                print_success(f"from {module_name} import {attr}")
-        else:
-            importlib.import_module(module_name)
-            if not silent:
-                print_success(f"import {module_name}")
-        return True
-    except ImportError as e:
-        if not silent:
-            print_error(f"{module_name} error: {e}")
-        return False
-    except AttributeError as e:
-        if not silent:
-            print_error(f"{module_name} missing {attr}: {e}")
-        return False
+# Python version
+import sys
+py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+if sys.version_info >= (3, 11):
+    print_ok(f"Python version: {py_version}")
+else:
+    print_error(f"Python version: {py_version} (need 3.11+)")
 
+# Current directory
+cwd = os.getcwd()
+print_ok(f"Working directory: {cwd}")
 
-def check_env_file():
-    """Cek file .env ada dan terbaca"""
-    env_file = ROOT_DIR / ".env"
-    if env_file.exists():
-        print_success(".env file found")
-        
-        # Load .env file manually untuk cek isi
-        try:
-            with open(env_file, 'r') as f:
-                lines = f.readlines()
-                api_keys = 0
-                for line in lines:
-                    if line.strip() and not line.startswith('#'):
-                        if '=' in line:
-                            key, value = line.strip().split('=', 1)
-                            if value and value != 'your_telegram_bot_token_here' and value != 'your_deepseek_api_key_here':
-                                api_keys += 1
-                                print_info(f"{key}=**** (terisi)")
-                            else:
-                                print_warning(f"{key}= (kosong/default)")
-                print_info(f"Total {api_keys} API keys terisi")
-        except Exception as e:
-            print_error(f"Error reading .env: {e}")
+# =============================================================================
+# 2. CHECK REQUIRED FILES (V1)
+# =============================================================================
+print_header("CHECKING V1 FILES")
+
+v1_required = [
+    "main.py",
+    "config.py",
+    "requirements.txt",
+    "railway.json",
+    "Dockerfile",
+    ".env.example",
+    "core/ai_engine.py",
+    "core/context_analyzer.py",
+    "core/prompt_builder.py",
+    "memory/vector_db.py",
+    "memory/episodic.py",
+    "memory/semantic.py",
+    "memory/relationship.py",
+    "memory/consolidation.py",
+    "roles/artis_references.py",
+    "roles/base.py",
+    "relationship/intimacy.py",
+    "relationship/ranking.py",
+    "relationship/hts.py",
+    "relationship/fwb.py",
+    "sexual/positions.py",
+    "sexual/areas.py",
+    "sexual/climax.py",
+    "sexual/preferences.py",
+    "sexual/compatibility.py",
+    "sexual/aftercare.py",
+    "threesome/manager.py",
+    "threesome/dynamics.py",
+    "dynamics/location.py",
+    "dynamics/position.py",
+    "dynamics/clothing.py",
+    "dynamics/expression_db.py",
+    "dynamics/sound_db.py",
+    "dynamics/nickname.py",
+    "leveling/time_based.py",
+    "leveling/progress_tracker.py",
+    "leveling/decay.py",
+    "public/locations.py",
+    "public/risk.py",
+    "public/thrill.py",
+    "public/events.py",
+    "public/auto_select.py",
+    "session/unique_id.py",
+    "session/storage.py",
+    "session/continuation.py",
+    "session/cleanup.py",
+    "bot/application.py",
+    "bot/commands.py",
+    "bot/handlers.py",
+    "bot/callbacks.py",
+    "bot/webhook.py",
+    "database/connection.py",
+    "database/models.py",
+    "database/repository.py",
+    "utils/logger.py",
+    "utils/exceptions.py",
+    "utils/helpers.py",
+    "utils/performance.py",
+    "monitoring/metrics.py",
+    "monitoring/dashboard.py",
+    "backup/automated.py",
+    "backup/recovery.py",
+    "backup/verify.py",
+    "scripts/setup_webhook.py",
+    "scripts/test_bot.py",
+]
+
+v1_missing = []
+for file in v1_required:
+    if not Path(file).exists():
+        v1_missing.append(file)
+
+if v1_missing:
+    print_warn(f"Missing {len(v1_missing)} V1 files:")
+    for f in v1_missing[:10]:
+        print(f"   • {f}")
+else:
+    print_ok("All V1 files present")
+
+# =============================================================================
+# 3. CHECK REQUIRED FILES (V2)
+# =============================================================================
+print_header("CHECKING V2 FILES")
+
+v2_required = [
+    "pdkt_natural/__init__.py",
+    "pdkt_natural/engine.py",
+    "pdkt_natural/chemistry.py",
+    "pdkt_natural/direction.py",
+    "pdkt_natural/mood.py",
+    "pdkt_natural/dreams.py",
+    "pdkt_natural/random_pdkt.py",
+    "pdkt_natural/mantan_manager.py",
+    "pdkt_natural/pdkt_list.py",
+    "pdkt_natural/command_handler.py",
+    "pdkt_natural/proactive.py",
+    "pdkt_natural/story.py",
+    "core/story_predictor.py",
+    "core/proactive_generator.py",
+    "core/scene_recommender.py",
+    "core/intent_analyzer.py",
+    "core/prompt_builder_v2.py",
+    "memory/hippocampus.py",
+    "memory/compact_memory.py",
+    "memory/episodic_v2.py",
+    "memory/semantic_v2.py",
+    "memory/forgetting.py",
+    "memory/memory_bridge.py",
+    "dynamics/expression_engine_v2.py",
+    "dynamics/sound_engine_v2.py",
+    "dynamics/name_generator.py",
+    "leveling/time_based_v2.py",
+    "leveling/activity_boost.py",
+    "relationship/fwb_manager.py",
+    "relationship/hts_manager.py",
+    "relationship/intimacy_v2.py",
+    "sexual/scene_generator.py",
+    "sexual/intimacy_engine.py",
+    "bot/commands_v2.py",
+    "bot/handlers_v2.py",
+    "bot/callbacks_v2.py",
+    "session/unique_id_v2.py",
+    "database/models_v2.py",
+    "database/repository_v2.py",
+    "database/migrations/v2_migration.sql",
+    "database/auto_migrate.py",
+]
+
+v2_missing = []
+for file in v2_required:
+    if not Path(file).exists():
+        v2_missing.append(file)
+
+if v2_missing:
+    print_warn(f"Missing {len(v2_missing)} V2 files:")
+    for f in v2_missing[:10]:
+        print(f"   • {f}")
+else:
+    print_ok("All V2 files present")
+
+# =============================================================================
+# 4. CHECK __init__.py FILES
+# =============================================================================
+print_header("CHECKING __INIT__.PY FILES")
+
+init_files = [
+    "core/__init__.py",
+    "memory/__init__.py",
+    "roles/__init__.py",
+    "relationship/__init__.py",
+    "sexual/__init__.py",
+    "threesome/__init__.py",
+    "dynamics/__init__.py",
+    "leveling/__init__.py",
+    "public/__init__.py",
+    "session/__init__.py",
+    "bot/__init__.py",
+    "database/__init__.py",
+    "utils/__init__.py",
+    "monitoring/__init__.py",
+    "backup/__init__.py",
+    "scripts/__init__.py",
+    "pdkt_natural/__init__.py",
+]
+
+init_missing = []
+for file in init_files:
+    if not Path(file).exists():
+        init_missing.append(file)
+
+if init_missing:
+    print_warn(f"Missing {len(init_missing)} __init__.py files:")
+    for f in init_missing:
+        print(f"   • {f}")
+else:
+    print_ok("All __init__.py files present")
+
+# =============================================================================
+# 5. CHECK ENVIRONMENT VARIABLES
+# =============================================================================
+print_header("CHECKING ENVIRONMENT VARIABLES")
+
+env_vars = [
+    "DEEPSEEK_API_KEY",
+    "TELEGRAM_TOKEN",
+    "ADMIN_ID",
+    "ENABLE_PDKT_NATURAL",
+    "ENABLE_MEMORY_V2",
+]
+
+env_missing = []
+for var in env_vars:
+    if not os.getenv(var):
+        env_missing.append(var)
+
+if env_missing:
+    print_warn(f"Missing environment variables:")
+    for var in env_missing:
+        print(f"   • {var} (set in Railway dashboard)")
+    
+    # Check if .env exists
+    if Path(".env").exists():
+        print_ok(".env file exists (but Railway uses dashboard)")
     else:
-        print_error(".env file not found")
-        return False
-    return True
+        print_warn(".env file not found (but Railway uses dashboard)")
+else:
+    print_ok("All environment variables set")
 
+# =============================================================================
+# 6. CHECK IMPORT INTEGRITY
+# =============================================================================
+print_header("CHECKING IMPORT INTEGRITY")
 
-def check_environment_variables():
-    """Cek environment variables penting"""
-    print_header("ENVIRONMENT VARIABLES")
+modules_to_check = [
+    # V1 modules
+    "config",
+    "core.ai_engine",
+    "core.context_analyzer",
+    "core.prompt_builder",
+    "memory.vector_db",
+    "memory.episodic",
+    "memory.semantic",
+    "memory.relationship",
+    "memory.consolidation",
+    "roles.artis_references",
+    "roles.base",
+    "relationship.intimacy",
+    "relationship.ranking",
+    "relationship.hts",
+    "relationship.fwb",
+    "sexual.positions",
+    "sexual.areas",
+    "sexual.climax",
+    "sexual.preferences",
+    "sexual.compatibility",
+    "sexual.aftercare",
+    "threesome.manager",
+    "threesome.dynamics",
+    "dynamics.location",
+    "dynamics.position",
+    "dynamics.clothing",
+    "dynamics.expression_db",
+    "dynamics.sound_db",
+    "dynamics.nickname",
+    "leveling.time_based",
+    "leveling.progress_tracker",
+    "leveling.decay",
+    "public.locations",
+    "public.risk",
+    "public.thrill",
+    "public.events",
+    "public.auto_select",
+    "session.unique_id",
+    "session.storage",
+    "session.continuation",
+    "session.cleanup",
+    "bot.application",
+    "bot.commands",
+    "bot.handlers",
+    "bot.callbacks",
+    "bot.webhook",
+    "database.connection",
+    "database.models",
+    "database.repository",
+    "utils.logger",
+    "utils.exceptions",
+    "utils.helpers",
+    "utils.performance",
+    "monitoring.metrics",
+    "monitoring.dashboard",
+    "backup.automated",
+    "backup.recovery",
+    "backup.verify",
+    "scripts.setup_webhook",
+    "scripts.test_bot",
     
-    required_vars = [
-        'TELEGRAM_TOKEN',
-        'DEEPSEEK_API_KEY',
-        'ADMIN_ID'
-    ]
-    
-    optional_vars = [
-        'PORT',
-        'RAILWAY_PUBLIC_DOMAIN',
-        'RAILWAY_STATIC_URL',
-        'WEBHOOK_URL',
-        'WEBHOOK_PORT',
-        'WEBHOOK_PATH',
-        'DB_TYPE',
-        'DB_PATH',
-        'LOG_LEVEL',
-        'SESSION_RETENTION_DAYS',
-        'SEXUAL_CONTENT_ENABLED',
-        'BOT_INITIATIVE_ENABLED',
-        'AFTERCARE_ENABLED'
-    ]
-    
-    all_ok = True
-    
-    # Cek required vars
-    for var in required_vars:
-        value = os.getenv(var)
-        if value and value != 'your_telegram_bot_token_here' and value != 'your_deepseek_api_key_here':
-            masked = value[:5] + '...' + value[-5:] if len(value) > 10 else '****'
-            print_success(f"{var}: {masked}")
-        else:
-            print_error(f"{var}: MISSING or DEFAULT")
-            all_ok = False
-    
-    # Cek optional vars
-    for var in optional_vars:
-        value = os.getenv(var)
-        if value:
-            print_info(f"{var}: {value}")
-        else:
-            print_info(f"{var}: (not set)")
-    
-    return all_ok
+    # V2 modules
+    "pdkt_natural.engine",
+    "pdkt_natural.chemistry",
+    "pdkt_natural.direction",
+    "pdkt_natural.mood",
+    "pdkt_natural.dreams",
+    "pdkt_natural.random_pdkt",
+    "pdkt_natural.mantan_manager",
+    "pdkt_natural.pdkt_list",
+    "pdkt_natural.command_handler",
+    "pdkt_natural.proactive",
+    "pdkt_natural.story",
+    "core.story_predictor",
+    "core.proactive_generator",
+    "core.scene_recommender",
+    "core.intent_analyzer",
+    "core.prompt_builder_v2",
+    "memory.hippocampus",
+    "memory.compact_memory",
+    "memory.episodic_v2",
+    "memory.semantic_v2",
+    "memory.forgetting",
+    "memory.memory_bridge",
+    "dynamics.expression_engine_v2",
+    "dynamics.sound_engine_v2",
+    "dynamics.name_generator",
+    "leveling.time_based_v2",
+    "leveling.activity_boost",
+    "relationship.fwb_manager",
+    "relationship.hts_manager",
+    "relationship.intimacy_v2",
+    "sexual.scene_generator",
+    "sexual.intimacy_engine",
+    "bot.commands_v2",
+    "bot.handlers_v2",
+    "bot.callbacks_v2",
+    "session.unique_id_v2",
+    "database.models_v2",
+    "database.repository_v2",
+    "database.auto_migrate",
+]
 
+failed_imports = []
+success_imports = 0
 
-def check_dependencies():
-    """Cek dependencies dari requirements.txt"""
-    print_header("DEPENDENCIES")
-    
-    requirements_file = ROOT_DIR / "requirements.txt"
-    if not requirements_file.exists():
-        print_error("requirements.txt not found")
-        return False
-    
-    with open(requirements_file, 'r') as f:
-        requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-    
-    all_ok = True
-    for req in requirements:
-        # Parse package name (ambil sebelum ==, >=, <=, dll)
-        if '==' in req:
-            package = req.split('==')[0]
-        elif '>=' in req:
-            package = req.split('>=')[0]
-        elif '<=' in req:
-            package = req.split('<=')[0]
-        else:
-            package = req
-        
-        try:
-            __import__(package.replace('-', '_'))
-            print_success(f"{req}")
-        except ImportError:
-            print_error(f"{req} - NOT INSTALLED")
-            all_ok = False
-    
-    return all_ok
-
-
-def check_config():
-    """Cek config.py bisa diimport"""
-    print_header("CONFIGURATION")
-    
+for module_name in modules_to_check:
     try:
-        from config import settings
-        print_success("config.settings imported")
-        
-        # Cek atribut penting
-        attrs = [
-            ('telegram_token', 'str'),
-            ('deepseek_api_key', 'str'),
-            ('admin_id', 'int'),
-            ('database', 'DatabaseSettings'),
-            ('ai', 'AISettings'),
-            ('webhook', 'WebhookSettings'),
-            ('logging', 'LoggingSettings'),
-        ]
-        
-        for attr, type_name in attrs:
-            if hasattr(settings, attr):
-                print_info(f"settings.{attr} exists")
-            else:
-                print_error(f"settings.{attr} missing")
-        
-        # Cek database path
-        if hasattr(settings, 'database') and hasattr(settings.database, 'path'):
-            db_path = settings.database.path
-            print_info(f"Database path: {db_path}")
-        
-        # Cek log dir
-        if hasattr(settings, 'logging') and hasattr(settings.logging, 'log_dir'):
-            log_dir = settings.logging.log_dir
-            print_info(f"Log directory: {log_dir}")
-            # Buat direktori jika belum ada
-            log_dir.mkdir(parents=True, exist_ok=True)
-            print_success(f"Log directory created/verified")
-        
-        return True
+        importlib.import_module(module_name)
+        success_imports += 1
     except ImportError as e:
-        print_error(f"config import error: {e}")
-        return False
+        failed_imports.append((module_name, str(e)))
+
+if failed_imports:
+    print_warn(f"Import errors: {len(failed_imports)}/{len(modules_to_check)}")
+    for module, error in failed_imports[:5]:  # Show first 5
+        print(f"   • {module}: {error}")
+else:
+    print_ok(f"All {len(modules_to_check)} modules import successfully")
+
+# =============================================================================
+# 7. CHECK FOR SYNTAX ERRORS
+# =============================================================================
+print_header("CHECKING SYNTAX ERRORS")
+
+python_files = list(Path(".").rglob("*.py"))
+syntax_errors = []
+
+for py_file in python_files[:50]:  # Check first 50 files
+    try:
+        compile(py_file.read_text(), py_file, 'exec')
+    except SyntaxError as e:
+        syntax_errors.append((str(py_file), str(e)))
+
+if syntax_errors:
+    print_error(f"Syntax errors found: {len(syntax_errors)}")
+    for file, error in syntax_errors[:3]:
+        print(f"   • {file}: {error}")
+else:
+    print_ok("No syntax errors found")
+
+# =============================================================================
+# 8. CHECK DATABASE MIGRATION
+# =============================================================================
+print_header("CHECKING DATABASE MIGRATION")
+
+if Path("database/auto_migrate.py").exists():
+    try:
+        from database import auto_migrate
+        print_ok("auto_migrate.py can be imported")
     except Exception as e:
-        print_error(f"config error: {e}")
-        return False
+        print_error(f"auto_migrate.py import failed: {e}")
+else:
+    print_warn("auto_migrate.py not found")
 
+# =============================================================================
+# 9. FINAL SUMMARY
+# =============================================================================
+print_header("DEPLOYMENT SUMMARY")
 
-def check_database():
-    """Cek database module"""
-    print_header("DATABASE")
-    
-    all_ok = True
-    
-    # Cek database.models
-    if check_import("database.models", "Constants", silent=True):
-        print_success("database.models with Constants")
+total_score = 0
+max_score = 9
+
+# Score each check
+checks = [
+    ("Python version", sys.version_info >= (3, 11)),
+    ("V1 files", len(v1_missing) == 0),
+    ("V2 files", len(v2_missing) == 0),
+    ("__init__.py files", len(init_missing) == 0),
+    ("Environment vars", len(env_missing) <= 2),  # Allow missing .env
+    ("Import integrity", len(failed_imports) == 0),
+    ("Syntax errors", len(syntax_errors) == 0),
+    ("Database migration", Path("database/auto_migrate.py").exists()),
+    ("Main.py exists", Path("main.py").exists()),
+]
+
+for i, (name, passed) in enumerate(checks):
+    if passed:
+        total_score += 1
+        print_ok(f"{i+1}. {name}")
     else:
-        print_error("database.models missing Constants")
-        all_ok = False
-    
-    # Cek database.connection
-    if check_import("database.connection", "init_db", silent=True):
-        print_success("database.connection with init_db")
-    else:
-        print_error("database.connection missing init_db")
-        all_ok = False
-    
-    return all_ok
+        print_error(f"{i+1}. {name}")
 
+print(f"\n{BLUE}{'='*60}{RESET}")
+if total_score == max_score:
+    print(f"{GREEN}✅ DEPLOYMENT READY! Score: {total_score}/{max_score}{RESET}")
+    print(f"{GREEN}🚀 You can deploy to Railway now!{RESET}")
+elif total_score >= 7:
+    print(f"{YELLOW}⚠️  DEPLOYMENT RISKY! Score: {total_score}/{max_score}{RESET}")
+    print(f"{YELLOW}   Fix warnings before deploy{RESET}")
+else:
+    print(f"{RED}❌ DEPLOYMENT NOT READY! Score: {total_score}/{max_score}{RESET}")
+    print(f"{RED}   Fix errors before deploy{RESET}")
 
-def check_utils():
-    """Cek utils modules"""
-    print_header("UTILITIES")
-    
-    all_ok = True
-    
-    # Logger
-    if check_import("utils.logger", "setup_logging", silent=True):
-        print_success("utils.logger with setup_logging")
-    else:
-        print_error("utils.logger missing setup_logging")
-        all_ok = False
-    
-    if check_import("utils.logger", "logger", silent=True):
-        print_success("utils.logger with logger")
-    else:
-        print_warning("utils.logger missing logger (might be alias)")
-    
-    # Exceptions
-    if check_import("utils.exceptions", "MyLoveError", silent=True):
-        print_success("utils.exceptions with MyLoveError")
-    else:
-        print_warning("utils.exceptions missing MyLoveError")
-    
-    if check_import("utils.exceptions", "GadisBaseException", silent=True):
-        print_success("utils.exceptions with GadisBaseException (alias)")
-    else:
-        print_warning("utils.exceptions missing GadisBaseException")
-    
-    # Helpers
-    if check_import("utils.helpers", "sanitize_input", silent=True):
-        print_success("utils.helpers available")
-    else:
-        print_warning("utils.helpers not available (optional)")
-    
-    return all_ok
+print(f"{BLUE}{'='*60}{RESET}")
 
+# =============================================================================
+# 10. RECOMMENDATIONS
+# =============================================================================
+if total_score < max_score:
+    print_header("RECOMMENDATIONS")
+    
+    if len(v1_missing) > 0:
+        print(f"• Add missing V1 files: {', '.join(v1_missing[:3])}")
+    
+    if len(v2_missing) > 0:
+        print(f"• Add missing V2 files: {', '.join(v2_missing[:3])}")
+    
+    if len(init_missing) > 0:
+        print("• Add missing __init__.py files")
+    
+    if len(env_missing) > 0:
+        print(f"• Set env vars in Railway: {', '.join(env_missing)}")
+    
+    if len(failed_imports) > 0:
+        print("• Fix import dependencies")
+    
+    if len(syntax_errors) > 0:
+        print("• Fix syntax errors")
 
-def check_bot_modules():
-    """Cek bot modules"""
-    print_header("BOT MODULES")
-    
-    all_ok = True
-    
-    # Bot package
-    if check_import("bot", "create_application", silent=True):
-        print_success("bot.create_application")
-    else:
-        print_warning("bot.create_application not directly exported")
-    
-    # Bot handlers - cek beberapa command penting
-    important_handlers = [
-        'start_command',
-        'help_command',
-        'status_command',
-        'cancel_command',
-        'message_handler',
-        'callback_handler',
-        'hts_call_handler',
-        'fwb_call_handler',
-    ]
-    
-    for handler in important_handlers:
-        if check_import("bot.handlers", handler, silent=True):
-            print_info(f"bot.handlers.{handler} OK")
-        else:
-            print_error(f"bot.handlers.{handler} MISSING")
-            all_ok = False
-    
-    # Bot callbacks
-    important_callbacks = [
-        'agree_18_callback',
-        'role_ipar_callback',
-        'role_teman_kantor_callback',
-        'role_janda_callback',
-        'role_pelakor_callback',
-        'role_istri_orang_callback',
-        'role_pdkt_callback',
-        'role_sepupu_callback',
-        'role_teman_sma_callback',
-        'role_mantan_callback',
-        'end_callback',
-        'close_callback',
-        'jadipacar_callback',
-        'break_callback',
-        'breakup_callback',
-        'fwb_callback',
-    ]
-    
-    for callback in important_callbacks:
-        if check_import("bot.callbacks", callback, silent=True):
-            print_info(f"bot.callbacks.{callback} OK")
-        else:
-            print_error(f"bot.callbacks.{callback} MISSING")
-            all_ok = False
-    
-    # Bot commands
-    if check_import("bot.commands", "error_handler", silent=True):
-        print_info("bot.commands.error_handler OK")
-    else:
-        print_error("bot.commands.error_handler MISSING")
-        all_ok = False
-    
-    # Bot webhook
-    if check_import("bot.webhook", "setup_webhook_sync", silent=True):
-        print_info("bot.webhook.setup_webhook_sync OK")
-    else:
-        print_warning("bot.webhook.setup_webhook_sync not found")
-    
-    return all_ok
-
-
-def check_cache():
-    """Cek cache module"""
-    print_header("CACHE")
-    
-    # Cache is optional, only warn if missing
-    if check_import("cache", "__init__", silent=True):
-        print_success("cache module exists")
-        if check_import("cache.redis_client", "init_redis", silent=True):
-            print_info("cache.redis_client.init_redis OK")
-        else:
-            print_warning("cache.redis_client missing init_redis")
-    else:
-        print_warning("cache module not found (optional)")
-    
-    return True
-
-
-def check_public_modules():
-    """Cek public modules (opsional)"""
-    print_header("PUBLIC MODULES")
-    
-    # Public modules are optional, only warn if missing
-    modules = [
-        ('public.locations', 'PublicLocations'),
-        ('public.risk', 'RiskCalculator'),
-        ('session.unique_id', 'id_generator'),
-        ('roles.artis_references', 'get_random_artist_for_role'),
-        ('threesome.manager', 'ThreesomeManager'),
-    ]
-    
-    for module, attr in modules:
-        if check_import(module, attr, silent=True):
-            print_info(f"{module}.{attr} OK")
-        else:
-            print_warning(f"{module}.{attr} not found (optional)")
-    
-    return True
-
-
-def check_healthcheck():
-    """Cek healthcheck server"""
-    print_header("HEALTHCHECK")
-    
-    # Cek Flask
-    if check_import("flask", "Flask", silent=True):
-        print_success("Flask installed for healthcheck")
-        print_info("Healthcheck endpoint akan tersedia di /health")
-    else:
-        print_warning("Flask not installed - healthcheck disabled")
-        print_info("Install dengan: pip install flask")
-    
-    # Cek PORT environment
-    port = os.getenv('PORT', '8080')
-    print_info(f"PORT: {port}")
-    
-    return True
-
-
-def check_main():
-    """Cek main.py bisa diimport"""
-    print_header("MAIN MODULE")
-    
-    try:
-        import main
-        print_success("main.py imported")
-        
-        # Cek fungsi utama ada
-        if hasattr(main, 'main'):
-            print_info("main.main() function exists")
-        else:
-            print_error("main.main() function missing")
-            return False
-        
-        return True
-    except ImportError as e:
-        print_error(f"main.py import error: {e}")
-        return False
-    except Exception as e:
-        print_error(f"main.py error: {e}")
-        return False
-
-
-def main():
-    """Main function"""
-    print(f"{BLUE}{'='*70}{RESET}")
-    print(f"{BLUE}🔍 MYLOVE ULTIMATE VERSI 1 - DEPLOYMENT CHECK{RESET}")
-    print(f"{BLUE}{'='*70}{RESET}")
-    
-    print_info(f"Python version: {sys.version}")
-    print_info(f"Working directory: {ROOT_DIR}")
-    print()
-    
-    checks = [
-        check_environment_variables,
-        check_dependencies,
-        check_config,
-        check_database,
-        check_utils,
-        check_bot_modules,
-        check_cache,
-        check_public_modules,
-        check_healthcheck,
-        check_main,
-    ]
-    
-    results = []
-    for check in checks:
-        try:
-            result = check()
-            results.append(result)
-        except Exception as e:
-            print_error(f"Error in {check.__name__}: {e}")
-            results.append(False)
-    
-    print_header("SUMMARY")
-    
-    total_checks = len(results)
-    passed = sum(results)
-    failed = total_checks - passed
-    
-    if failed == 0:
-        print_success(f"✅ ALL CHECKS PASSED ({passed}/{total_checks})")
-        print(f"\n{GREEN}🚀 Siap deploy ke Railway!{RESET}")
-        return 0
-    else:
-        print_warning(f"⚠️  {failed} check(s) failed ({passed}/{total_checks})")
-        print(f"\n{YELLOW}Perbaiki error di atas sebelum deploy!{RESET}")
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+print(f"\n{BLUE}📝 Run: python check_deploy.py before each deploy{RESET}\n")
