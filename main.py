@@ -201,6 +201,58 @@ class MYLOVEBot:
             "bot_ready": self.application is not None,
             "uptime": str(datetime.now() - self.start_time)
         })
+        
+    # ===== TAMBAHKAN INI =====
+    async def debug_ai_handler(self, request):
+        """Debug AI endpoint - test AI response"""
+        try:
+            # Import AI engine
+            from core.ai_engine_simple import AIEngineSimple
+            from config import settings
+        
+            # Cek API key
+            if not settings.deepseek_api_key or settings.deepseek_api_key == "your_deepseek_api_key_here":
+                return web.json_response({
+                    "status": "error",
+                    "error": "API key not set or invalid"
+                })
+        
+            # Buat engine
+            engine = AIEngineSimple(settings.deepseek_api_key)
+        
+            # Test dengan pesan sederhana
+            response = await engine.generate_response(
+                user_id=12345,
+                session_id="debug_test",
+                user_message="Halo, apa kabar?",
+                context={
+                    "bot_name": "Lestari",
+                    "user_name": "Test User",
+                    "role": "ipar",
+                    "level": 1
+                }
+            )
+        
+            return web.json_response({
+                "status": "success",
+                "api_key_prefix": settings.deepseek_api_key[:10] + "...",
+                "response": response,
+                "response_length": len(response)
+            })
+        
+        except ImportError as e:
+            return web.json_response({
+                "status": "error",
+                "error": f"Import error: {str(e)}",
+                "solution": "Pastikan path ke core.ai_engine_simple benar"
+            })
+        except Exception as e:
+            return web.json_response({
+                "status": "error",
+                "error": str(e),
+                "error_type": type(e).__name__
+            })
+    # ===== END TAMBAHAN ===== 
 
     async def start(self):
         """Start bot and aiohttp server"""
