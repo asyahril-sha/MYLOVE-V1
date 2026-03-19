@@ -1,24 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-AUTO MIGRATE - JALANKAN CUKUP 1X, DIAMIN JALAN SENDIRI
-Cukup upload ke GitHub, Railway akan jalanin otomatis
+AUTO MIGRATE - JALANKAN CUKUP 1X
 """
 
 import sqlite3
-import os
+import time
 from pathlib import Path
 
 def migrate():
-    """Migrasi database - Panggil sekali, langsung beres"""
-    
     db_path = Path("data/mylove.db")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Cek apakah sudah pernah migrasi
+    # Cek apakah sudah migrasi
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS migration_log (
             version TEXT PRIMARY KEY,
@@ -28,13 +25,13 @@ def migrate():
     
     cursor.execute("SELECT version FROM migration_log WHERE version = 'v2'")
     if cursor.fetchone():
-        print("✅ Database sudah V2, tidak perlu migrasi")
+        print("✅ Database sudah V2")
         conn.close()
         return True
     
     print("🔄 Migrasi ke V2...")
     
-    # ===== 1. TABEL PDKT SESSIONS =====
+    # ===== TABEL PDKT =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pdkt_sessions (
             id TEXT PRIMARY KEY,
@@ -62,7 +59,7 @@ def migrate():
         )
     """)
     
-    # ===== 2. TABEL PDKT INNER THOUGHTS =====
+    # ===== TABEL INNER THOUGHTS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pdkt_inner_thoughts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +70,7 @@ def migrate():
         )
     """)
     
-    # ===== 3. TABEL MANTAN =====
+    # ===== TABEL MANTAN =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS mantan (
             id TEXT PRIMARY KEY,
@@ -99,7 +96,7 @@ def migrate():
         )
     """)
     
-    # ===== 4. TABEL FWB REQUESTS =====
+    # ===== TABEL FWB REQUESTS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fwb_requests (
             id TEXT PRIMARY KEY,
@@ -114,7 +111,7 @@ def migrate():
         )
     """)
     
-    # ===== 5. TABEL FWB RELATIONS =====
+    # ===== TABEL FWB RELATIONS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fwb_relations (
             id TEXT PRIMARY KEY,
@@ -135,7 +132,7 @@ def migrate():
         )
     """)
     
-    # ===== 6. TABEL HTS RELATIONS =====
+    # ===== TABEL HTS RELATIONS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS hts_relations (
             id TEXT PRIMARY KEY,
@@ -155,7 +152,7 @@ def migrate():
         )
     """)
     
-    # ===== 7. TABEL MEMORIES V2 =====
+    # ===== TABEL MEMORIES V2 =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS memories_v2 (
             id TEXT PRIMARY KEY,
@@ -183,7 +180,6 @@ def migrate():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_memories_v2_user ON memories_v2(user_id)")
     
     # ===== LOG MIGRASI =====
-    import time
     cursor.execute(
         "INSERT INTO migration_log (version, migrated_at) VALUES (?, ?)",
         ('v2', time.time())
