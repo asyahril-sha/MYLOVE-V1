@@ -151,11 +151,13 @@ class SemanticMemory:
                 (r'jam (\d+) (\w+)', 'routine')
             ]
         }
-        
+    
+    # =========================================================================
+    # METHOD UNTUK LOKASI (SUDAH ADA)
+    # =========================================================================
+    
     async def save_location_to_long_term(self, user_id: int, location: str, timestamp: float):
         """Simpan lokasi ke memori jangka panjang"""
-        fact_key = f"location_history.{timestamp}"
-        
         await self.add_fact(
             user_id=user_id,
             category="location",
@@ -184,7 +186,202 @@ class SemanticMemory:
         # Sort by time
         locations.sort(key=lambda x: x['time'])
         return [loc['location'] for loc in locations]
+    
+    async def get_last_location(self, user_id: int) -> Optional[str]:
+        """Dapatkan lokasi terakhir yang dikunjungi"""
+        recent = await self.get_recent_locations(user_id, hours=24)
+        return recent[-1] if recent else None
+    
+    # =========================================================================
+    # METHOD UNTUK PAKAIAN
+    # =========================================================================
+    
+    async def save_clothing_to_long_term(self, user_id: int, clothing: str, reason: str, timestamp: float):
+        """Simpan pakaian ke memori jangka panjang"""
+        await self.add_fact(
+            user_id=user_id,
+            category="clothing",
+            fact_type=f"at_{int(timestamp)}",
+            value={'clothing': clothing, 'reason': reason},
+            confidence=0.9,
+            source="conversation"
+        )
+        logger.debug(f"👗 Clothing saved to long-term memory: {clothing} ({reason})")
+    
+    async def get_recent_clothing(self, user_id: int, hours: int = 4) -> List[Dict]:
+        """Dapatkan riwayat pakaian dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        clothing_history = []
         
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('clothing.at_') and fact['timestamp'] > cutoff:
+                clothing_history.append({
+                    'clothing': fact['value']['clothing'],
+                    'reason': fact['value']['reason'],
+                    'time': fact['timestamp']
+                })
+        
+        # Sort by time
+        clothing_history.sort(key=lambda x: x['time'])
+        return clothing_history
+    
+    async def get_last_clothing(self, user_id: int) -> Optional[str]:
+        """Dapatkan pakaian terakhir yang dipakai"""
+        recent = await self.get_recent_clothing(user_id, hours=24)
+        return recent[-1]['clothing'] if recent else None
+    
+    # =========================================================================
+    # METHOD UNTUK POSISI
+    # =========================================================================
+    
+    async def save_position_to_long_term(self, user_id: int, position: str, timestamp: float):
+        """Simpan posisi ke memori jangka panjang"""
+        await self.add_fact(
+            user_id=user_id,
+            category="position",
+            fact_type=f"at_{int(timestamp)}",
+            value=position,
+            confidence=0.8,
+            source="conversation"
+        )
+        logger.debug(f"🧍 Position saved to long-term memory: {position}")
+    
+    async def get_recent_positions(self, user_id: int, hours: int = 4) -> List[str]:
+        """Dapatkan riwayat posisi dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        positions = []
+        
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('position.at_') and fact['timestamp'] > cutoff:
+                positions.append(fact['value'])
+        
+        # Sort by time
+        return positions
+    
+    async def get_last_position(self, user_id: int) -> Optional[str]:
+        """Dapatkan posisi terakhir"""
+        recent = await self.get_recent_positions(user_id, hours=24)
+        return recent[-1] if recent else None
+    
+    # =========================================================================
+    # METHOD UNTUK AKTIVITAS
+    # =========================================================================
+    
+    async def save_activity_to_long_term(self, user_id: int, activity: str, timestamp: float):
+        """Simpan aktivitas ke memori jangka panjang"""
+        await self.add_fact(
+            user_id=user_id,
+            category="activity",
+            fact_type=f"at_{int(timestamp)}",
+            value=activity,
+            confidence=0.8,
+            source="conversation"
+        )
+        logger.debug(f"🎯 Activity saved to long-term memory: {activity}")
+    
+    async def get_recent_activities(self, user_id: int, hours: int = 4) -> List[str]:
+        """Dapatkan riwayat aktivitas dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        activities = []
+        
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('activity.at_') and fact['timestamp'] > cutoff:
+                activities.append(fact['value'])
+        
+        # Sort by time
+        return activities
+    
+    async def get_last_activity(self, user_id: int) -> Optional[str]:
+        """Dapatkan aktivitas terakhir"""
+        recent = await self.get_recent_activities(user_id, hours=24)
+        return recent[-1] if recent else None
+    
+    # =========================================================================
+    # METHOD UNTUK MOOD
+    # =========================================================================
+    
+    async def save_mood_to_long_term(self, user_id: int, mood: str, intensity: float, timestamp: float):
+        """Simpan mood ke memori jangka panjang"""
+        await self.add_fact(
+            user_id=user_id,
+            category="mood",
+            fact_type=f"at_{int(timestamp)}",
+            value={'mood': mood, 'intensity': intensity},
+            confidence=0.7,
+            source="conversation"
+        )
+        logger.debug(f"🎭 Mood saved to long-term memory: {mood} ({intensity})")
+    
+    async def get_recent_moods(self, user_id: int, hours: int = 4) -> List[Dict]:
+        """Dapatkan riwayat mood dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        moods = []
+        
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('mood.at_') and fact['timestamp'] > cutoff:
+                moods.append({
+                    'mood': fact['value']['mood'],
+                    'intensity': fact['value']['intensity'],
+                    'time': fact['timestamp']
+                })
+        
+        # Sort by time
+        moods.sort(key=lambda x: x['time'])
+        return moods
+    
+    async def get_last_mood(self, user_id: int) -> Optional[str]:
+        """Dapatkan mood terakhir"""
+        recent = await self.get_recent_moods(user_id, hours=24)
+        return recent[-1]['mood'] if recent else None
+    
+    # =========================================================================
+    # METHOD UNTUK AROUSAL/GAIRAH
+    # =========================================================================
+    
+    async def save_arousal_to_long_term(self, user_id: int, level: int, reason: str, timestamp: float):
+        """Simpan level gairah ke memori jangka panjang"""
+        await self.add_fact(
+            user_id=user_id,
+            category="arousal",
+            fact_type=f"at_{int(timestamp)}",
+            value={'level': level, 'reason': reason},
+            confidence=0.7,
+            source="conversation"
+        )
+        logger.debug(f"🔥 Arousal saved to long-term memory: {level} ({reason})")
+    
+    async def get_arousal_history(self, user_id: int, hours: int = 4) -> List[Dict]:
+        """Dapatkan riwayat gairah dalam X jam terakhir"""
+        cutoff = time.time() - (hours * 3600)
+        history = []
+        
+        if user_id not in self.facts:
+            return []
+        
+        for fact_key, fact in self.facts[user_id].items():
+            if fact_key.startswith('arousal.at_') and fact['timestamp'] > cutoff:
+                history.append({
+                    'level': fact['value']['level'],
+                    'reason': fact['value']['reason'],
+                    'time': fact['timestamp']
+                })
+        
+        # Sort by time
+        history.sort(key=lambda x: x['time'])
+        return history
+    
     # =========================================================================
     # ADD FACTS
     # =========================================================================
