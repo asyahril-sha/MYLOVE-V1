@@ -24,9 +24,6 @@ from datetime import datetime
 from config import settings
 
 # Import semua memory systems
-from memory.working_memory import WorkingMemory
-from memory.episodic_memory import EpisodicMemory, EpisodeType
-from memory.semantic_memory import SemanticMemory, FactCategory
 from memory.state_tracker import StateTracker, StateType
 from memory.relationship_memory import RelationshipMemory, RelationshipType, MilestoneType
 
