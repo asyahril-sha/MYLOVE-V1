@@ -53,7 +53,7 @@ class AISettings(BaseModel):
     
     # Response length constraints
     min_message_length: int = Field(1000, env='MIN_MESSAGE_LENGTH')
-    max_message_length: int = Field(2000, env='MAX_MESSAGE_LENGTH')
+    max_message_length: int = Field(3000, env='MAX_MESSAGE_LENGTH')
     response_timeout: int = Field(5, env='RESPONSE_TIMEOUT')
     
     @validator('temperature')
