@@ -2,20 +2,34 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM (UPDATED)
+MYLOVE ULTIMATE VERSI 2 - POSITION SYSTEM (FIX FULL)
 =============================================================================
 Mengelola posisi tubuh bot
 - Posisi berubah sesuai aktivitas
-- 6+ posisi tubuh
+- 8+ posisi tubuh
 - get_random_position() untuk callback
+- FIX: Lengkap dengan PositionType enum
 =============================================================================
 """
 
 import random
 import logging
 from typing import Dict, List, Optional
+from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+class PositionType(str, Enum):
+    """Tipe posisi"""
+    DUDUK = "duduk"
+    BERDIRI = "berdiri"
+    BERBARING = "berbaring"
+    BERSANDAR = "bersandar"
+    JONGKOK = "jongkok"
+    MERANGKAK = "merangkak"
+    MIRING = "miring"
+    TELENTANG = "telentang"
 
 
 class PositionSystem:
@@ -28,42 +42,50 @@ class PositionSystem:
             "duduk": {
                 "name": "duduk",
                 "description": "duduk santai",
-                "activities": ["ngobrol", "nonton TV", "baca buku", "main HP", "kerja"]
+                "type": PositionType.DUDUK,
+                "activities": ["ngobrol", "nonton TV", "baca buku", "main HP", "kerja", "ngopi"]
             },
             "berdiri": {
                 "name": "berdiri",
                 "description": "berdiri tegak",
-                "activities": ["masak", "cuci piring", "siap-siap", "ngantri", "stretch"]
+                "type": PositionType.BERDIRI,
+                "activities": ["masak", "cuci piring", "siap-siap", "ngantri", "stretch", "foto"]
             },
             "berbaring": {
                 "name": "berbaring",
                 "description": "berbaring",
-                "activities": ["tidur-tiduran", "rebahan", "istirahat", "baca buku", "main HP"]
+                "type": PositionType.BERBARING,
+                "activities": ["tidur-tiduran", "rebahan", "istirahat", "baca buku", "main HP", "melamun"]
             },
             "bersandar": {
                 "name": "bersandar",
                 "description": "bersandar",
-                "activities": ["santai", "ngobrol", "nunggu", "ngopi", "melamun"]
+                "type": PositionType.BERSANDAR,
+                "activities": ["santai", "ngobrol", "nunggu", "ngopi", "melamun", "dengerin musik"]
             },
             "jongkok": {
                 "name": "jongkok",
                 "description": "jongkok",
-                "activities": ["bersih-bersih", "main sama kucing", "foto", "ngambil barang"]
+                "type": PositionType.JONGKOK,
+                "activities": ["bersih-bersih", "main sama kucing", "foto", "ngambil barang", "berkebun"]
             },
             "merangkak": {
                 "name": "merangkak",
                 "description": "merangkak",
-                "activities": ["nyari barang", "main", "bersih-bersih"]
+                "type": PositionType.MERANGKAK,
+                "activities": ["nyari barang", "main", "bersih-bersih", "beres-beres"]
             },
             "miring": {
                 "name": "miring",
                 "description": "berbaring miring",
-                "activities": ["tidur", "rebahan", "nonton HP", "baca buku"]
+                "type": PositionType.MIRING,
+                "activities": ["tidur", "rebahan", "nonton HP", "baca buku", "ngelamun"]
             },
             "telentang": {
                 "name": "telentang",
                 "description": "telentang",
-                "activities": ["tidur", "rebahan", "stretch", "meditasi"]
+                "type": PositionType.TELENTANG,
+                "activities": ["tidur", "rebahan", "stretch", "meditasi", "tarik napas"]
             }
         }
         
@@ -82,15 +104,30 @@ class PositionSystem:
         """Dapatkan deskripsi posisi saat ini"""
         return self.get_current()["description"]
     
+    def get_current_type(self) -> PositionType:
+        """Dapatkan tipe posisi saat ini"""
+        return self.get_current()["type"]
+    
     def get_random_position(self) -> Dict:
         """
         Dapatkan posisi random (untuk callback)
         
         Returns:
-            Dict posisi dengan name, description, activities
+            Dict posisi dengan name, description, type, activities
         """
         pos_id = random.choice(list(self.positions.keys()))
         return self.positions[pos_id]
+    
+    def get_random_position_with_activity(self) -> tuple:
+        """
+        Dapatkan posisi random + aktivitas random
+        
+        Returns:
+            (position_dict, activity)
+        """
+        pos = self.get_random_position()
+        activity = random.choice(pos["activities"])
+        return pos, activity
     
     def change_position(self, position_id: str = None) -> Dict:
         """
@@ -106,7 +143,7 @@ class PositionSystem:
             self.current_position = position_id
         else:
             others = [p for p in self.positions.keys() if p != self.current_position]
-            self.current_position = random.choice(others)
+            self.current_position = random.choice(others) if others else "duduk"
         
         return self.get_current()
     
@@ -146,3 +183,29 @@ class PositionSystem:
     def get_all_positions(self) -> List[str]:
         """Dapatkan semua nama posisi"""
         return [pos["name"] for pos in self.positions.values()]
+    
+    def get_positions_by_type(self, pos_type: PositionType) -> List[Dict]:
+        """Dapatkan posisi berdasarkan tipe"""
+        return [pos for pos in self.positions.values() if pos["type"] == pos_type]
+    
+    def format_position_text(self) -> str:
+        """Format teks posisi untuk ditampilkan"""
+        pos = self.get_current()
+        return f"🧍 Aku lagi **{pos['description']}**."
+    
+    def get_stats(self) -> Dict:
+        """Dapatkan statistik posisi"""
+        return {
+            "total_positions": len(self.positions),
+            "current": self.current_position,
+            "by_type": {
+                "duduk": len(self.get_positions_by_type(PositionType.DUDUK)),
+                "berdiri": len(self.get_positions_by_type(PositionType.BERDIRI)),
+                "berbaring": len(self.get_positions_by_type(PositionType.BERBARING)),
+                "bersandar": len(self.get_positions_by_type(PositionType.BERSANDAR)),
+                "jongkok": len(self.get_positions_by_type(PositionType.JONGKOK)),
+                "merangkak": len(self.get_positions_by_type(PositionType.MERANGKAK)),
+                "miring": len(self.get_positions_by_type(PositionType.MIRING)),
+                "telentang": len(self.get_positions_by_type(PositionType.TELENTANG))
+            }
+        }
