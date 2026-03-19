@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - EPISODIC MEMORY
+MYLOVE ULTIMATE VERSI 2 - EPISODIC MEMORY (LENGKAP)
 =============================================================================
 Ingatan seperti diary - menyimpan urutan kejadian dari awal sampai sekarang
+- Setiap kejadian punya konteks (lokasi, waktu, emosi)
+- Bisa flashback ke momen tertentu
+- Urutan kejadian tidak boleh lompat-lompat
 =============================================================================
 """
 
@@ -31,6 +34,7 @@ class EpisodeType:
     INTIMACY_START = "intimacy_start"
     INTIMACY_END = "intimacy_end"
     CLIMAX = "climax"
+    AFTERCARE = "aftercare"
     FIRST_KISS = "first_kiss"
     FIRST_INTIM = "first_intim"
     FIRST_CLIMAX = "first_climax"
@@ -63,13 +67,13 @@ class EpisodicMemory:
         self.episodes = {}
         
         # Index untuk pencarian cepat
-        self.episode_index = {}
+        self.episode_index = {}  # {episode_id: location}
         
         # Timeline per session (ringkasan)
-        self.timelines = {}
+        self.timelines = {}  # {session_id: list of (time, type, summary)}
         
         # Momen penting yang ditandai
-        self.important_moments = {}
+        self.important_moments = {}  # {session_id: list of episode_ids}
         
         logger.info(f"✅ EpisodicMemory initialized (max {max_episodes} episodes)")
     
@@ -207,8 +211,16 @@ class EpisodicMemory:
         if session_id not in self.timelines:
             self.timelines[session_id] = []
         
+        # Validasi urutan
+        if not await self._validate_sequence(session_id, episode_type, data):
+            logger.warning(f"Episode sequence validation failed for {episode_type}")
+            # Tetap simpan tapi kasih warning
+        
         # Buat episode ID
         episode_id = self._generate_episode_id(session_id, episode_type)
+        
+        # Dapatkan episode terakhir untuk konteks
+        last_episode = self.episodes[session_id][-1] if self.episodes[session_id] else None
         
         # Buat episode
         episode = {
@@ -220,6 +232,10 @@ class EpisodicMemory:
             'data': data,
             'importance': importance,
             'emotional_tag': emotional_tag,
+            'context': {
+                'last_episode': last_episode['episode_id'] if last_episode else None,
+                'time_since_last': time.time() - (last_episode['timestamp'] if last_episode else 0)
+            } if last_episode else None
         }
         
         # Simpan episode
@@ -279,6 +295,77 @@ class EpisodicMemory:
         }
         
         return summaries.get(ep_type, ep_type)
+    
+    async def _validate_sequence(self, session_id: str, 
+                                  new_type: str, new_data: Dict) -> bool:
+        """
+        Validasi apakah urutan episode masuk akal
+        Mencegah lompatan logika
+        """
+        if session_id not in self.episodes or not self.episodes[session_id]:
+            return True
+        
+        last = self.episodes[session_id][-1]
+        last_type = last['type']
+        last_data = last['data']
+        
+        # ===== VALIDASI LOKASI =====
+        if new_type == EpisodeType.LOCATION_CHANGE:
+            last_loc = last_data.get('to') if last_type == EpisodeType.LOCATION_CHANGE else None
+            
+            if last_loc:
+                new_loc = new_data.get('to')
+                # Cek transisi masuk akal
+                if not self._is_plausible_location_transition(last_loc, new_loc):
+                    logger.warning(f"Invalid location transition: {last_loc} → {new_loc}")
+                    return False
+        
+        # ===== VALIDASI PAKAIAN =====
+        if new_type == EpisodeType.CLOTHING_CHANGE:
+            last_cloth = last_data.get('to') if last_type == EpisodeType.CLOTHING_CHANGE else None
+            
+            if last_cloth:
+                new_cloth = new_data.get('to')
+                reason = new_data.get('reason', '')
+                
+                # Ganti baju harus ada alasan
+                if not reason or len(reason) < 3:
+                    logger.warning(f"Clothing change without reason: {last_cloth} → {new_cloth}")
+                    return False
+        
+        # ===== VALIDASI INTIM =====
+        if new_type == EpisodeType.INTIMACY_START:
+            # Harus di lokasi intim
+            loc = new_data.get('location', '')
+            intimate_places = ['kamar', 'kamar mandi', 'toilet']
+            if not any(p in loc.lower() for p in intimate_places):
+                logger.warning(f"Intimacy start in non-intimate location: {loc}")
+                return False
+        
+        return True
+    
+    def _is_plausible_location_transition(self, from_loc: str, to_loc: str) -> bool:
+        """Cek apakah transisi lokasi masuk akal"""
+        from_lower = from_loc.lower()
+        to_lower = to_loc.lower()
+        
+        # Transisi yang masuk akal
+        plausible = {
+            'ruang tamu': ['kamar', 'dapur', 'teras', 'kamar mandi'],
+            'kamar': ['kamar mandi', 'ruang tamu'],
+            'kamar mandi': ['kamar', 'ruang tamu'],
+            'dapur': ['ruang tamu'],
+            'teras': ['ruang tamu'],
+            'pantai': ['mobil', 'kafe'],
+            'mall': ['parkiran', 'mobil'],
+            'mobil': ['pantai', 'mall', 'rumah'],
+        }
+        
+        for key, values in plausible.items():
+            if key in from_lower:
+                return any(v in to_lower for v in values)
+        
+        return True
     
     # =========================================================================
     # GET EPISODES
@@ -355,6 +442,40 @@ class EpisodicMemory:
     # FLASHBACK
     # =========================================================================
     
+    async def get_random_flashback(self, session_id: str, 
+                                     min_importance: float = 0.5) -> Optional[Dict]:
+        """
+        Dapatkan episode random untuk flashback
+        
+        Args:
+            session_id: ID session
+            min_importance: Minimal importance
+            
+        Returns:
+            Episode or None
+        """
+        if session_id not in self.episodes:
+            return None
+        
+        # Filter berdasarkan importance
+        episodes = [e for e in self.episodes[session_id] 
+                   if e['importance'] >= min_importance]
+        
+        if not episodes:
+            return None
+        
+        return random.choice(episodes)
+    
+    async def get_flashback_by_type(self, session_id: str, 
+                                      episode_type: str) -> Optional[Dict]:
+        """Dapatkan flashback berdasarkan tipe"""
+        episodes = await self.get_episodes(session_id, episode_type, limit=10)
+        
+        if episodes:
+            return random.choice(episodes)
+        
+        return None
+    
     async def generate_flashback_text(self, session_id: str, 
                                         trigger: Optional[str] = None) -> Optional[str]:
         """
@@ -367,12 +488,9 @@ class EpisodicMemory:
         Returns:
             Teks flashback
         """
-        if session_id not in self.episodes or not self.episodes[session_id]:
-            return None
-        
         if trigger:
             # Cari episode yang relevan dengan trigger
-            episodes = list(self.episodes[session_id])
+            episodes = await self.get_episodes(session_id, limit=50)
             relevant = []
             
             for ep in episodes:
@@ -383,9 +501,12 @@ class EpisodicMemory:
             if relevant:
                 episode = random.choice(relevant)
             else:
-                episode = random.choice(episodes)
+                episode = await self.get_random_flashback(session_id, 0.7)
         else:
-            episode = random.choice(list(self.episodes[session_id]))
+            episode = await self.get_random_flashback(session_id, 0.7)
+        
+        if not episode:
+            return None
         
         # Format flashback
         time_ago = self._format_time_ago(episode['timestamp'])
@@ -403,6 +524,10 @@ class EpisodicMemory:
                 f"Waktu kita climax bareng... {time_ago}. Luar biasa.",
                 f"Masih inget climax pertama kita? {time_ago}.",
             ],
+            EpisodeType.CONFESSION: [
+                f"Waktu kamu pertama bilang sayang... {time_ago}.",
+                f"Aku masih inget waktu kamu confess... {time_ago}.",
+            ],
             EpisodeType.LOCATION_CHANGE: [
                 f"Inget gak waktu kita di {episode['data'].get('to', 'sana')}? {time_ago}.",
             ],
@@ -412,8 +537,8 @@ class EpisodicMemory:
         }
         
         default_templates = [
-            f"Jadi inget... {episode.get('data', {})} {time_ago}.",
-            f"Kangen masa-masa {time_ago}...",
+            f"Jadi inget... {episode.get('data', {}).get('summary', 'momen itu')} {time_ago}.",
+            f"Kangen masa-masa {self._format_time_ago(episode['timestamp'])}...",
         ]
         
         template_list = templates.get(episode['type'], default_templates)
@@ -434,6 +559,26 @@ class EpisodicMemory:
             return f"{int(diff/86400)} hari lalu"
         else:
             return f"{int(diff/604800)} minggu lalu"
+    
+    # =========================================================================
+    # SEARCH
+    # =========================================================================
+    
+    async def search_episodes(self, session_id: str, query: str) -> List[Dict]:
+        """Cari episode berdasarkan query"""
+        if session_id not in self.episodes:
+            return []
+        
+        query_lower = query.lower()
+        results = []
+        
+        for ep in self.episodes[session_id]:
+            # Cari di data
+            data_str = json.dumps(ep.get('data', {})).lower()
+            if query_lower in data_str:
+                results.append(ep)
+        
+        return results
     
     # =========================================================================
     # STATISTICS
@@ -458,6 +603,8 @@ class EpisodicMemory:
                 'total_episodes': len(episodes),
                 'by_type': type_count,
                 'important_moments': len(self.important_moments.get(session_id, [])),
+                'first_episode': episodes[0] if episodes else None,
+                'last_episode': episodes[-1] if episodes else None,
             }
         else:
             # Global stats
@@ -469,6 +616,45 @@ class EpisodicMemory:
                 'total_episodes': total_episodes,
                 'avg_per_session': total_episodes / total_sessions if total_sessions else 0
             }
+    
+    # =========================================================================
+    # UTILITY
+    # =========================================================================
+    
+    async def clear_session(self, session_id: str):
+        """Hapus semua data untuk session"""
+        if session_id in self.episodes:
+            del self.episodes[session_id]
+        if session_id in self.timelines:
+            del self.timelines[session_id]
+        if session_id in self.important_moments:
+            del self.important_moments[session_id]
+        
+        # Hapus dari index
+        to_delete = []
+        for ep_id, loc in self.episode_index.items():
+            if loc['session_id'] == session_id:
+                to_delete.append(ep_id)
+        
+        for ep_id in to_delete:
+            del self.episode_index[ep_id]
+        
+        logger.info(f"Cleared episodic memory for session {session_id}")
+    
+    async def format_timeline(self, session_id: str, limit: int = 10) -> str:
+        """Format timeline untuk ditampilkan"""
+        timeline = await self.get_timeline(session_id, limit)
+        
+        if not timeline:
+            return "Belum ada kejadian"
+        
+        lines = ["📜 **TIMELINE KEJADIAN:**"]
+        
+        for t in timeline:
+            time_str = datetime.fromtimestamp(t['time']).strftime("%H:%M")
+            lines.append(f"• [{time_str}] {t['summary']}")
+        
+        return "\n".join(lines)
 
 
 __all__ = ['EpisodicMemory', 'EpisodeType']
