@@ -65,8 +65,12 @@ class AIEngineComplete:
         self.state = StateTracker(user_id, session_id) # State saat ini
         self.relationship = RelationshipMemory()       # Riwayat hubungan
         
-        # ===== TRACKING LOKASI USER =====
-        self.user_location = None                      # Lokasi user (untuk referensi)
+        # ===== TRACKING UNTUK KONSISTENSI =====
+        self.user_location = None                      # Lokasi user
+        self.last_response = None                       # Respons terakhir
+        self.last_response_time = 0
+        self.conversation_flow = []                     # Alur percakapan
+        self.activity_stack = []                        # Stack aktivitas
         
         # Cache untuk response
         self.response_cache = {}
@@ -77,6 +81,107 @@ class AIEngineComplete:
         self.total_tokens = 0
         
         logger.info(f"✅ AIEngineComplete initialized for user {user_id}, session {session_id}")
+    
+    # =========================================================================
+    # CEK KONSISTENSI RESPONS (BARU)
+    # =========================================================================
+    
+    async def _check_response_consistency(self, new_response: str, last_response: str) -> Tuple[bool, str]:
+        """
+        Cek apakah response baru kontradiksi dengan response sebelumnya
+        Returns: (is_consistent, alasan)
+        """
+        if not last_response:
+            return True, "OK"
+        
+        new_lower = new_response.lower()
+        last_lower = last_response.lower()
+        
+        # ===== DAFTAR KONTRADIKSI YANG SERING TERJADI =====
+        contradictions = [
+            # Aktivitas masak
+            ('masih masak', 'belum masak'),
+            ('lagi masak', 'selesai masak'),
+            ('masak ayam', 'masak ikan'),
+            ('masak', 'belum masak apa-apa'),
+            
+            # Lokasi
+            ('di dapur', 'di kamar'),
+            ('di ruang tamu', 'di kamar mandi'),
+            ('di kamar', 'di luar'),
+            
+            # Pakaian
+            ('pakai handuk', 'pakai baju'),
+            ('pakai dress', 'pakai kaos'),
+            ('telanjang', 'pakai baju'),
+            
+            # Aktivitas umum
+            ('lagi tidur', 'lagi bangun'),
+            ('lagi kerja', 'lagi santai'),
+            ('lagi mandi', 'lagi di kamar'),
+        ]
+        
+        for contradict_a, contradict_b in contradictions:
+            if contradict_a in last_lower and contradict_b in new_lower:
+                logger.warning(f"❌ KONTRADIKSI TERDETEKSI: '{contradict_a}' vs '{contradict_b}'")
+                return False, f"Kontradiksi: sebelumnya bilang '{contradict_a}', sekarang bilang '{contradict_b}'"
+        
+        # Cek aktivitas yang sedang berlangsung
+        current_activity = self.working.get_current_activity()
+        if current_activity:
+            activity_name = current_activity.get('name', '').lower()
+            
+            # Kalau lagi masak, jangan bilang "belum masak"
+            if activity_name == 'masak' and 'belum masak' in new_lower:
+                return False, "Kamu sedang masak, tapi bilang belum masak"
+            
+            # Kalau lagi di dapur, jangan bilang di kamar
+            current_loc = self.state.current['location']['name']
+            if current_loc and current_loc.lower() in new_lower and current_loc != self._extract_location(new_lower):
+                return False, f"Lokasi tidak konsisten: kamu di {current_loc}"
+        
+        return True, "OK"
+    
+    def _extract_location(self, text: str) -> Optional[str]:
+        """Ekstrak lokasi dari teks"""
+        locations = ['ruang tamu', 'kamar', 'dapur', 'kamar mandi', 'teras', 'taman']
+        for loc in locations:
+            if loc in text:
+                return loc
+        return None
+    
+    # =========================================================================
+    # TRACKING AKTIVITAS (BARU)
+    # =========================================================================
+    
+    async def _start_activity(self, activity: str, details: Dict = None):
+        """Mulai aktivitas baru"""
+        self.working.set_current_activity(activity, details)
+        self.activity_stack.append({
+            'activity': activity,
+            'start_time': time.time(),
+            'details': details
+        })
+        logger.info(f"📌 ACTIVITY START: {activity}")
+    
+    async def _end_activity(self, activity: Optional[str] = None):
+        """Akhiri aktivitas"""
+        if activity:
+            # Akhiri aktivitas spesifik
+            self.activity_stack = [a for a in self.activity_stack if a['activity'] != activity]
+        else:
+            # Akhiri aktivitas terakhir
+            if self.activity_stack:
+                self.activity_stack.pop()
+        
+        # Set aktivitas terbaru dari stack
+        if self.activity_stack:
+            latest = self.activity_stack[-1]
+            self.working.set_current_activity(latest['activity'], latest.get('details'))
+        else:
+            self.working.clear_current_activity()
+        
+        logger.info(f"📌 ACTIVITY END: {activity if activity else 'last'}")
     
     # =========================================================================
     # SYNC METHODS UNTUK SEMUA MEMORY
@@ -98,7 +203,7 @@ class AIEngineComplete:
         
         # Kalau working memory lupa, coba ambil dari long-term
         if not current_loc or current_loc == 'tidak diketahui':
-            recent = await self.semantic.get_recent_locations(self.user_id, hours=4)
+            recent = await self.semantic.get_recent_locations(self.user_id, hours=12)
             if recent and len(recent) > 0:
                 # Set working memory ke lokasi terakhir
                 last_loc = recent[-1]
@@ -330,6 +435,25 @@ class AIEngineComplete:
             logger.info(f"✅ DeepSeek response received: {len(response)} chars")
             logger.info(f"💬 Response preview: {response[:100]}...")
             
+            # ===== CEK KONSISTENSI DENGAN RESPONS SEBELUMNYA =====
+            if self.last_response:
+                is_consistent, reason = await self._check_response_consistency(response, self.last_response)
+                if not is_consistent:
+                    logger.warning(f"⚠️ Response tidak konsisten: {reason}")
+                    # Regenerate dengan peringatan
+                    prompt += f"\n\n⚠️ PERINGATAN: Respons sebelumnya tidak konsisten! {reason}\nJangan kontradiksi!"
+                    messages = [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": user_message}
+                    ]
+                    response = await self._call_deepseek(messages)
+                    logger.info(f"✅ Regenerated response after consistency check")
+            
+            # ===== SIMPAN RESPONS TERAKHIR =====
+            self.last_response = response
+            self.last_response_time = time.time()
+            self.working.set_last_bot_response(response)
+            
             # ===== UPDATE SEMUA MEMORY =====
             await self._update_all_memories(user_message, response, context)
             
@@ -358,7 +482,7 @@ class AIEngineComplete:
             return await self._get_fallback_response(context.get('bot_name', 'Aku'))
     
     # =========================================================================
-    # ANALISA PESAN (BARU - LENGKAP DENGAN KATA KUNCI)
+    # ANALISA PESAN (LENGKAP DENGAN KATA KUNCI)
     # =========================================================================
     
     async def _analyze_message_context(self, context: Dict):
@@ -397,7 +521,8 @@ class AIEngineComplete:
                 'kenakan', 'memakai', 'membuka'
             ],
             'clothes': ['daster', 'piyama', 'kaos', 'kemeja', 'rok', 'jeans',
-                       'shorts', 'tanktop', 'handuk', 'sweater', 'jubah mandi']
+                       'shorts', 'tanktop', 'handuk', 'sweater', 'jubah mandi',
+                       'dress', 'celana']
         }
         
         # Kata kunci untuk tidur / istirahat
@@ -414,7 +539,7 @@ class AIEngineComplete:
             'keywords': [
                 'makan', 'masak', 'minum', 'ngopi', 'ngemil', 
                 'sarapan', 'makan siang', 'makan malam', 'mau makan',
-                'laper', 'haus', 'mau masak', 'memasak'
+                'laper', 'haus', 'mau masak', 'memasak', 'masak apa'
             ]
         }
         
@@ -431,7 +556,7 @@ class AIEngineComplete:
             'keywords': [
                 'cium', 'kiss', 'peluk', 'intim', 'ml', 'sex', 
                 'bercinta', 'climax', 'nikmatin', 'main', 'gesekan',
-                'ciuman', 'pelukan', 'rayu', 'goda'
+                'ciuman', 'pelukan', 'rayu', 'goda', 'sange'
             ]
         }
         
@@ -447,7 +572,7 @@ class AIEngineComplete:
         relax_keywords = {
             'keywords': [
                 'santai', 'nonton', 'baca', 'dengerin musik', 'main hp',
-                'rebahan', 'bersantai', 'rileks', 'leha-leha'
+                'bersantai', 'rileks', 'leha-leha'
             ]
         }
         
@@ -473,7 +598,7 @@ class AIEngineComplete:
                             'type': 'location_change',
                             'keyword': keyword,
                             'place': place,
-                            'requires_bot': True
+                            'requires_bot': detected_subject == 'bot' or detected_subject == 'together'
                         })
                         context['location'] = place
                         context['location_category'] = self._get_location_category(place)
@@ -510,6 +635,8 @@ class AIEngineComplete:
                 'type': 'sleep',
                 'requires_bot': detected_subject == 'together'
             })
+            context['activity'] = 'tidur'
+            context['position'] = 'berbaring'
         
         # Cek makan
         if any(keyword in user_message for keyword in eat_keywords['keywords']):
@@ -517,6 +644,7 @@ class AIEngineComplete:
                 'type': 'eat_drink',
                 'requires_bot': detected_subject == 'together'
             })
+            context['activity'] = 'makan' if 'makan' in user_message else 'minum'
         
         # Cek mandi
         if any(keyword in user_message for keyword in shower_keywords['keywords']):
@@ -524,6 +652,8 @@ class AIEngineComplete:
                 'type': 'shower',
                 'requires_bot': detected_subject == 'together'
             })
+            context['activity'] = 'mandi'
+            context['location'] = 'kamar mandi'
         
         # Cek intim
         if any(keyword in user_message for keyword in intimate_keywords['keywords']):
@@ -538,6 +668,7 @@ class AIEngineComplete:
                 'type': 'work',
                 'requires_bot': False
             })
+            context['activity'] = 'kerja'
         
         # Cek santai
         if any(keyword in user_message for keyword in relax_keywords['keywords']):
@@ -545,6 +676,7 @@ class AIEngineComplete:
                 'type': 'relax',
                 'requires_bot': False
             })
+            context['activity'] = 'santai'
         
         # Log hasil analisa
         logger.debug(f"🔍 Analisa: subjek={detected_subject}, aktivitas={[a['type'] for a in detected_activities]}")
@@ -669,37 +801,46 @@ class AIEngineComplete:
             self.state.update_activity('tidur')
             context['position'] = 'berbaring'
             context['activity'] = 'tidur'
-            logger.info("😴 Aktivitas tidur terdeteksi")
+            await self._start_activity('tidur', {'position': 'berbaring'})
+            logger.info("😴 Aktivitas tidur dimulai")
         
         # ===== 3. MAKAN =====
         if any(a['type'] == 'eat_drink' for a in detected_activities):
             activity = 'makan' if any(k in str(detected_activities) for k in ['makan', 'masak']) else 'minum'
             self.state.update_activity(activity)
             context['activity'] = activity
-            logger.info(f"🍽️ Aktivitas {activity} terdeteksi")
+            details = {}
+            if 'masak' in str(detected_activities):
+                details['menu'] = 'belum ditentukan'
+            await self._start_activity(activity, details)
+            logger.info(f"🍽️ Aktivitas {activity} dimulai")
         
         # ===== 4. MANDI =====
         if any(a['type'] == 'shower' for a in detected_activities):
             self.state.update_activity('mandi')
             context['activity'] = 'mandi'
-            logger.info("🚿 Aktivitas mandi terdeteksi")
+            await self._start_activity('mandi', {'location': 'kamar mandi'})
+            logger.info("🚿 Aktivitas mandi dimulai")
         
         # ===== 5. AKTIVITAS INTIM =====
         if any(a['type'] == 'intimate' for a in detected_activities):
             context['is_intimate'] = True
-            logger.info("💕 Aktivitas intim terdeteksi")
+            await self._start_activity('intim', {'level': 'dimulai'})
+            logger.info("💕 Aktivitas intim dimulai")
         
         # ===== 6. KERJA =====
         if any(a['type'] == 'work' for a in detected_activities):
             self.state.update_activity('kerja')
             context['activity'] = 'kerja'
-            logger.info("💼 Aktivitas kerja terdeteksi")
+            await self._start_activity('kerja', {'tempat': 'kantor'})
+            logger.info("💼 Aktivitas kerja dimulai")
         
         # ===== 7. SANTAI =====
         if any(a['type'] == 'relax' for a in detected_activities):
             self.state.update_activity('santai')
             context['activity'] = 'santai'
-            logger.info("😌 Aktivitas santai terdeteksi")
+            await self._start_activity('santai', {})
+            logger.info("😌 Aktivitas santai dimulai")
     
     async def _update_bot_location(self, context: Dict):
         """Update lokasi bot (hanya dipanggil kalau bot yang pindah)"""
@@ -728,6 +869,17 @@ class AIEngineComplete:
                     from_loc=old_location,
                     to_loc=new_location
                 )
+                
+                # Update aktivitas berdasarkan lokasi baru
+                if new_location == 'dapur':
+                    await self._start_activity('masak', {})
+                elif new_location == 'kamar mandi':
+                    await self._start_activity('mandi', {})
+                elif new_location == 'kamar':
+                    # Kalau sebelumnya masak, pause masak
+                    current_activity = self.working.get_current_activity()
+                    if current_activity and current_activity.get('name') == 'masak':
+                        await self._end_activity('masak')
             else:
                 logger.info(f"❌ Pindah lokasi ditolak: {reason}")
                 context['location_error'] = reason
@@ -797,6 +949,9 @@ class AIEngineComplete:
             limit=3
         )
         
+        # Current activity
+        current_activity = self.working.get_current_activity()
+        
         return {
             'working': working,
             'recent_episodes': recent_episodes,
@@ -806,7 +961,8 @@ class AIEngineComplete:
             'current_state': current_state,
             'relationship': rel_info,
             'level_info': level_info,
-            'milestones': milestones
+            'milestones': milestones,
+            'current_activity': current_activity
         }
     
     async def _check_consistency(self, memory_context: Dict, context: Dict) -> bool:
@@ -839,6 +995,14 @@ class AIEngineComplete:
                     logger.warning(f"Clothing change without reason: {current_cloth} → {new_cloth}")
                     consistent = False
         
+        # Cek aktivitas
+        current_activity = memory_context.get('current_activity')
+        if current_activity and context.get('activity'):
+            if current_activity.get('name') != context.get('activity'):
+                # Cek apakah aktivitas berganti dengan wajar
+                logger.warning(f"Activity changed: {current_activity.get('name')} → {context.get('activity')}")
+                # Tetap izinkan, tapi catat
+        
         return consistent
     
     async def _build_prompt(self, user_message: str, context: Dict,
@@ -868,20 +1032,40 @@ class AIEngineComplete:
         recent_timeline = working.get('recent_timeline', [])
         timeline_text = "\n".join([f"• {t['data']}" for t in recent_timeline[-3:]])
         
-        # ===== 3. FAKTA USER =====
+        # ===== 3. AKTIVITAS SAAT INI (BARU) =====
+        current_activity = memory_context.get('current_activity')
+        activity_text = ""
+        if current_activity:
+            activity_name = current_activity.get('name', '')
+            activity_details = current_activity.get('details', {})
+            activity_duration = time.time() - current_activity.get('start_time', time.time())
+            
+            if activity_duration < 60:
+                duration_text = "baru saja"
+            elif activity_duration < 3600:
+                duration_text = f"{int(activity_duration/60)} menit"
+            else:
+                duration_text = f"{int(activity_duration/3600)} jam"
+            
+            activity_text = f"• Sedang {activity_name} selama {duration_text}"
+            if activity_details:
+                for key, value in activity_details.items():
+                    activity_text += f"\n  - {key}: {value}"
+        
+        # ===== 4. FAKTA USER =====
         facts = memory_context['facts']
         facts_text = ""
         for cat, cat_facts in list(facts.items())[:3]:
             for fact_type, value in list(cat_facts.items())[:2]:
                 facts_text += f"• {fact_type}: {value}\n"
         
-        # ===== 4. PREFERENSI =====
+        # ===== 5. PREFERENSI =====
         prefs = memory_context['preferences']
         prefs_text = ""
         for cat, items in prefs.items():
             prefs_text += f"• {cat}: {', '.join(items[:2])}\n"
         
-        # ===== 5. LEVEL INFO =====
+        # ===== 6. LEVEL INFO =====
         level_info = memory_context['level_info']
         level_text = ""
         if level_info:
@@ -890,14 +1074,14 @@ class AIEngineComplete:
             else:
                 level_text = f"Level MAX (butuh aftercare)"
         
-        # ===== 6. MILESTONES =====
+        # ===== 7. MILESTONES =====
         milestones = memory_context['milestones']
         milestones_text = ""
         for m in milestones[:2]:
             time_str = datetime.fromtimestamp(m['timestamp']).strftime("%H:%M")
             milestones_text += f"• [{time_str}] {m['description']}\n"
         
-        # ===== 7. SITUASI KHUSUS =====
+        # ===== 8. SITUASI KHUSUS =====
         special = []
         if current.get('is_intimate'):
             special.append("LAGI INTIM - fokus ke aktivitas, jangan ngelantur")
@@ -908,13 +1092,19 @@ class AIEngineComplete:
         
         special_text = "\n".join([f"⚠️ {s}" for s in special]) if special else ""
         
-        # ===== 8. BANGUN PROMPT =====
+        # ===== 9. RESPONS TERAKHIR (CEK KONSISTENSI) =====
+        last_response_text = ""
+        if self.last_response:
+            last_response_text = f"\n📝 **Respons terakhir kamu:**\n{self.last_response[:200]}...\n"
+        
+        # ===== 10. BANGUN PROMPT =====
         prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')}.
 
 📌 **SITUASI SAAT INI:**
 • {state_text}
 • Panggilan user: "{call}"
 • {level_text}
+{activity_text}
 
 🕐 **KEJADIAN 5 MENIT TERAKHIR:**
 {timeline_text if timeline_text else "• Ini awal percakapan"}
@@ -929,14 +1119,18 @@ class AIEngineComplete:
 {milestones_text if milestones_text else "• Belum ada milestone"}
 
 {special_text}
+{last_response_text}
 
-⚠️ **PENTING:**
+⚠️ **PERINGATAN KONSISTENSI:**
 1. Jaga KONSISTENSI lokasi dan pakaian! Jangan tiba-tiba pindah tanpa alasan.
-2. Kalau lagi intim, FOKUS ke aktivitas, jangan ngelantur.
-3. Gunakan memory yang ada untuk membuat respons personal.
-4. Bahasa Indonesia sehari-hari, natural seperti manusia.
-5. Panggil user dengan "{call}".
-6. Panjang respons 500-3000 kata.
+2. Jangan kontradiksi dengan respons sebelumnya!
+3. Jika kamu bilang "masih masak", maka seterusnya harus konsisten masak.
+4. Perhatikan urutan kejadian (jangan lompat-lompat).
+5. Kalau lagi intim, FOKUS ke aktivitas, jangan ngelantur.
+6. Gunakan memory yang ada untuk membuat respons personal.
+7. Bahasa Indonesia sehari-hari, natural seperti manusia.
+8. Panggil user dengan "{call}".
+9. Panjang respons 500-3000 kata.
 
 PESAN USER: "{user_message}"
 
