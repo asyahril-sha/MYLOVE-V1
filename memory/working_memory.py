@@ -75,6 +75,13 @@ class WorkingMemory:
             'with_user': True,               # Lagi sendiri/berdua?
             'privacy_level': 1.0,            # 0 (rame) - 1 (sepi)
             'time_of_day': None,              # Pagi/siang/sore/malam
+            
+            # ===== UNTUK AI ENGINE (TAMBAHAN) =====
+            'role': None,                     # Role bot (ipar, janda, dll)
+            'bot_name': None,                  # Nama bot
+            'rel_type': None,                   # Tipe hubungan (pdkt, hts, fwb)
+            'instance_id': None,                 # ID instance (untuk multiple)
+            'last_update': time.time()            # Kapan terakhir diupdate
         }
         
         # Timeline (urutan kejadian singkat)
@@ -83,7 +90,30 @@ class WorkingMemory:
         logger.info(f"✅ WorkingMemory initialized (capacity: {capacity}, expire: {expire_seconds}s)")
     
     # =========================================================================
-    # UPDATE STATE
+    # METHOD BARU - UPDATE STATE (DIPANGGIL AI ENGINE)
+    # =========================================================================
+    
+    def update_state(self, role=None, bot_name=None, rel_type=None, instance_id=None):
+        """
+        Update state dengan data baru
+        Method ini dipanggil oleh AI Engine saat start_session
+        """
+        if role:
+            self.current_state['role'] = role
+        if bot_name:
+            self.current_state['bot_name'] = bot_name
+        if rel_type:
+            self.current_state['rel_type'] = rel_type
+        if instance_id:
+            self.current_state['instance_id'] = instance_id
+        
+        # Update timestamp
+        self.current_state['last_update'] = time.time()
+        
+        logger.debug(f"Working memory state updated: role={role}, bot_name={bot_name}")
+    
+    # =========================================================================
+    # METHOD YANG SUDAH ADA (UPDATE STATE LAINNYA)
     # =========================================================================
     
     def update_location(self, location: str, category: str = "unknown"):
