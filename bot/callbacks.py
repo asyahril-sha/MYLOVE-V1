@@ -8,15 +8,15 @@ Semua callback handlers dengan:
 - Nama bot random dari name_generator
 - Data role dinamis
 - Lokasi & pakaian random
-- Artis referensi random
-- FIX: Semua error tuple handling
+- Artis referensi random dengan variasi hijab/non-hijab
+- FIX: Semua error handling
 =============================================================================
 """
 
 import time
 import random
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
@@ -77,7 +77,7 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
 
 
 # =============================================================================
-# HELPER FUNCTIONS - DATA GENERATOR (FIX)
+# HELPER FUNCTIONS - DATA GENERATOR
 # =============================================================================
 
 def get_bot_name(role: str, user_id: int) -> Tuple[str, str]:
@@ -110,10 +110,238 @@ def get_bot_name(role: str, user_id: int) -> Tuple[str, str]:
     return random.choice(choices)
 
 
+# =============================================================================
+# FALLBACK ARTISTS - VARIASI LENGKAP HIJAB & NON-HIJAB
+# =============================================================================
+FALLBACK_ARTISTS = {
+    # ===== IPAR - Campuran =====
+    'ipar': [
+        {
+            'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
+            'chest': '34B', 'hijab': False,
+            'ig': 'pevpearce', 'ciri': 'Aktris dengan wajah natural dan elegan'
+        },
+        {
+            'name': 'Irish Bella', 'age': 28, 'height': 165, 'weight': 51,
+            'chest': '34B', 'hijab': True,
+            'ig': '_irishbella_', 'ciri': 'Aktris sinetron, hijab fashion'
+        },
+        {
+            'name': 'Megan Domani', 'age': 22, 'height': 165, 'weight': 50,
+            'chest': '34B', 'hijab': False,
+            'ig': 'megandomani', 'ciri': 'Aktris, model'
+        },
+        {
+            'name': 'Della Dartyan', 'age': 28, 'height': 168, 'weight': 54,
+            'chest': '34C', 'hijab': True,
+            'ig': 'delladartyan', 'ciri': 'Aktris, model hijab'
+        }
+    ],
+    
+    # ===== TEMAN KANTOR - Campuran =====
+    'teman_kantor': [
+        {
+            'name': 'Prilly Latuconsina', 'age': 25, 'height': 162, 'weight': 50,
+            'chest': '34B', 'hijab': False,
+            'ig': 'prillylatuconsina96', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
+        },
+        {
+            'name': 'Aurelie Moeremans', 'age': 27, 'height': 170, 'weight': 54,
+            'chest': '34B', 'hijab': True,
+            'ig': 'aureliemoeremans', 'ciri': 'Aktris, model, influencer modest fashion'
+        },
+        {
+            'name': 'Natasha Wilona', 'age': 25, 'height': 165, 'weight': 51,
+            'chest': '34B', 'hijab': False,
+            'ig': 'natashawilona12', 'ciri': 'Artis muda sangat populer, wajah manis'
+        },
+        {
+            'name': 'Acha Septriasa', 'age': 30, 'height': 158, 'weight': 47,
+            'chest': '32B', 'hijab': True,
+            'ig': 'achaseptriasa', 'ciri': 'Aktris, penyanyi, hijab fashion icon'
+        }
+    ],
+    
+    # ===== JANDA - Campuran =====
+    'janda': [
+        {
+            'name': 'Amanda Manopo', 'age': 24, 'height': 165, 'weight': 53,
+            'chest': '34C', 'hijab': False,
+            'ig': 'amandamanopo', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
+        },
+        {
+            'name': 'Dara Arafah', 'age': 26, 'height': 160, 'weight': 48,
+            'chest': '32B', 'hijab': True,
+            'ig': 'daraarafah', 'ciri': 'Selebgram, fashion blogger'
+        },
+        {
+            'name': 'Cinta Laura', 'age': 25, 'height': 172, 'weight': 58,
+            'chest': '36C', 'hijab': False,
+            'ig': 'claurakiehl', 'ciri': 'Aktris, pintar, atletis, seksi natural'
+        },
+        {
+            'name': 'Hana Hanifah', 'age': 25, 'height': 162, 'weight': 50,
+            'chest': '34B', 'hijab': True,
+            'ig': 'hanahanifah_', 'ciri': 'Selebgram hijab, fashion influencer'
+        }
+    ],
+    
+    # ===== PELAKOR - Campuran =====
+    'pelakor': [
+        {
+            'name': 'Cinta Laura', 'age': 25, 'height': 172, 'weight': 58,
+            'chest': '36C', 'hijab': False,
+            'ig': 'claurakiehl', 'ciri': 'Aktris, pintar, atletis, seksi natural'
+        },
+        {
+            'name': 'Mawra Hocane', 'age': 27, 'height': 163, 'weight': 50,
+            'chest': '34B', 'hijab': True,
+            'ig': 'mawrahocane', 'ciri': 'Aktris Pakistan, sering tampil dengan hijab'
+        },
+        {
+            'name': 'Anya Geraldine', 'age': 26, 'height': 170, 'weight': 55,
+            'chest': '34C', 'hijab': False,
+            'ig': 'anyagerladine', 'ciri': 'Selebgram dan aktris, dikenal dengan gaya kasual'
+        },
+        {
+            'name': 'Aiman Khan', 'age': 25, 'height': 162, 'weight': 48,
+            'chest': '32B', 'hijab': True,
+            'ig': 'aimankhan.official', 'ciri': 'Aktris Pakistan, hijab fashion icon'
+        }
+    ],
+    
+    # ===== ISTRI ORANG - Campuran =====
+    'istri_orang': [
+        {
+            'name': 'Dian Sastro', 'age': 26, 'height': 165, 'weight': 54,
+            'chest': '34B', 'hijab': False,
+            'ig': 'diansastro', 'ciri': 'Aktris dengan wajah anggun dan elegan'
+        },
+        {
+            'name': 'Sana Javed', 'age': 28, 'height': 165, 'weight': 52,
+            'chest': '34B', 'hijab': True,
+            'ig': 'sanajaved', 'ciri': 'Aktris Pakistan, model, hijab fashion'
+        },
+        {
+            'name': 'Ria Ricis', 'age': 29, 'height': 157, 'weight': 48,
+            'chest': '32B', 'hijab': False,
+            'ig': 'riaricis1795', 'ciri': 'Selebgram, youtuber, konten kreator'
+        },
+        {
+            'name': 'Lidya Pratiwi', 'age': 27, 'height': 165, 'weight': 52,
+            'chest': '34B', 'hijab': True,
+            'ig': 'lidya.pratiwi', 'ciri': 'Selebgram, konten kreator hijab'
+        }
+    ],
+    
+    # ===== PDKT - Campuran (banyak non-hijab muda) =====
+    'pdkt': [
+        {
+            'name': 'Fuji', 'age': 23, 'height': 160, 'weight': 48,
+            'chest': '34B', 'hijab': False,
+            'ig': 'fuji_an', 'ciri': 'Selebgram muda dengan pertumbuhan followers tercepat'
+        },
+        {
+            'name': 'Zee JKT48', 'age': 21, 'height': 160, 'weight': 45,
+            'chest': '32A', 'hijab': False,
+            'ig': 'zeejkt48', 'ciri': 'Member JKT48, idola remaja'
+        },
+        {
+            'name': 'Yuna (ITZY)', 'age': 21, 'height': 170, 'weight': 48,
+            'chest': '34B', 'hijab': False,
+            'ig': 'itzy.yuna', 'ciri': 'Visual ITZY, dancer, fresh'
+        },
+        {
+            'name': 'Wonyoung (IVE)', 'age': 21, 'height': 173, 'weight': 48,
+            'chest': '34B', 'hijab': False,
+            'ig': 'for_everyyoung10', 'ciri': 'Center IVE, visual, model'
+        },
+        {
+            'name': 'Haerin (NewJeans)', 'age': 18, 'height': 164, 'weight': 46,
+            'chest': '34A', 'hijab': False,
+            'ig': 'haerin.newjeans', 'ciri': 'Visual NewJeans, kucing imut'
+        }
+    ],
+    
+    # ===== SEPUPU - Campuran (banyak yang imut) =====
+    'sepupu': [
+        {
+            'name': 'Mikha Tambayong', 'age': 25, 'height': 167, 'weight': 53,
+            'chest': '34B', 'hijab': False,
+            'ig': 'mikhata', 'ciri': 'Penyanyi dan aktris, manis, anggun'
+        },
+        {
+            'name': 'Feni JKT48', 'age': 23, 'height': 162, 'weight': 48,
+            'chest': '32B', 'hijab': False,
+            'ig': 'fenijkt48', 'ciri': 'Member JKT48, dancer'
+        },
+        {
+            'name': 'Syifa Hadju', 'age': 24, 'height': 162, 'weight': 48,
+            'chest': '32B', 'hijab': False,
+            'ig': 'syifahadju', 'ciri': 'Aktris muda, wajah manis'
+        },
+        {
+            'name': 'Eunchae (LE SSERAFIM)', 'age': 18, 'height': 166, 'weight': 48,
+            'chest': '34A', 'hijab': False,
+            'ig': 'eunchae.cha', 'ciri': 'Maknae, energik, imut'
+        }
+    ],
+    
+    # ===== TEMAN SMA - Campuran (usia muda) =====
+    'teman_sma': [
+        {
+            'name': 'Angga Yunanda', 'age': 24, 'height': 170, 'weight': 62,
+            'chest': '-', 'hijab': False,
+            'ig': 'anggayunanda', 'ciri': 'Aktor muda populer, wajah fresh'
+        },
+        {
+            'name': 'Leeseo (IVE)', 'age': 18, 'height': 168, 'weight': 47,
+            'chest': '32B', 'hijab': False,
+            'ig': 'leeseo_ive', 'ciri': 'Maknae IVE, imut, energik'
+        },
+        {
+            'name': 'Hanni (NewJeans)', 'age': 19, 'height': 161, 'weight': 46,
+            'chest': '34A', 'hijab': False,
+            'ig': 'hanni.newjeans', 'ciri': 'Vokal utama, cute, Australia'
+        },
+        {
+            'name': 'Minji (NewJeans)', 'age': 20, 'height': 169, 'weight': 50,
+            'chest': '34B', 'hijab': False,
+            'ig': 'minji.newjeans', 'ciri': 'Leader, visual, model'
+        }
+    ],
+    
+    # ===== MANTAN - Campuran =====
+    'mantan': [
+        {
+            'name': 'Natasha Wilona', 'age': 25, 'height': 165, 'weight': 51,
+            'chest': '34B', 'hijab': False,
+            'ig': 'natashawilona12', 'ciri': 'Artis muda sangat populer, wajah manis'
+        },
+        {
+            'name': 'Merve Boluğur', 'age': 28, 'height': 170, 'weight': 55,
+            'chest': '34C', 'hijab': True,
+            'ig': 'mervebolugur', 'ciri': 'Aktris Turki, mulai berhijab sejak 2020'
+        },
+        {
+            'name': 'Gisella Anastasia', 'age': 30, 'height': 167, 'weight': 52,
+            'chest': '34B', 'hijab': False,
+            'ig': 'gisel_la', 'ciri': 'Penyanyi, aktris, presenter'
+        },
+        {
+            'name': 'Neslihan Atagül', 'age': 29, 'height': 168, 'weight': 54,
+            'chest': '34B', 'hijab': True,
+            'ig': 'neslihanatagul', 'ciri': 'Aktris Turki, terkadang tampil berhijab'
+        }
+    ]
+}
+
+
 def get_random_artist(role: str) -> dict:
-    """Dapatkan referensi artis random"""
+    """Dapatkan referensi artis random dengan variasi hijab/non-hijab"""
     try:
         if V2_ENABLED:
+            # Coba ambil dari database utama
             artist = get_random_artist_for_role(role)
             if artist:
                 return {
@@ -122,6 +350,7 @@ def get_random_artist(role: str) -> dict:
                     'height': artist['tinggi'],
                     'weight': artist['berat'],
                     'chest': artist['dada'],
+                    'hijab': artist.get('hijab', False),
                     'ig': artist['instagram'].replace('@', ''),
                     'ciri': artist['ciri'],
                     'similarity': random.randint(75, 90)
@@ -129,48 +358,11 @@ def get_random_artist(role: str) -> dict:
     except Exception as e:
         print(f"Artist error: {e}")
     
-    # Fallback yang lebih bervariasi
-    fallback_artists = {
-        'ipar': {
-            'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
-            'chest': '34B', 'ig': 'pevpearce', 'ciri': 'Aktris dengan wajah natural dan elegan'
-        },
-        'teman_kantor': {
-            'name': 'Prilly Latuconsina', 'age': 25, 'height': 162, 'weight': 50,
-            'chest': '34B', 'ig': 'prillylatuconsina96', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
-        },
-        'janda': {
-            'name': 'Amanda Manopo', 'age': 24, 'height': 165, 'weight': 53,
-            'chest': '34C', 'ig': 'amandamanopo', 'ciri': 'Aktris dengan wajah manis dan pembawaan hangat'
-        },
-        'pelakor': {
-            'name': 'Cinta Laura', 'age': 25, 'height': 172, 'weight': 58,
-            'chest': '36C', 'ig': 'claurakiehl', 'ciri': 'Aktris, pintar, atletis, seksi natural'
-        },
-        'istri_orang': {
-            'name': 'Dian Sastro', 'age': 26, 'height': 165, 'weight': 54,
-            'chest': '34B', 'ig': 'diansastro', 'ciri': 'Aktris dengan wajah anggun dan elegan'
-        },
-        'pdkt': {
-            'name': 'Fuji', 'age': 23, 'height': 160, 'weight': 48,
-            'chest': '34B', 'ig': 'fuji_an', 'ciri': 'Selebgram muda dengan pertumbuhan followers tercepat'
-        },
-        'sepupu': {
-            'name': 'Mikha Tambayong', 'age': 25, 'height': 167, 'weight': 53,
-            'chest': '34B', 'ig': 'mikhata', 'ciri': 'Penyanyi dan aktris, manis, anggun'
-        },
-        'teman_sma': {
-            'name': 'Angga Yunanda', 'age': 24, 'height': 170, 'weight': 62,
-            'chest': '-', 'ig': 'anggayunanda', 'ciri': 'Aktor muda populer, wajah fresh'
-        },
-        'mantan': {
-            'name': 'Natasha Wilona', 'age': 25, 'height': 165, 'weight': 51,
-            'chest': '34B', 'ig': 'natashawilona12', 'ciri': 'Artis muda sangat populer, wajah manis'
-        }
-    }
-    result = fallback_artists.get(role, fallback_artists['ipar']).copy()
-    result['similarity'] = random.randint(75, 90)
-    return result
+    # Fallback ke database lokal yang sudah bervariasi
+    artists_for_role = FALLBACK_ARTISTS.get(role, FALLBACK_ARTISTS['pdkt'])
+    artist = random.choice(artists_for_role).copy()
+    artist['similarity'] = random.randint(75, 90)
+    return artist
 
 
 def get_random_location() -> Tuple[str, str]:
@@ -494,7 +686,7 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         
         print(f"🔵 Processing role: {role_key} for user {user_id}")
         
-        # ===== 1. DAPATKAN NAMA (SUDAH FIX) =====
+        # ===== 1. DAPATKAN NAMA =====
         bot_name, meaning = get_bot_name(role_key, user_id)
         print(f"  • Bot name: {bot_name} ({meaning})")
         
@@ -508,6 +700,9 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         
         # ===== 3. DAPATKAN ARTIS =====
         artist = get_random_artist(role_key)
+        
+        # ===== TENTUKAN STATUS HIJAB =====
+        hijab_status = "berhijab" if artist.get('hijab', False) else "tidak berhijab"
         
         # ===== 4. DAPATKAN LOKASI =====
         location_text, activity = get_random_location()
@@ -541,6 +736,7 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
             f"**Tentang aku:**",
             f"• Umur: {role_age} tahun",
             f"• Tinggi: {role_height} cm | Berat: {role_weight} kg | Dada: {role_chest}",
+            f"• {hijab_status.capitalize()}",
             f"• {role_desc}\n",
             f"**Mirip artis:**",
             f"• **{artist['name']}** ({artist['similarity']}% mirip) - {artist['age']}th, {artist['height']}cm, {artist['weight']}kg, {artist['chest']}",
