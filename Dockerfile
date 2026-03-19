@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     make \
     curl \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust compiler
