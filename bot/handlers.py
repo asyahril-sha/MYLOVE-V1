@@ -525,7 +525,103 @@ async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
+# =============================================================================
+# 6. SESSION COMMANDS (LANJUTAN)
+# =============================================================================
 
+async def continue_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk melanjutkan session yang tersimpan"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah ada session_id di args
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "❌ **Gunakan:** `/continue [session_id]`\n\n"
+            "Contoh: `/continue abc123`\n\n"
+            "Ketik `/sessions` untuk melihat daftar session."
+        )
+        return
+    
+    session_id = args[0]
+    
+    try:
+        # Coba load session dari database
+        import sqlite3
+        from pathlib import Path
+        from datetime import datetime
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Cek apakah session ada
+        cursor.execute("""
+            SELECT session_id, user_id, role, bot_name, intimacy_level, 
+                   relationship_status, created_at, last_active
+            FROM sessions 
+            WHERE session_id = ? AND user_id = ?
+        """, (session_id, user_id))
+        
+        session = cursor.fetchone()
+        conn.close()
+        
+        if not session:
+            await update.message.reply_text(
+                f"❌ Session dengan ID `{session_id}` tidak ditemukan atau bukan milik Anda."
+            )
+            return
+        
+        # Extract data
+        session_id, db_user_id, role, bot_name, intimacy, rel_status, created_at, last_active = session
+        
+        # Set context user data
+        context.user_data['current_session'] = session_id
+        context.user_data['current_role'] = role
+        context.user_data['bot_name'] = bot_name
+        context.user_data['intimacy_level'] = intimacy
+        context.user_data['relationship_status'] = rel_status
+        context.user_data['paused'] = False
+        
+        # Update last active
+        context.user_data['last_active'] = time.time()
+        
+        # Update di database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE sessions 
+            SET last_active = datetime('now'), status = 'active'
+            WHERE session_id = ?
+        """, (session_id,))
+        conn.commit()
+        conn.close()
+        
+        # Format tanggal
+        from datetime import datetime
+        try:
+            created_date = datetime.fromisoformat(created_at).strftime('%d/%m/%Y %H:%M')
+        except:
+            created_date = created_at[:16] if created_at else "Unknown"
+        
+        await update.message.reply_text(
+            f"✅ **Session dilanjutkan!**\n\n"
+            f"👤 **Bot:** {bot_name}\n"
+            f"🎭 **Role:** {role}\n"
+            f"📈 **Level:** {intimacy}/12\n"
+            f"📅 **Dimulai:** {created_date}\n\n"
+            f"Silakan lanjutkan percakapan."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error continue session: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+        
 async def continue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat dan lanjutkan session tersimpan"""
     user_id = update.effective_user.id
@@ -1560,6 +1656,7 @@ __all__ = [
     'close_command',
     'end_command',
     'continue_command',
+    'continue_handler', 
     'sessions_command',
     
     # Relationship commands
