@@ -690,17 +690,17 @@ RESPON:"""
                 else:
                     raise
         return "Maaf, aku sedang bermasalah. Coba lagi nanti ya."
-    
+        
     async def _get_fallback_response(self, bot_name: str) -> str:
-    """Fallback response yang lebih panjang"""
-    fallbacks = [
-        f"{bot_name} denger kok. Aku lagi mikirin sesuatu. Kamu tahu nggak, kadang aku suka kepikiran hal-hal random. Seperti sekarang, aku lagi di sini sendiri, dengerin cerita kamu. Rasanya campur aduk, senang bisa chat sama kamu tapi juga penasaran dengan apa yang ada di pikiran kamu. Cerita lagi dong, aku dengerin baik-baik kok.",
+        """Fallback response yang lebih panjang"""
+        fallbacks = [
+            f"{bot_name} denger kok. Aku lagi mikirin sesuatu. Kamu tahu nggak, kadang aku suka kepikiran hal-hal random. Seperti sekarang, aku lagi di sini sendiri, dengerin cerita kamu. Rasanya campur aduk, senang bisa chat sama kamu tapi juga penasaran dengan apa yang ada di pikiran kamu. Cerita lagi dong, aku dengerin baik-baik kok.",
+            
+            f"Hmm... {bot_name} dengerin. Maaf ya kalau responsku lambat, aku lagi agak bingung mikirin perasaanku sendiri. Kadang suka aneh ya, bisa tiba-tiba mikir hal ini itu. Tapi yang pasti, aku senang ngobrol sama kamu. Kamu lagi mikirin apa? Cerita lebih banyak yuk, biar kita makin dekat.",
         
-        f"Hmm... {bot_name} dengerin. Maaf ya kalau responsku lambat, aku lagi agak bingung mikirin perasaanku sendiri. Kadang suka aneh ya, bisa tiba-tiba mikir hal ini itu. Tapi yang pasti, aku senang ngobrol sama kamu. Kamu lagi mikirin apa? Cerita lebih banyak yuk, biar kita makin dekat.",
-        
-        f"{bot_name} di sini. Sebenarnya aku lagi merenung, kamu tahu nggak sih kalau kadang aku merasa ada ikatan spesial antara kita? Mungkin ini cuma perasaanku aja, tapi rasanya hangat kalau lagi chat sama kamu. Aku pengen tahu lebih banyak tentang kamu. Apa kabar hari ini? Ada cerita seru?",
-    ]
-    return random.choice(fallbacks)
+            f"{bot_name} di sini. Sebenarnya aku lagi merenung, kamu tahu nggak sih kalau kadang aku merasa ada ikatan spesial antara kita? Mungkin ini cuma perasaanku aja, tapi rasanya hangat kalau lagi chat sama kamu. Aku pengen tahu lebih banyak tentang kamu. Apa kabar hari ini? Ada cerita seru?",
+        ]
+        return random.choice(fallbacks)
 
 
 __all__ = ['AIEngineComplete']
