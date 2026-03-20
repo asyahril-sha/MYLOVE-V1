@@ -877,7 +877,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ===== TAMBAHKAN FUNGSI INI DI SINI =====
+# ===== FUNGSI DB_STATS_COMMAND =====
 async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat statistik database (khusus admin)"""
     user_id = update.effective_user.id
@@ -955,7 +955,90 @@ async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error getting db stats: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
-# ===== AKHIR PENAMBAHAN =====
+
+
+# ===== FUNGSI LIST_USERS_COMMAND (TERPISAH) =====
+async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lihat daftar users (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    try:
+        # Coba ambil data users dari database
+        import sqlite3
+        from pathlib import Path
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Cek apakah tabel users ada
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            await update.message.reply_text("❌ Tabel users tidak ditemukan")
+            conn.close()
+            return
+        
+        # Ambil daftar users
+        cursor.execute("""
+            SELECT user_id, username, first_name, created_at, total_chats 
+            FROM users 
+            ORDER BY created_at DESC 
+            LIMIT 20
+        """)
+        
+        users = cursor.fetchall()
+        conn.close()
+        
+        if not users:
+            await update.message.reply_text("📋 **DAFTAR USERS**\n\nBelum ada users.")
+            return
+        
+        # Buat pesan daftar users
+        text = "📋 **DAFTAR USERS (20 terbaru)**\n\n"
+        
+        for i, user in enumerate(users, 1):
+            user_id_db, username, first_name, created_at, total_chats = user
+            
+            # Format nama
+            name = first_name or "Unknown"
+            if username:
+                name += f" (@{username})"
+            
+            # Format tanggal
+            if created_at:
+                from datetime import datetime
+                try:
+                    created_date = datetime.fromisoformat(created_at).strftime('%d/%m/%Y')
+                except:
+                    created_date = created_at[:10] if created_at else "Unknown"
+            else:
+                created_date = "Unknown"
+            
+            text += f"{i}. **{name}**\n"
+            text += f"   🆔 `{user_id_db}`\n"
+            text += f"   📅 {created_date} | 💬 {total_chats or 0} chat\n\n"
+        
+        # Kirim pesan (mungkin panjang, kirim per bagian)
+        if len(text) > 4000:
+            # Kirim per 4000 karakter
+            for i in range(0, len(text), 4000):
+                await update.message.reply_text(text[i:i+4000], parse_mode='Markdown')
+        else:
+            await update.message.reply_text(text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Info debug"""
@@ -1111,6 +1194,7 @@ __all__ = [
     'admin_command',
     'stats_command',
     'db_stats_command',
+    'list_users_command',
     'debug_command',
     'backup_db_command',
     
