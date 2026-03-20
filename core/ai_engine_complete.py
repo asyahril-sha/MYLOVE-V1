@@ -868,6 +868,14 @@ RESPON:"""
         self.scene_duration = 0
         logger.info(f"🗑️ Conversation reset for user {self.user_id}")
         return True
+        
+    # <=== TAMBAHKAN INI ===>
+    async def end_session(self):
+        """Akhiri session dan bersihkan memory"""
+        logger.info(f"🔚 Ending session for user {self.user_id}")
+        await self.reset_conversation()
+        logger.info(f"✅ Session ended for user {self.user_id}")
+        return True
     
     def _update_scene(self, user_message: str, context: Dict):
         """Update scene berdasarkan konteks percakapan"""
