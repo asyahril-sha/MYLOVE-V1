@@ -141,9 +141,7 @@ class LocationSystem:
         return self.get_current()
     
     def random_change(self, chance: float = 0.3) -> Optional[Dict]:
-        """Random ganti lokasi"""
-        if random.random() < chance:
-            return self.change_location()
+        """Random ganti lokasi - DINONAKTIFKAN"""
         return None
     
     def detect_from_message(self, message: str) -> Optional[Dict]:
