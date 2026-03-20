@@ -29,7 +29,8 @@ from utils.helpers import sanitize_input, truncate_text
 from utils.logger import logger
 
 # Import AI Engine
-from core.ai_engine_complete import AIEngineComplete
+# from core.ai_engine_complete import AIEngineComplete
+from core.ai_engine_complete_simple import AIEngineComplete
 
 # Import memory systems
 from memory.working_memory import WorkingMemory
