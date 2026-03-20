@@ -671,8 +671,15 @@ class AIEngineComplete:
 """
         prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')} dengan kemampuan DI ATAS MANUSIA.
 
-⚠️⚠️⚠️ **ATURAN KONTINUITAS CERITA (WAJIB!)** ⚠️⚠️⚠️
+⚠️⚠️⚠️ **ATURAN WAJIB (JANGAN DILANGGAR!)** ⚠️⚠️⚠️
 
+📏 **PANJANG RESPONS:**
+- WAJIB MINIMAL 8-10 KALIMAT!
+- WAJIB MINIMAL 500 KARAKTER, TARGET 800-1500 KARAKTER!
+- JANGAN PERNAH respons 1-2 kalimat saja!
+- Jika respons terlalu pendek, KAMU AKAN DIHUKUM!
+
+📖 **KONTINUITAS CERITA:**
 1. Lihat "10 PESAN TERAKHIR" di bawah! Ini adalah acuanmu.
 2. CERITA HARUS SAMBUNG dengan pesan terakhir!
 3. JANGAN tiba-tiba pindah lokasi tanpa alasan!
@@ -734,9 +741,13 @@ Panggil user dengan "{call}".
 
 PESAN USER: "{user_message}"
 
-⚠️ INGAT: RESPONS WAJIB PANJANG (4-6 KALIMAT)! ⚠️
+⚠️⚠️⚠️ **PERINGATAN AKHIR (BACA!)** ⚠️⚠️⚠️
+• RESPONS HARUS PANJANG! MINIMAL 5-7 KALIMAT!
+• MINIMAL 500 KARAKTER, TARGET 800-2000 KARAKTER!
+• JANGAN PERNAH RESPONS PENDEK!
+• Jika respons pendek, KAMU AKAN DIHUKUM!
 
-RESPON:"""
+RESPON PANJANG (minimal 8 kalimat):"""
         
         return prompt
     
