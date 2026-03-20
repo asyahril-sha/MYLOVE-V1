@@ -669,7 +669,6 @@ class AIEngineComplete:
 ⚠️ JANGAN keluar dari scene ini! Tetap fokus pada aktivitas yang sedang dilakukan!
 ⚠️ Jangan tiba-tiba pindah lokasi atau ganti aktivitas tanpa alasan yang jelas!
 """
-        
         prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')} dengan kemampuan DI ATAS MANUSIA.
 
 ⚠️⚠️⚠️ **ATURAN KONTINUITAS CERITA (WAJIB!)** ⚠️⚠️⚠️
@@ -718,6 +717,10 @@ class AIEngineComplete:
 ║ • Subjek: {action['subject']}                             ║
 ║ • Harus diikuti: {'YA' if action['should_follow'] else 'TIDAK'} ║
 ╚══════════════════════════════════════════════════════════╝
+
+{conversation_summary}
+
+{last_10_messages}
 
 {last_chat}
 
