@@ -135,10 +135,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Failed to create AI engine: {e}")
                 # Fallback response
                 responses = [
-                    f"{bot_name} denger kok. Cerita lagi dong...",
-                    f"Hmm... {bot_name} dengerin. Lanjutkan.",
-                    f"{bot_name} di sini. Ada yang mau dibahas?"
-                ]
+                    f"{bot_name} tersenyum sambil memandangmu. 'Maaf ya responsnya agak lambat. Aku lagi mikirin sesuatu. Tapi aku selalu seneng kalau kamu chat. Rasanya hangat gitu. Cerita lagi dong, aku dengerin baik-baik kok...'",
+    
+                    f"{bot_name} menghela napas sambil memainkan ujung bajunya. 'Hehe, maaf ya tadi agak lemot. Kadang aku suka overthinking kalau chat sama kamu. Tapi serius, aku suka banget ngobrol sama kamu. Kamu lagi mikirin apa hari ini?'",
+    
+                    f"{bot_name} mendekat sambil tersenyum manis. 'Halo... maaf ya responsnya pendek tadi. Sekarang aku udah siap kok. Aku kangen denger cerita kamu. Ada yang mau diceritain? Aku di sini, dengerin.'"
+                    ]
                 await update.message.reply_text(random.choice(responses))
                 return
         
