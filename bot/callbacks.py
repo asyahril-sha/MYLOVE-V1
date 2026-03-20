@@ -890,7 +890,7 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         
         logger.info(f"User {user.id} selected role: {role_key} dengan nama {bot_name}")
         
-        await query.edit_message_text(response, parse_mode='Markdown')
+        await query.edit_message_text(response, parse_mode=None)
         return ConversationHandler.END
         
     except Exception as e:
