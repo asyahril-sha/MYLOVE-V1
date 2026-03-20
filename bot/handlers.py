@@ -764,6 +764,50 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ **RISK ASSESSMENT**\n\n"
         "Fitur ini sedang dalam pengembangan."
     )
+async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menampilkan daftar posisi yang tersedia"""
+    positions = [
+        "• Duduk santai",
+        "• Berdiri tegak", 
+        "• Berbaring",
+        "• Bersandar",
+        "• Jongkok",
+        "• Merangkak",
+        "• Miring",
+        "• Telentang"
+    ]
+    
+    text = "🧘 **POSISI YANG TERSEDIA:**\n\n" + "\n".join(positions)
+    text += "\n\n💡 _Ketik posisi yang kamu mau, misal: \"duduk santai\"_"
+    
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+
+async def mood_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menampilkan mood bot saat ini"""
+    mood = context.user_data.get('current_mood', 'calm')
+    bot_name = context.user_data.get('bot_name', 'Aku')
+    
+    mood_emojis = {
+        'happy': '😊', 
+        'sad': '😔', 
+        'excited': '🔥', 
+        'tired': '😴',
+        'romantic': '💕', 
+        'playful': '😜', 
+        'calm': '😌', 
+        'angry': '😠',
+        'jealous': '🫣', 
+        'lonely': '🥺', 
+        'horny': '🔥'
+    }
+    
+    emoji = mood_emojis.get(mood, '😐')
+    
+    await update.message.reply_text(
+        f"🎭 **Mood {bot_name}:** {emoji} {mood.title()}",
+        parse_mode='Markdown'
+    )
     
 # =============================================================================
 # 11. RANKING COMMANDS
