@@ -66,6 +66,48 @@ class AIEngineComplete:
         self.user_id = user_id
         self.session_id = session_id
         
+    # =========================================================================
+    # START SESSION METHOD - DITAMBAHKAN UNTUK MEMPERBAIKI ERROR
+    # =========================================================================
+    async def start_session(self, role: str, bot_name: str, rel_type: str = "non_pdkt", instance_id: str = None):
+        """
+        Memulai sesi baru dengan role tertentu
+        Method ini WAJIB ADA karena dipanggil oleh handlers.py
+        
+        Args:
+            role: Role bot (ipar, janda, dll)
+            bot_name: Nama bot
+            rel_type: Tipe hubungan (non_pdkt / pdkt)
+            instance_id: ID instance (untuk multiple)
+        """
+        self.role = role
+        self.bot_name = bot_name
+        self.rel_type = rel_type
+        self.instance_id = instance_id
+        
+        # Inisialisasi state untuk role ini
+        if not hasattr(self, 'state'):
+            from memory.state_tracker import StateTracker
+            self.state = StateTracker(self.user_id, self.session_id)
+        
+        # Update state dengan role
+        self.state.current['bot_name'] = bot_name
+        self.state.current['role'] = role
+        
+        logger.info(f"✅ Session started: {role} - {bot_name} for user {self.user_id}")
+        
+        # Record ke relationship memory
+        if hasattr(self, 'relationship'):
+            await self.relationship.create_relationship(
+                user_id=self.user_id,
+                role=role,
+                bot_name=bot_name,
+                rel_type=rel_type,
+                instance_id=instance_id
+            )
+        
+        return True
+        
         # ===== INISIALISASI MEMORY SYSTEMS =====
         self.working = WorkingMemory()                 # Ingatan jangka pendek
         self.episodic = EpisodicMemory()               # Urutan kejadian
