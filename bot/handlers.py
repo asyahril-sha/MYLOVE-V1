@@ -877,6 +877,86 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ===== TAMBAHKAN FUNGSI INI DI SINI =====
+async def db_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lihat statistik database (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command ini hanya untuk admin")
+        return
+    
+    # Coba ambil statistik database
+    try:
+        # Cek apakah database ada
+        import os
+        import sqlite3
+        from pathlib import Path
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        # Dapatkan ukuran database
+        size_bytes = os.path.getsize(db_path)
+        size_mb = size_bytes / (1024 * 1024)
+        
+        # Waktu modifikasi terakhir
+        mod_time = os.path.getmtime(db_path)
+        from datetime import datetime
+        last_updated = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Hitung jumlah record
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Cek tabel yang ada
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        # Inisialisasi statistik
+        total_users = 0
+        total_sessions = 0
+        total_messages = 0
+        
+        # Hitung users
+        if 'users' in tables:
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+        
+        # Hitung sessions
+        if 'sessions' in tables:
+            cursor.execute("SELECT COUNT(*) FROM sessions")
+            total_sessions = cursor.fetchone()[0]
+        
+        # Hitung messages
+        if 'messages' in tables:
+            cursor.execute("SELECT COUNT(*) FROM messages")
+            total_messages = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        # Buat pesan statistik
+        stats_text = (
+            "🗄️ **STATISTIK DATABASE**\n\n"
+            f"📊 **Total Users:** {total_users}\n"
+            f"💬 **Total Sessions:** {total_sessions}\n"
+            f"📝 **Total Messages:** {total_messages}\n"
+            f"📁 **Ukuran Database:** {size_mb:.2f} MB\n"
+            f"⏱️ **Terakhir Update:** {last_updated}\n"
+            f"📌 **Lokasi:** {db_path}"
+        )
+        
+        await update.message.reply_text(stats_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error getting db stats: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+# ===== AKHIR PENAMBAHAN =====
+
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Info debug"""
     user_id = update.effective_user.id
@@ -895,7 +975,6 @@ async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     await update.message.reply_text(debug_info)
-
 
 # =============================================================================
 # 13. DUMMY COMMANDS (UNTUK BACKWARD COMPATIBILITY)
@@ -1031,6 +1110,7 @@ __all__ = [
     # Admin commands
     'admin_command',
     'stats_command',
+    'db_stats_command',
     'debug_command',
     'backup_db_command',
     
