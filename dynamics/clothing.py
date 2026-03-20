@@ -189,17 +189,7 @@ class ClothingSystem:
         return self.get_current()
     
     def random_change(self, chance: float = 0.1) -> Optional[Dict]:
-        """
-        Random ganti pakaian dengan probabilitas tertentu
-        
-        Args:
-            chance: Probabilitas ganti pakaian (0-1)
-        
-        Returns:
-            Pakaian baru jika berubah, None jika tidak
-        """
-        if random.random() < chance:
-            return self.change_clothing()
+        """Random ganti pakaian - DINONAKTIFKAN"""
         return None
     
     def get_all_clothes(self) -> List[str]:
