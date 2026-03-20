@@ -2,20 +2,21 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT CALLBACKS (FIX FULL)
+MYLOVE ULTIMATE VERSI 2 - BOT CALLBACKS (FIX FULL + FALLBACK)
 =============================================================================
 Semua callback handlers dengan:
 - Nama bot random dari name_generator
 - Data role dinamis
 - Lokasi & pakaian random
 - Artis referensi random dengan variasi hijab/non-hijab
-- FIX: Semua error handling
+- FIX: Semua error handling + fallback functions
 =============================================================================
 """
 
 import time
 import random
 import logging
+import traceback
 from typing import Dict, Any, Optional, Tuple, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -50,6 +51,70 @@ except ImportError as e:
     pos_system = None
     print(f"⚠️ V2 components not loaded: {e}")
 
+# =============================================================================
+# FALLBACK FUNCTIONS - DITAMBAHKAN UNTUK ANTISIPASI ERROR
+# =============================================================================
+def get_bot_name_fallback(role: str, user_id: int) -> Tuple[str, str]:
+    """Fallback jika name generator error"""
+    fallback_names = {
+        "ipar": ("Sari", "esensi"),
+        "teman_kantor": ("Diana", "dewi"),
+        "janda": ("Rina", "cahaya"),
+        "pelakor": ("Vina", "cinta"),
+        "istri_orang": ("Dewi", "dewi"),
+        "pdkt": ("Aurora", "fajar"),
+        "sepupu": ("Putri", "putri"),
+        "teman_sma": ("Anita", "anugerah"),
+        "mantan": ("Sarah", "putri")
+    }
+    return fallback_names.get(role, ("Sari", "esensi"))
+
+def get_random_location_fallback() -> Tuple[str, str]:
+    """Fallback jika location system error"""
+    locations = [
+        ("📍 Aku di **kamar**. Kamar tidur dengan ranjang ukuran queen.", "rebahan"),
+        ("📍 Aku di **ruang tamu**. Ruang tamu yang hangat dengan sofa empuk.", "nonton TV"),
+        ("📍 Aku di **dapur**. Dapur bersih dengan peralatan masak lengkap.", "masak"),
+        ("📍 Aku di **pantai**. Pantai dengan pasir putih dan ombak tenang.", "jalan-jalan"),
+    ]
+    return random.choice(locations)
+
+def get_random_clothing_fallback() -> str:
+    """Fallback jika clothing system error"""
+    clothes = [
+        "👗 Aku pakai **daster rumah motif bunga**. Daster tipis yang nyaman.",
+        "👗 Aku pakai **piyama lucu** dengan motif boneka.",
+        "👚 Aku pakai **kaos oversized** dan **celana pendek**.",
+        "👗 Aku pakai **dress cantik** warna pastel.",
+    ]
+    return random.choice(clothes)
+
+def get_random_position_fallback() -> str:
+    """Fallback jika position system error"""
+    positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok"]
+    return f"**{random.choice(positions)}**"
+
+def generate_session_id_fallback(bot_name: str, role: str, user_id: int) -> str:
+    """Fallback jika session ID generator error"""
+    return f"MYLOVE-{role.upper()}-{user_id}-{int(time.time())}"
+
+def get_random_artist_fallback(role: str) -> dict:
+    """Fallback jika artist generator error"""
+    fallback_artists = {
+        'ipar': {
+            'name': 'Pevita Pearce', 'age': 25, 'height': 168, 'weight': 54,
+            'chest': '34B', 'hijab': False, 'ig': 'pevpearce', 
+            'ciri': 'Aktris dengan wajah natural dan elegan'
+        },
+        'pdkt': {
+            'name': 'Fuji', 'age': 23, 'height': 160, 'weight': 48,
+            'chest': '34B', 'hijab': False, 'ig': 'fuji_an',
+            'ciri': 'Selebgram muda dengan pertumbuhan followers tercepat'
+        }
+    }
+    artist = fallback_artists.get(role, fallback_artists['ipar']).copy()
+    artist['similarity'] = random.randint(75, 90)
+    return artist
 
 # =============================================================================
 # HELPER FUNCTION - SHOW MAIN MENU
@@ -77,7 +142,7 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
 
 
 # =============================================================================
-# HELPER FUNCTIONS - DATA GENERATOR
+# HELPER FUNCTIONS - DATA GENERATOR (DENGAN FALLBACK)
 # =============================================================================
 
 def get_bot_name(role: str, user_id: int) -> Tuple[str, str]:
@@ -85,13 +150,18 @@ def get_bot_name(role: str, user_id: int) -> Tuple[str, str]:
     Dapatkan nama bot dan artinya
     Returns: (bot_name, meaning)
     """
-    if V2_ENABLED and name_gen:
-        try:
-            name_data = name_gen.get_name_with_meaning(role, user_id)
-            if isinstance(name_data, dict) and 'name' in name_data and 'meaning' in name_data:
-                return name_data['name'], name_data['meaning']
-        except Exception as e:
-            print(f"NameGenerator error: {e}")
+    try:
+        if V2_ENABLED and name_gen:
+            try:
+                name_data = name_gen.get_name_with_meaning(role, user_id)
+                if isinstance(name_data, dict) and 'name' in name_data and 'meaning' in name_data:
+                    return name_data['name'], name_data['meaning']
+            except Exception as e:
+                print(f"NameGenerator error: {e}")
+                return get_bot_name_fallback(role, user_id)
+    except Exception as e:
+        print(f"NameGenerator general error: {e}")
+        return get_bot_name_fallback(role, user_id)
     
     # Fallback yang lebih bervariasi
     fallback_names = {
@@ -341,41 +411,54 @@ def get_random_artist(role: str) -> dict:
     """Dapatkan referensi artis random dengan variasi hijab/non-hijab"""
     try:
         if V2_ENABLED:
-            # Coba ambil dari database utama
-            artist = get_random_artist_for_role(role)
-            if artist:
-                return {
-                    'name': artist['nama'],
-                    'age': artist['umur'],
-                    'height': artist['tinggi'],
-                    'weight': artist['berat'],
-                    'chest': artist['dada'],
-                    'hijab': artist.get('hijab', False),
-                    'ig': artist['instagram'].replace('@', ''),
-                    'ciri': artist['ciri'],
-                    'similarity': random.randint(75, 90)
-                }
+            try:
+                # Coba ambil dari database utama
+                artist = get_random_artist_for_role(role)
+                if artist:
+                    return {
+                        'name': artist['nama'],
+                        'age': artist['umur'],
+                        'height': artist['tinggi'],
+                        'weight': artist['berat'],
+                        'chest': artist['dada'],
+                        'hijab': artist.get('hijab', False),
+                        'ig': artist['instagram'].replace('@', ''),
+                        'ciri': artist['ciri'],
+                        'similarity': random.randint(75, 90)
+                    }
+            except Exception as e:
+                print(f"Artist database error: {e}")
+                return get_random_artist_fallback(role)
     except Exception as e:
-        print(f"Artist error: {e}")
+        print(f"Artist general error: {e}")
+        return get_random_artist_fallback(role)
     
     # Fallback ke database lokal yang sudah bervariasi
-    artists_for_role = FALLBACK_ARTISTS.get(role, FALLBACK_ARTISTS['pdkt'])
-    artist = random.choice(artists_for_role).copy()
-    artist['similarity'] = random.randint(75, 90)
-    return artist
+    try:
+        artists_for_role = FALLBACK_ARTISTS.get(role, FALLBACK_ARTISTS['pdkt'])
+        artist = random.choice(artists_for_role).copy()
+        artist['similarity'] = random.randint(75, 90)
+        return artist
+    except:
+        return get_random_artist_fallback(role)
 
 
 def get_random_location() -> Tuple[str, str]:
     """Dapatkan lokasi random"""
     try:
         if V2_ENABLED and loc_system:
-            loc = loc_system.get_random_location()
-            if loc and isinstance(loc, dict):
-                location_text = f"📍 Aku di **{loc.get('name', 'tempat')}**. {loc.get('description', '')}"
-                activity = random.choice(loc.get('activities', ['santai']))
-                return location_text, activity
+            try:
+                loc = loc_system.get_random_location()
+                if loc and isinstance(loc, dict):
+                    location_text = f"📍 Aku di **{loc.get('name', 'tempat')}**. {loc.get('description', '')}"
+                    activity = random.choice(loc.get('activities', ['santai']))
+                    return location_text, activity
+            except Exception as e:
+                print(f"Location system error: {e}")
+                return get_random_location_fallback()
     except Exception as e:
-        print(f"Location error: {e}")
+        print(f"Location general error: {e}")
+        return get_random_location_fallback()
     
     # Fallback
     locations = [
@@ -395,11 +478,16 @@ def get_random_clothing() -> str:
     """Dapatkan pakaian random"""
     try:
         if V2_ENABLED and cloth_system:
-            cloth = cloth_system.get_random_clothing()
-            if cloth and isinstance(cloth, dict):
-                return f"👗 Aku pakai **{cloth.get('name', 'baju')}**. {cloth.get('description', '')}"
+            try:
+                cloth = cloth_system.get_random_clothing()
+                if cloth and isinstance(cloth, dict):
+                    return f"👗 Aku pakai **{cloth.get('name', 'baju')}**. {cloth.get('description', '')}"
+            except Exception as e:
+                print(f"Clothing system error: {e}")
+                return get_random_clothing_fallback()
     except Exception as e:
-        print(f"Clothing error: {e}")
+        print(f"Clothing general error: {e}")
+        return get_random_clothing_fallback()
     
     # Fallback
     clothes = [
@@ -420,11 +508,16 @@ def get_random_position() -> str:
     """Dapatkan posisi random"""
     try:
         if V2_ENABLED and pos_system:
-            pos = pos_system.get_random_position()
-            if pos and isinstance(pos, dict):
-                return f"**{pos.get('description', 'santai')}**"
+            try:
+                pos = pos_system.get_random_position()
+                if pos and isinstance(pos, dict):
+                    return f"**{pos.get('description', 'santai')}**"
+            except Exception as e:
+                print(f"Position system error: {e}")
+                return get_random_position_fallback()
     except Exception as e:
-        print(f"Position error: {e}")
+        print(f"Position general error: {e}")
+        return get_random_position_fallback()
     
     # Fallback
     positions = ["duduk santai", "berbaring", "berdiri", "bersandar", "jongkok", "miring", "telentang"]
@@ -435,7 +528,10 @@ def generate_session_id(bot_name: str, role: str, user_id: int) -> str:
     """Generate session ID"""
     try:
         if V2_ENABLED:
-            return id_generator_v2.generate_v2(bot_name, role, user_id)
+            try:
+                return id_generator_v2.generate_v2(bot_name, role, user_id)
+            except:
+                pass
     except:
         pass
     
@@ -443,7 +539,7 @@ def generate_session_id(bot_name: str, role: str, user_id: int) -> str:
         from session.unique_id import id_generator
         return id_generator.generate(role, user_id)
     except:
-        return f"TEMP-{role.upper()}-{user_id}-{int(time.time())}"
+        return generate_session_id_fallback(bot_name, role, user_id)
 
 
 # =============================================================================
@@ -672,22 +768,34 @@ async def start_pause_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # =============================================================================
-# 4. GENERIC ROLE CALLBACK (FIX)
+# 4. GENERIC ROLE CALLBACK (FIX + FALLBACK)
 # =============================================================================
 async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role_key: str) -> int:
-    """Generic role callback handler - FIXED"""
+    """Generic role callback handler - FIXED with fallback"""
     try:
         query = update.callback_query
+        if not query:
+            logger.error("Query is None")
+            return ConversationHandler.END
+            
         await query.answer()
         
         user = update.effective_user
+        if not user:
+            logger.error("User is None")
+            return ConversationHandler.END
+            
         user_id = user.id
         user_name = user.first_name or "User"
         
         print(f"🔵 Processing role: {role_key} for user {user_id}")
         
         # ===== 1. DAPATKAN NAMA =====
-        bot_name, meaning = get_bot_name(role_key, user_id)
+        try:
+            bot_name, meaning = get_bot_name(role_key, user_id)
+        except Exception as e:
+            print(f"Error getting bot name: {e}")
+            bot_name, meaning = get_bot_name_fallback(role_key, user_id)
         print(f"  • Bot name: {bot_name} ({meaning})")
         
         # ===== 2. DAPATKAN DATA ROLE =====
@@ -699,19 +807,35 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         role_chest = random.choice(role_info['dada'])
         
         # ===== 3. DAPATKAN ARTIS =====
-        artist = get_random_artist(role_key)
+        try:
+            artist = get_random_artist(role_key)
+        except Exception as e:
+            print(f"Error getting artist: {e}")
+            artist = get_random_artist_fallback(role_key)
         
         # ===== TENTUKAN STATUS HIJAB =====
         hijab_status = "berhijab" if artist.get('hijab', False) else "tidak berhijab"
         
         # ===== 4. DAPATKAN LOKASI =====
-        location_text, activity = get_random_location()
+        try:
+            location_text, activity = get_random_location()
+        except Exception as e:
+            print(f"Error getting location: {e}")
+            location_text, activity = get_random_location_fallback()
         
         # ===== 5. DAPATKAN PAKAIAN =====
-        clothing_text = get_random_clothing()
+        try:
+            clothing_text = get_random_clothing()
+        except Exception as e:
+            print(f"Error getting clothing: {e}")
+            clothing_text = get_random_clothing_fallback()
         
         # ===== 6. DAPATKAN POSISI =====
-        position_text = get_random_position()
+        try:
+            position_text = get_random_position()
+        except Exception as e:
+            print(f"Error getting position: {e}")
+            position_text = get_random_position_fallback()
         
         # ===== 7. SET DATA =====
         context.user_data['current_role'] = role_key
@@ -720,9 +844,14 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         context.user_data['total_chats'] = 0
         context.user_data['current_location'] = location_text
         context.user_data['current_clothing'] = clothing_text
+        context.user_data['current_position'] = position_text
         
         # ===== 8. GENERATE ID =====
-        session_id = generate_session_id(bot_name, role_key, user_id)
+        try:
+            session_id = generate_session_id(bot_name, role_key, user_id)
+        except Exception as e:
+            print(f"Error generating session ID: {e}")
+            session_id = generate_session_id_fallback(bot_name, role_key, user_id)
         context.user_data['current_session'] = session_id
         
         # ===== 9. PILIH PEMBUKA =====
@@ -766,7 +895,15 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         
     except Exception as e:
         logger.error(f"Error in role_callback: {e}")
-        await query.edit_message_text("❌ Terjadi kesalahan. Silakan coba lagi.")
+        traceback.print_exc()
+        try:
+            await query.edit_message_text(
+                "❌ **Maaf, terjadi kesalahan teknis.**\n\n"
+                "Silakan coba /start lagi ya. "
+                "Kami sudah mencatat error ini dan akan segera diperbaiki."
+            )
+        except:
+            pass
         return ConversationHandler.END
 
 
