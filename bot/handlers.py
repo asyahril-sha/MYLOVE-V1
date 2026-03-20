@@ -1039,6 +1039,137 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"Error listing users: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
+        
+# ===== FUNGSI GET_USER_COMMAND =====
+async def get_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lihat detail user tertentu (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    # Cek apakah ada argumen (user_id yang dicari)
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "❌ **Gunakan:** `/get_user [user_id]`\n\n"
+            "Contoh: `/get_user 123456789`"
+        )
+        return
+    
+    target_user_id = args[0]
+    
+    try:
+        # Coba ambil data user dari database
+        import sqlite3
+        from pathlib import Path
+        from datetime import datetime
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Cek apakah tabel users ada
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            await update.message.reply_text("❌ Tabel users tidak ditemukan")
+            conn.close()
+            return
+        
+        # Ambil data user
+        cursor.execute("""
+            SELECT user_id, username, first_name, last_name, created_at, 
+                   total_chats, total_sessions, last_active
+            FROM users 
+            WHERE user_id = ?
+        """, (target_user_id,))
+        
+        user = cursor.fetchone()
+        
+        if not user:
+            await update.message.reply_text(f"❌ User dengan ID `{target_user_id}` tidak ditemukan")
+            conn.close()
+            return
+        
+        # Ambil sessions user
+        cursor.execute("""
+            SELECT session_id, role, bot_name, created_at, status, intimacy_level
+            FROM sessions 
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 5
+        """, (target_user_id,))
+        
+        sessions = cursor.fetchall()
+        conn.close()
+        
+        # Format data user
+        user_id_db, username, first_name, last_name, created_at, total_chats, total_sessions, last_active = user
+        
+        full_name = first_name or ""
+        if last_name:
+            full_name += f" {last_name}"
+        if not full_name:
+            full_name = "Unknown"
+        
+        # Format tanggal
+        def format_date(date_str):
+            if date_str:
+                try:
+                    return datetime.fromisoformat(date_str).strftime('%d/%m/%Y %H:%M')
+                except:
+                    return date_str[:16]
+            return "Unknown"
+        
+        created_date = format_date(created_at)
+        last_active_date = format_date(last_active) if last_active else "Never"
+        
+        # Buat pesan detail user
+        text = (
+            f"👤 **DETAIL USER**\n\n"
+            f"🆔 **User ID:** `{user_id_db}`\n"
+            f"📛 **Nama:** {full_name}\n"
+        )
+        
+        if username:
+            text += f"📧 **Username:** @{username}\n"
+        
+        text += (
+            f"📅 **Bergabung:** {created_date}\n"
+            f"⏱️ **Terakhir Aktif:** {last_active_date}\n"
+            f"💬 **Total Chat:** {total_chats or 0}\n"
+            f"📁 **Total Sessions:** {total_sessions or 0}\n\n"
+        )
+        
+        # Tambahkan sessions
+        if sessions:
+            text += "📋 **Sessions Terbaru:**\n"
+            for i, session in enumerate(sessions, 1):
+                session_id, role, bot_name, created_at, status, intimacy = session
+                status_emoji = {
+                    'active': '🟢',
+                    'paused': '⏸️',
+                    'closed': '📁',
+                    'ended': '🏁'
+                }.get(status, '⚪')
+                
+                text += f"{i}. {status_emoji} **{role}** - {bot_name}\n"
+                text += f"   📈 Level {intimacy} | 🆔 `{session_id[:8]}...`\n"
+        else:
+            text += "📋 **Tidak ada sessions**\n"
+        
+        await update.message.reply_text(text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error getting user: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Info debug"""
@@ -1195,6 +1326,7 @@ __all__ = [
     'stats_command',
     'db_stats_command',
     'list_users_command',
+    'get_user_command',
     'debug_command',
     'backup_db_command',
     
