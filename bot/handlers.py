@@ -775,6 +775,13 @@ async def climaxhistory_command(update: Update, context: ContextTypes.DEFAULT_TY
         "Fitur ini sedang dalam pengembangan."
     )
 
+async def climaxrank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ranking climax (alias untuk tophts)"""
+    await update.message.reply_text(
+        "🏆 **RANKING CLIMAX**\n\n"
+        "Fitur ini sedang dalam pengembangan.",
+        parse_mode='Markdown'
+    )
 
 # =============================================================================
 # 12. ADMIN COMMANDS
