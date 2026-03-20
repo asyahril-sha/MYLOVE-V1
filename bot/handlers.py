@@ -732,6 +732,24 @@ async def explore_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def go_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pergi ke lokasi tertentu"""
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "❌ **Gunakan:** `/go [lokasi]`\n\n"
+            "Contoh: `/go dapur` atau `/go kamar`"
+        )
+        return
+    
+    location = ' '.join(args)
+    context.user_data['current_location'] = location
+    
+    await update.message.reply_text(
+        f"📍 Pindah ke **{location}**"
+    )
+
+
 async def locations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat semua lokasi"""
     await update.message.reply_text(
@@ -746,8 +764,7 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ **RISK ASSESSMENT**\n\n"
         "Fitur ini sedang dalam pengembangan."
     )
-
-
+    
 # =============================================================================
 # 11. RANKING COMMANDS
 # =============================================================================
