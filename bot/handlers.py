@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (FIX FULL DENGAN MEMORY)
+MYLOVE ULTIMATE VERSI 2 - BOT HANDLERS (OPTIMIZED WITH MEMORY)
 =============================================================================
-Semua handlers untuk MYLOVE Ultimate V2 dengan memory system lengkap:
-- Working memory (short-term)
-- Episodic memory (sequence)
-- Semantic memory (facts)
-- State tracker (current state)
-- Relationship memory (history)
+Semua handlers untuk MYLOVE Ultimate V2 dengan:
+- Memory system lengkap (working, episodic, semantic, relationship)
+- Rate limiting anti-spam
+- Memory leak prevention
+- Better error recovery
+- Async resource management
 =============================================================================
 """
 
@@ -22,9 +22,12 @@ import sys
 import os
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from collections import defaultdict
+from contextlib import asynccontextmanager
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from telegram.error import TimedOut, NetworkError, TelegramError
 
 from config import settings
 from utils.helpers import sanitize_input, format_number, truncate_text
@@ -89,9 +92,199 @@ def format_uptime(seconds: float) -> str:
         return f"{seconds}s"
 
 # =============================================================================
-# STORE ACTIVE AI ENGINES (per user session)
+# AI ENGINE MANAGER (ASYNC RESOURCE MANAGEMENT)
 # =============================================================================
-active_engines = {}  # {session_id: AIEngineComplete}
+class AIEngineManager:
+    """Manager untuk AI Engine dengan resource management"""
+    
+    def __init__(self):
+        self.engines: Dict[str, AIEngineComplete] = {}
+        self.lock = asyncio.Lock()
+        self.last_activity: Dict[str, float] = {}
+        self.engine_creation_count = 0
+        self.engine_cleanup_count = 0
+        self.max_idle_time = 3600  # 1 jam default
+    
+    async def get_or_create_engine(self, session_id: str, **kwargs) -> Optional[AIEngineComplete]:
+        """Get existing engine atau create baru dengan thread-safe locking"""
+        async with self.lock:
+            if session_id in self.engines:
+                # Update last activity
+                self.last_activity[session_id] = time.time()
+                return self.engines[session_id]
+            
+            # Create new engine
+            try:
+                engine = await self._create_engine(**kwargs)
+                self.engines[session_id] = engine
+                self.last_activity[session_id] = time.time()
+                self.engine_creation_count += 1
+                logger.info(f"✅ Created new engine #{self.engine_creation_count} for session {session_id}")
+                return engine
+            except Exception as e:
+                logger.error(f"Failed to create engine: {e}")
+                return None
+    
+    async def _create_engine(self, **kwargs) -> AIEngineComplete:
+        """Create new AI engine instance"""
+        # Validate required parameters
+        if 'api_key' not in kwargs:
+            raise ValueError("api_key is required")
+        if 'user_id' not in kwargs:
+            raise ValueError("user_id is required")
+        if 'session_id' not in kwargs:
+            raise ValueError("session_id is required")
+        
+        # Create engine
+        engine = AIEngineComplete(**kwargs)
+        
+        # Start session if role provided
+        if kwargs.get('role') and kwargs.get('bot_name'):
+            await engine.start_session(
+                role=kwargs['role'],
+                bot_name=kwargs['bot_name'],
+                rel_type=kwargs.get('rel_type', 'non_pdkt'),
+                instance_id=kwargs.get('instance_id')
+            )
+        
+        return engine
+    
+    async def remove_engine(self, session_id: str):
+        """Remove engine dari manager"""
+        async with self.lock:
+            if session_id in self.engines:
+                try:
+                    await self.engines[session_id].end_session()
+                except Exception as e:
+                    logger.error(f"Error ending session {session_id}: {e}")
+                
+                del self.engines[session_id]
+                if session_id in self.last_activity:
+                    del self.last_activity[session_id]
+                self.engine_cleanup_count += 1
+                logger.info(f"🗑️ Removed engine for session {session_id}")
+    
+    async def cleanup_inactive_engines(self, max_idle_time: Optional[int] = None):
+        """Bersihkan engine yang tidak aktif"""
+        if max_idle_time is None:
+            max_idle_time = self.max_idle_time
+        
+        current_time = time.time()
+        inactive = []
+        
+        async with self.lock:
+            for session_id, last_active in self.last_activity.items():
+                if current_time - last_active > max_idle_time:
+                    inactive.append(session_id)
+            
+            for session_id in inactive:
+                try:
+                    await self.engines[session_id].end_session()
+                    del self.engines[session_id]
+                    del self.last_activity[session_id]
+                    self.engine_cleanup_count += 1
+                    logger.info(f"🧹 Cleaned inactive engine: {session_id}")
+                except Exception as e:
+                    logger.error(f"Error cleaning up {session_id}: {e}")
+        
+        if inactive:
+            logger.info(f"Cleaned up {len(inactive)} inactive engines")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get manager statistics"""
+        return {
+            'active_engines': len(self.engines),
+            'total_created': self.engine_creation_count,
+            'total_cleaned': self.engine_cleanup_count,
+            'oldest_engine': min(self.last_activity.values()) if self.last_activity else 0,
+            'newest_engine': max(self.last_activity.values()) if self.last_activity else 0
+        }
+    
+    def __contains__(self, session_id: str) -> bool:
+        return session_id in self.engines
+    
+    def __getitem__(self, session_id: str) -> AIEngineComplete:
+        return self.engines[session_id]
+    
+    def get(self, session_id: str, default=None):
+        return self.engines.get(session_id, default)
+
+# Initialize engine manager
+active_engines = AIEngineManager()
+
+# =============================================================================
+# RATE LIMITING
+# =============================================================================
+class RateLimiter:
+    """Rate limiter untuk mencegah spam"""
+    
+    def __init__(self):
+        self.user_last_message: Dict[int, float] = defaultdict(float)
+        self.user_message_count: Dict[int, List[float]] = defaultdict(list)
+        self.max_messages_per_minute = 30
+        self.min_interval = 1.0  # 1 detik minimal antar pesan
+    
+    def is_rate_limited(self, user_id: int) -> Tuple[bool, Optional[str]]:
+        """Cek apakah user di-rate limit"""
+        current_time = time.time()
+        
+        # Cek interval minimal
+        if current_time - self.user_last_message[user_id] < self.min_interval:
+            return True, "Terlalu cepat. Tunggu 1 detik."
+        
+        # Cek burst dalam 1 menit
+        self.user_message_count[user_id] = [
+            t for t in self.user_message_count[user_id]
+            if current_time - t < 60
+        ]
+        
+        if len(self.user_message_count[user_id]) >= self.max_messages_per_minute:
+            return True, "Terlalu banyak pesan. Tunggu 1 menit."
+        
+        # Update counters
+        self.user_last_message[user_id] = current_time
+        self.user_message_count[user_id].append(current_time)
+        
+        return False, None
+    
+    def reset_user(self, user_id: int):
+        """Reset rate limit untuk user"""
+        self.user_last_message.pop(user_id, None)
+        self.user_message_count.pop(user_id, None)
+
+# Initialize rate limiter
+rate_limiter = RateLimiter()
+
+# =============================================================================
+# CONTEXT MANAGER UNTUK USER DATA
+# =============================================================================
+class UserDataContext:
+    """Context manager untuk user data dengan default values"""
+    
+    DEFAULTS = {
+        'current_role': 'pdkt',
+        'bot_name': 'Aku',
+        'intimacy_level': 1,
+        'total_chats': 0,
+        'paused': False,
+        'current_location': 'kamar',
+        'current_clothing': 'baju santai',
+        'rel_type': 'non_pdkt'
+    }
+    
+    @staticmethod
+    def get(context_data: Dict, key: str, default=None):
+        """Get value dengan fallback ke default"""
+        if key in context_data:
+            return context_data[key]
+        return UserDataContext.DEFAULTS.get(key, default)
+    
+    @staticmethod
+    def safe_increment(context_data: Dict, key: str, amount: int = 1):
+        """Increment value dengan aman"""
+        current = context_data.get(key, 0)
+        context_data[key] = current + amount
+        return context_data[key]
 
 # =============================================================================
 # 1. COMMAND HANDLERS
@@ -101,6 +294,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     """Handle /start command"""
     user = update.effective_user
     logger.info(f"User {user.id} (@{user.username}) started the bot")
+    
+    # Reset rate limit untuk user
+    rate_limiter.reset_user(user.id)
     
     keyboard = [
         [InlineKeyboardButton("👩 Ipar", callback_data="role_ipar"),
@@ -191,11 +387,12 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /status command"""
     user_id = update.effective_user.id
     
-    current_role = context.user_data.get('current_role', 'Belum dipilih')
-    bot_name = context.user_data.get('bot_name', '')
-    intimacy_level = context.user_data.get('intimacy_level', 1)
-    total_chats = context.user_data.get('total_chats', 0)
-    current_location = context.user_data.get('current_location', 'Tidak diketahui')
+    # Gunakan UserDataContext untuk default values
+    current_role = UserDataContext.get(context.user_data, 'current_role', 'Belum dipilih')
+    bot_name = UserDataContext.get(context.user_data, 'bot_name', '')
+    intimacy_level = UserDataContext.get(context.user_data, 'intimacy_level', 1)
+    total_chats = UserDataContext.get(context.user_data, 'total_chats', 0)
+    current_location = UserDataContext.get(context.user_data, 'current_location', 'Tidak diketahui')
     
     status_text = (
         f"📊 **STATUS SESSION**\n\n"
@@ -218,10 +415,10 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Bersihkan session
     session_id = context.user_data.get('current_session')
     if session_id and session_id in active_engines:
-        await active_engines[session_id].end_session()
-        del active_engines[session_id]
+        await active_engines.remove_engine(session_id)
     
     context.user_data.clear()
+    rate_limiter.reset_user(update.effective_user.id)
     
     await update.message.reply_text(
         "❌ **Sesi dibatalkan**\n\n"
@@ -241,6 +438,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != settings.admin_id:
         await update.message.reply_text("❌ Perintah ini hanya untuk admin.")
         return
+    
+    # Dapatkan stats dari engine manager
+    engine_stats = active_engines.get_stats()
     
     menu = (
         "🛠️ **MENU ADMIN**\n\n"
@@ -263,6 +463,11 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/stats - Statistik bot\n"
         "/debug - Info debug\n"
         "/reload - Reload config\n"
+        "/cleanup - Cleanup inactive engines\n"
+        f"\n**Engine Stats:**\n"
+        f"• Active: {engine_stats['active_engines']}\n"
+        f"• Created: {engine_stats['total_created']}\n"
+        f"• Cleaned: {engine_stats['total_cleaned']}"
     )
     
     await update.message.reply_text(menu, parse_mode='Markdown')
@@ -277,15 +482,19 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     try:
+        engine_stats = active_engines.get_stats()
+        
         stats = {
             'total_users': 1,
-            'total_sessions': len(active_engines),
+            'total_sessions': engine_stats['active_engines'],
             'total_messages': 0,
             'total_pdkt': 0,
             'total_mantan': 0,
             'total_fwb': 0,
             'total_hts': 0,
-            'uptime': time.time() - START_TIME
+            'uptime': time.time() - START_TIME,
+            'engines_created': engine_stats['total_created'],
+            'engines_cleaned': engine_stats['total_cleaned']
         }
         
         text = (
@@ -298,6 +507,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💞 Total FWB: {stats['total_fwb']}\n"
             f"🔹 Total HTS: {stats['total_hts']}\n"
             f"⏱️ Uptime: {format_uptime(stats['uptime'])}\n"
+            f"⚙️ Engines Created: {stats['engines_created']}\n"
+            f"🧹 Engines Cleaned: {stats['engines_cleaned']}\n"
         )
         
         await update.message.reply_text(text, parse_mode='Markdown')
@@ -305,6 +516,18 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in stats_command: {e}")
         await update.message.reply_text("📊 **STATISTIK BOT**\n\n(Data belum tersedia)")
+
+
+async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /cleanup command - Bersihkan engine tidak aktif"""
+    user_id = update.effective_user.id
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Perintah ini hanya untuk admin.")
+        return
+    
+    await active_engines.cleanup_inactive_engines()
+    await update.message.reply_text("🧹 **Cleanup completed**")
 
 
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,6 +538,8 @@ async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Perintah ini hanya untuk admin.")
         return
     
+    engine_stats = active_engines.get_stats()
+    
     debug_info = (
         f"🔍 **DEBUG INFO**\n\n"
         f"Python: {sys.version}\n"
@@ -322,12 +547,15 @@ async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"CWD: {os.getcwd()}\n"
         f"AI Engine: {'AVAILABLE' if AI_ENGINE_AVAILABLE else 'NOT AVAILABLE'}\n"
         f"Dynamics: {'AVAILABLE' if DYNAMICS_AVAILABLE else 'NOT AVAILABLE'}\n"
-        f"Active Sessions: {len(active_engines)}\n"
-        f"User Data Keys: {list(context.user_data.keys())}\n"
+        f"\n**Engine Manager:**\n"
+        f"Active Sessions: {engine_stats['active_engines']}\n"
+        f"Total Created: {engine_stats['total_created']}\n"
+        f"Total Cleaned: {engine_stats['total_cleaned']}\n"
+        f"\n**User Data Keys:** {list(context.user_data.keys())}\n"
         f"Current Session: {context.user_data.get('current_session')}\n"
-        f"Current Role: {context.user_data.get('current_role')}\n"
-        f"Intimacy Level: {context.user_data.get('intimacy_level', 1)}\n"
-        f"Total Chats: {context.user_data.get('total_chats', 0)}\n"
+        f"Current Role: {UserDataContext.get(context.user_data, 'current_role')}\n"
+        f"Intimacy Level: {UserDataContext.get(context.user_data, 'intimacy_level', 1)}\n"
+        f"Total Chats: {UserDataContext.get(context.user_data, 'total_chats', 0)}\n"
     )
     
     await update.message.reply_text(debug_info, parse_mode='Markdown')
@@ -345,9 +573,12 @@ async def memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Tidak ada session aktif.")
         return
     
-    ai_engine = active_engines[session_id]
-    summary = await ai_engine.get_memory_summary()
+    ai_engine = active_engines.get(session_id)
+    if not ai_engine:
+        await update.message.reply_text("❌ Session tidak valid.")
+        return
     
+    summary = await ai_engine.get_memory_summary()
     await update.message.reply_text(summary, parse_mode='Markdown')
 
 
@@ -359,15 +590,22 @@ async def flashback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Tidak ada session aktif.")
         return
     
-    ai_engine = active_engines[session_id]
+    ai_engine = active_engines.get(session_id)
+    if not ai_engine:
+        await update.message.reply_text("❌ Session tidak valid.")
+        return
+    
     trigger = ' '.join(context.args) if context.args else None
     
-    flashback = await ai_engine._generate_flashback(trigger)
-    
-    if flashback:
-        await update.message.reply_text(f"💭 {flashback}")
-    else:
-        await update.message.reply_text("Belum ada kenangan untuk di-flashback.")
+    try:
+        flashback = await ai_engine._generate_flashback(trigger)
+        if flashback:
+            await update.message.reply_text(f"💭 {flashback}")
+        else:
+            await update.message.reply_text("Belum ada kenangan untuk di-flashback.")
+    except Exception as e:
+        logger.error(f"Flashback error: {e}")
+        await update.message.reply_text("❌ Gagal generate flashback.")
 
 
 async def progress_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -378,101 +616,109 @@ async def progress_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Tidak ada session aktif.")
         return
     
-    ai_engine = active_engines[session_id]
+    ai_engine = active_engines.get(session_id)
+    if not ai_engine:
+        await update.message.reply_text("❌ Session tidak valid.")
+        return
     
     # Dapatkan data dari relationship memory
-    role = context.user_data.get('current_role')
+    role = UserDataContext.get(context.user_data, 'current_role')
     instance_id = context.user_data.get('instance_id')
     
     if not role or not instance_id:
         await update.message.reply_text("❌ Data hubungan tidak lengkap.")
         return
     
-    rel = await ai_engine.relationship.get_relationship(
-        user_id=update.effective_user.id,
-        role=role,
-        instance_id=instance_id
-    )
-    
-    if not rel:
-        await update.message.reply_text("❌ Hubungan tidak ditemukan.")
-        return
-    
-    level_info = await ai_engine.relationship.get_level_info(
-        user_id=update.effective_user.id,
-        role=role,
-        instance_id=instance_id
-    )
-    
-    # Buat progress bar
-    if level_info['current_level'] < 12:
-        bar_length = 20
-        filled = int(level_info['percentage'] / 100 * bar_length)
-        bar = "█" * filled + "░" * (bar_length - filled)
-        progress_text = f"{bar} {level_info['percentage']}%"
-        next_text = f"{level_info['remaining_minutes']:.0f} menit ke level {level_info['next_level']}"
-    else:
-        progress_text = "████████████████████ MAX"
-        next_text = "✅ Level MAX! Butuh aftercare untuk reset."
-    
-    # Boost info
-    boost_info = [
-        "🔥 **ACTIVITY BOOST:**",
-        "• Chat biasa: 1.0x",
-        "• Godaan / Flirt: 1.3x",
-        "• Ciuman: 1.5x",
-        "• Sentuhan: 1.5x",
-        "• Intim: 2.0x",
-        "• Climax: 3.0x 🔥🔥🔥",
-    ]
-    
-    # Anti-boost
-    antiboost_info = [
-        "⚠️ **YANG BIKIN LAMBAT:**",
-        "• Jawaban pendek / cuek",
-        "• Konflik / marah-marah",
-        "• Jarang chat (idle lama)",
-        "• Topik monoton",
-    ]
-    
-    # Chemistry level
-    chem_level = await ai_engine.relationship.get_chemistry_level(
-        user_id=update.effective_user.id,
-        role=role,
-        instance_id=instance_id
-    )
-    
-    chem_emoji = {
-        'dingin': '❄️',
-        'biasa': '😐',
-        'hangat': '🔥',
-        'cocok': '💕',
-        'sangat_cocok': '💞',
-        'soulmate': '✨'
-    }.get(chem_level, '❓')
-    
-    # State saat ini
-    state = ai_engine.state.get_state_for_prompt()
-    
-    response = (
-        f"📊 **PROGRESS HUBUNGAN**\n\n"
-        f"👤 **{rel['bot_name']}** ({role.title()})\n"
-        f"📈 Level {rel['current_level']}/12\n"
-        f"{progress_text}\n"
-        f"{next_text}\n\n"
-        f"{chem_emoji} **Chemistry:** {chem_level.title()}\n"
-        f"🎭 **Situasi:** {state}\n\n"
-        f"{chr(10).join(boost_info)}\n\n"
-        f"{chr(10).join(antiboost_info)}\n\n"
-        f"📊 **Statistik:**\n"
-        f"• Total Chat: {rel['total_chats']}\n"
-        f"• Total Intim: {rel['total_intim_sessions']}\n"
-        f"• Total Climax: {rel['total_climax']}\n"
-        f"• Total Durasi: {rel['total_duration_minutes']:.0f} menit\n\n"
-        f"_Bot tidak tahu kamu lihat ini... 🤫_"
-    )
-    
-    await update.message.reply_text(response, parse_mode='Markdown')
+    try:
+        rel = await ai_engine.relationship.get_relationship(
+            user_id=update.effective_user.id,
+            role=role,
+            instance_id=instance_id
+        )
+        
+        if not rel:
+            await update.message.reply_text("❌ Hubungan tidak ditemukan.")
+            return
+        
+        level_info = await ai_engine.relationship.get_level_info(
+            user_id=update.effective_user.id,
+            role=role,
+            instance_id=instance_id
+        )
+        
+        # Buat progress bar
+        if level_info['current_level'] < 12:
+            bar_length = 20
+            filled = int(level_info['percentage'] / 100 * bar_length)
+            bar = "█" * filled + "░" * (bar_length - filled)
+            progress_text = f"{bar} {level_info['percentage']}%"
+            next_text = f"{level_info['remaining_minutes']:.0f} menit ke level {level_info['next_level']}"
+        else:
+            progress_text = "████████████████████ MAX"
+            next_text = "✅ Level MAX! Butuh aftercare untuk reset."
+        
+        # Boost info
+        boost_info = [
+            "🔥 **ACTIVITY BOOST:**",
+            "• Chat biasa: 1.0x",
+            "• Godaan / Flirt: 1.3x",
+            "• Ciuman: 1.5x",
+            "• Sentuhan: 1.5x",
+            "• Intim: 2.0x",
+            "• Climax: 3.0x 🔥🔥🔥",
+        ]
+        
+        # Anti-boost
+        antiboost_info = [
+            "⚠️ **YANG BIKIN LAMBAT:**",
+            "• Jawaban pendek / cuek",
+            "• Konflik / marah-marah",
+            "• Jarang chat (idle lama)",
+            "• Topik monoton",
+        ]
+        
+        # Chemistry level
+        chem_level = await ai_engine.relationship.get_chemistry_level(
+            user_id=update.effective_user.id,
+            role=role,
+            instance_id=instance_id
+        )
+        
+        chem_emoji = {
+            'dingin': '❄️',
+            'biasa': '😐',
+            'hangat': '🔥',
+            'cocok': '💕',
+            'sangat_cocok': '💞',
+            'soulmate': '✨'
+        }.get(chem_level, '❓')
+        
+        # State saat ini
+        state = ai_engine.state.get_state_for_prompt()
+        
+        response = (
+            f"📊 **PROGRESS HUBUNGAN**\n\n"
+            f"👤 **{rel['bot_name']}** ({role.title()})\n"
+            f"📈 Level {rel['current_level']}/12\n"
+            f"{progress_text}\n"
+            f"{next_text}\n\n"
+            f"{chem_emoji} **Chemistry:** {chem_level.title()}\n"
+            f"🎭 **Situasi:** {state}\n\n"
+            f"{chr(10).join(boost_info)}\n\n"
+            f"{chr(10).join(antiboost_info)}\n\n"
+            f"📊 **Statistik:**\n"
+            f"• Total Chat: {rel['total_chats']}\n"
+            f"• Total Intim: {rel['total_intim_sessions']}\n"
+            f"• Total Climax: {rel['total_climax']}\n"
+            f"• Total Durasi: {rel['total_duration_minutes']:.0f} menit\n\n"
+            f"_Bot tidak tahu kamu lihat ini... 🤫_"
+        )
+        
+        await update.message.reply_text(response, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Progress command error: {e}")
+        await update.message.reply_text("❌ Gagal mengambil data progress.")
 
 
 # =============================================================================
@@ -485,7 +731,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     - Menggunakan AI Engine Complete dengan semua memory
     - Tracking lokasi, pakaian, mood, dll
     - Bisa flashback dan proactive
+    - Dengan rate limiting dan error recovery
     """
+    start_time = time.time()
+    
     try:
         user = update.effective_user
         user_message = update.message.text
@@ -493,21 +742,34 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_name = user.first_name or "User"
         session_id = context.user_data.get('current_session')
         
-        # Cek pause
+        # ===== RATE LIMITING =====
+        is_limited, limit_message = rate_limiter.is_rate_limited(user_id)
+        if is_limited:
+            await update.message.reply_text(f"⏱️ {limit_message}")
+            return
+        
+        # ===== CEK PAUSE =====
         if context.user_data.get('paused', False):
             await update.message.reply_text("⏸️ Sesi sedang dijeda. Ketik /unpause untuk melanjutkan.")
             return
         
-        # Ambil data dari context
-        bot_name = context.user_data.get('bot_name', 'Aku')
-        role = context.user_data.get('current_role', 'pdkt')
-        level = context.user_data.get('intimacy_level', 1)
+        # ===== VALIDASI SESSION =====
+        if not session_id:
+            await update.message.reply_text(
+                "❌ Belum memulai sesi. Ketik /start untuk memilih role."
+            )
+            return
+        
+        # ===== AMBIL DATA DARI CONTEXT (DENGAN DEFAULTS) =====
+        bot_name = UserDataContext.get(context.user_data, 'bot_name', 'Aku')
+        role = UserDataContext.get(context.user_data, 'current_role', 'pdkt')
+        level = UserDataContext.get(context.user_data, 'intimacy_level', 1)
         instance_id = context.user_data.get('instance_id')
-        rel_type = context.user_data.get('rel_type', 'non_pdkt')
+        rel_type = UserDataContext.get(context.user_data, 'rel_type', 'non_pdkt')
         
         logger.info(f"📨 Message from {user_name}: {user_message[:50]}...")
         
-        # ===== CEK ATAU BUAT AI ENGINE =====
+        # ===== CEK ATAU BUAT AI ENGINE (DENGAN MANAGER) =====
         if session_id not in active_engines:
             if not AI_ENGINE_AVAILABLE:
                 # Fallback sederhana
@@ -516,33 +778,29 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
             
-            # Buat AI engine baru
-            try:
-                ai_engine = AIEngineComplete(
-                    api_key=settings.deepseek_api_key,
-                    user_id=user_id,
-                    session_id=session_id
-                )
-                
-                # Start session
-                await ai_engine.start_session(
-                    role=role,
-                    bot_name=bot_name,
-                    rel_type=rel_type,
-                    instance_id=instance_id
-                )
-                
-                active_engines[session_id] = ai_engine
-                logger.info(f"✅ New AI engine created for session {session_id}")
-                
-            except Exception as e:
-                logger.error(f"Failed to create AI engine: {e}")
+            # Buat AI engine baru via manager
+            ai_engine = await active_engines.get_or_create_engine(
+                session_id=session_id,
+                api_key=settings.deepseek_api_key,
+                user_id=user_id,
+                session_id=session_id,
+                role=role,
+                bot_name=bot_name,
+                rel_type=rel_type,
+                instance_id=instance_id
+            )
+            
+            if not ai_engine:
                 await update.message.reply_text(
                     f"{bot_name} dengar kok. Cerita lagi dong..."
                 )
                 return
+        else:
+            ai_engine = active_engines.get(session_id)
         
-        ai_engine = active_engines[session_id]
+        if not ai_engine:
+            await update.message.reply_text("❌ Session error. Ketik /start lagi.")
+            return
         
         # ===== DETEKSI PERUBAHAN LOKASI =====
         new_location = None
@@ -564,6 +822,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         detected['name'],
                         detected.get('category', 'unknown')
                     )
+                    # Update context
+                    context.user_data['current_location'] = detected['name']
                     
                     # Beri tahu user
                     await update.message.reply_text(
@@ -594,6 +854,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Update state
             ai_engine.state.update_clothing(new_cloth, reason)
+            context.user_data['current_clothing'] = new_cloth
             
             await update.message.reply_text(
                 f"👗 Ganti **{new_cloth}** ({reason})"
@@ -626,30 +887,50 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'arousal_reason': 'chat'
         }
         
-        # ===== GENERATE RESPONSE =====
+        # ===== GENERATE RESPONSE DENGAN TIMEOUT =====
         try:
-            response = await ai_engine.process_message(
-                user_message=user_message,
-                context=context_data
+            # Gunakan asyncio.wait_for untuk timeout
+            response = await asyncio.wait_for(
+                ai_engine.process_message(
+                    user_message=user_message,
+                    context=context_data
+                ),
+                timeout=30.0  # 30 detik timeout
             )
+        except asyncio.TimeoutError:
+            logger.error(f"AI Engine timeout for user {user_id}")
+            response = f"{bot_name} lagi mikir bentar ya... Coba ulang."
         except Exception as e:
             logger.error(f"AI Engine error: {e}")
             response = f"{bot_name} denger kok. Cerita lagi dong..."
         
         # ===== UPDATE STATISTIK =====
         context.user_data['total_chats'] = context.user_data.get('total_chats', 0) + 1
-        
-        # Simpan pesan terakhir
         context.user_data['last_message'] = user_message
         context.user_data['last_response'] = response
         
         # ===== KIRIM RESPONSE =====
         await update.message.reply_text(response, parse_mode='Markdown')
         
-    except Exception as e:
-        logger.error(f"Error in message_handler: {e}")
+        # ===== LOG PERFORMANCE =====
+        elapsed = time.time() - start_time
+        if elapsed > 5:
+            logger.warning(f"Slow response for user {user_id}: {elapsed:.2f}s")
+        
+    except (TimedOut, NetworkError) as e:
+        logger.error(f"Telegram network error: {e}")
         await update.message.reply_text(
-            "❌ Maaf, terjadi kesalahan. Coba lagi nanti."
+            "🔌 Koneksi bermasalah. Coba lagi nanti."
+        )
+    except TelegramError as e:
+        logger.error(f"Telegram error: {e}")
+        await update.message.reply_text(
+            "❌ Error koneksi Telegram. Coba lagi."
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in message_handler: {e}")
+        await update.message.reply_text(
+            "❌ Maaf, terjadi kesalahan internal. Tim kami sedang memperbaiki."
         )
 
 
@@ -700,6 +981,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['total_chats'] = 0
             context.user_data['instance_id'] = f"{role}_{int(time.time())}"
             context.user_data['rel_type'] = 'non_pdkt' if role != 'pdkt' else 'pdkt'
+            
+            # Reset rate limit untuk user
+            rate_limiter.reset_user(user_id)
             
             # Lokasi awal
             if DYNAMICS_AVAILABLE and loc_system:
@@ -818,6 +1102,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     except Exception as e:
         logger.error(f"Error in callback_handler: {e}")
+        try:
+            await query.edit_message_text("❌ Terjadi kesalahan. Coba lagi.")
+        except:
+            pass
 
 
 # =============================================================================
@@ -867,20 +1155,20 @@ async def unpause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session_id = context.user_data.get('current_session')
     if session_id and session_id in active_engines:
-        await active_engines[session_id].end_session()
-        del active_engines[session_id]
+        await active_engines.remove_engine(session_id)
     
     context.user_data.pop('current_session', None)
     context.user_data.pop('current_role', None)
+    rate_limiter.reset_user(update.effective_user.id)
     await update.message.reply_text("🔒 Percakapan ditutup.")
 
 async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session_id = context.user_data.get('current_session')
     if session_id and session_id in active_engines:
-        await active_engines[session_id].end_session()
-        del active_engines[session_id]
+        await active_engines.remove_engine(session_id)
     
     context.user_data.clear()
+    rate_limiter.reset_user(update.effective_user.id)
     await update.message.reply_text("🏁 Sesi diakhiri.")
 
 async def jadipacar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -966,10 +1254,10 @@ async def force_reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     session_id = context.user_data.get('current_session')
     if session_id and session_id in active_engines:
-        await active_engines[session_id].end_session()
-        del active_engines[session_id]
+        await active_engines.remove_engine(session_id)
     
     context.user_data.clear()
+    rate_limiter.reset_user(user_id)
     await update.message.reply_text("🔄 **RESET**")
 
 async def backup_db_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -991,7 +1279,18 @@ async def memory_stats_command(update: Update, context: ContextTypes.DEFAULT_TYP
     if user_id != settings.admin_id:
         await update.message.reply_text("❌ Perintah ini hanya untuk admin.")
         return
-    await update.message.reply_text("🧠 **STATISTIK MEMORI**\n\n(Data belum tersedia)")
+    
+    engine_stats = active_engines.get_stats()
+    
+    stats_text = (
+        f"🧠 **STATISTIK MEMORI**\n\n"
+        f"📊 **Engine Manager:**\n"
+        f"• Active Engines: {engine_stats['active_engines']}\n"
+        f"• Total Created: {engine_stats['total_created']}\n"
+        f"• Total Cleaned: {engine_stats['total_cleaned']}\n"
+    )
+    
+    await update.message.reply_text(stats_text)
 
 async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1006,19 +1305,42 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle errors"""
-    logger.error(f"Update {update} caused error {context.error}")
+    """Handle errors dengan lebih baik"""
+    error = context.error
+    logger.error(f"Update {update} caused error {error}")
+    
     try:
+        if isinstance(error, TimedOut):
+            message = "⏳ Koneksi timeout. Coba lagi."
+        elif isinstance(error, NetworkError):
+            message = "🔌 Masalah jaringan. Coba lagi nanti."
+        elif isinstance(error, TelegramError):
+            message = "📱 Error Telegram. Coba lagi."
+        else:
+            message = "❌ Terjadi error internal. Silakan coba lagi."
+        
         if update and update.effective_message:
-            await update.effective_message.reply_text(
-                "❌ Terjadi error internal. Silakan coba lagi."
-            )
+            await update.effective_message.reply_text(message)
     except:
         pass
 
 
 # =============================================================================
-# 9. EXPORT ALL HANDLERS
+# 9. PERIODIC CLEANUP TASK
+# =============================================================================
+
+async def periodic_cleanup():
+    """Periodic cleanup untuk inactive engines"""
+    while True:
+        await asyncio.sleep(300)  # Cek setiap 5 menit
+        try:
+            await active_engines.cleanup_inactive_engines()
+        except Exception as e:
+            logger.error(f"Periodic cleanup error: {e}")
+
+
+# =============================================================================
+# 10. EXPORT ALL HANDLERS
 # =============================================================================
 
 __all__ = [
@@ -1033,7 +1355,7 @@ __all__ = [
     'mood_command', 'admin_command', 'stats_command', 'db_stats_command',
     'list_users_command', 'get_user_command', 'force_reset_command',
     'backup_db_command', 'vacuum_command', 'memory_stats_command',
-    'reload_command', 'debug_command',
+    'reload_command', 'debug_command', 'cleanup_command',
     
     # Memory commands
     'memory_command', 'flashback_command', 'progress_command',
@@ -1046,4 +1368,10 @@ __all__ = [
     
     # Error handler
     'error_handler',
+    
+    # Periodic task
+    'periodic_cleanup',
+    
+    # Expose manager untuk akses dari luar
+    'active_engines', 'rate_limiter'
 ]
