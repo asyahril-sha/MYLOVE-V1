@@ -72,6 +72,15 @@ class AIEngineComplete:
         self.semantic = SemanticMemory()               # Fakta-fakta
         self.state = StateTracker(user_id, session_id) # State saat ini
         self.relationship = RelationshipMemory()       # Riwayat hubungan
+
+        # ===== LOCATION, CLOTHING, POSITION SYSTEMS =====
+        from dynamics.location import LocationSystem
+        from dynamics.clothing import ClothingSystem
+        from dynamics.position import PositionSystem
+        
+        self.location_system = LocationSystem()
+        self.clothing_system = ClothingSystem()
+        self.position_system = PositionSystem()
         
         # ===== TRACKING KONDISI USER (TERPISAH) =====
         self.user = {
