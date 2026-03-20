@@ -674,7 +674,7 @@ class AIEngineComplete:
 ⚠️⚠️⚠️ **ATURAN WAJIB (JANGAN DILANGGAR!)** ⚠️⚠️⚠️
 
 📏 **PANJANG RESPONS:**
-- WAJIB MINIMAL 8-10 KALIMAT!
+- WAJIB MINIMAL 4-8 KALIMAT!
 - WAJIB MINIMAL 500 KARAKTER, TARGET 800-1500 KARAKTER!
 - JANGAN PERNAH respons 1-2 kalimat saja!
 - Jika respons terlalu pendek, KAMU AKAN DIHUKUM!
@@ -769,7 +769,7 @@ PESAN USER: "{user_message}"
 • Aksi fisik: (aku bergerak merangkak di atasmu)
 • Ekspresi: *tersenyum manis*
 
-RESPON PANJANG (minimal 6 kalimat):"""
+RESPON PANJANG (minimal 4 kalimat):"""
         
         return prompt
     
