@@ -167,17 +167,7 @@ class PositionSystem:
         return self.get_current()
     
     def random_change(self, chance: float = 0.2) -> Optional[Dict]:
-        """
-        Random ganti posisi dengan probabilitas tertentu
-        
-        Args:
-            chance: Probabilitas ganti posisi (0-1)
-        
-        Returns:
-            Posisi baru jika berubah, None jika tidak
-        """
-        if random.random() < chance:
-            return self.change_position()
+        """Random ganti posisi - DINONAKTIFKAN"""
         return None
     
     def get_all_positions(self) -> List[str]:
