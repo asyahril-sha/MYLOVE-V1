@@ -38,7 +38,7 @@ from bot.handlers import (
     break_command, unbreak_command, breakup_command, fwb_command,
     htslist_command, fwblist_command, hts_call_handler,
     fwb_call_handler, tophts_command, myclimax_command,
-    climaxrank_command, climaxhistory_command, explore_command,
+    climaxhistory_command, explore_command,
     go_command, positions_command, risk_command, mood_command,
     admin_command, stats_command, db_stats_command, list_users_command,
     get_user_command, force_reset_command, backup_db_command,
@@ -270,7 +270,6 @@ def create_application() -> Application:
     # Ranking commands
     app.add_handler(CommandHandler("tophts", tophts_command))
     app.add_handler(CommandHandler("myclimax", myclimax_command))
-    app.add_handler(CommandHandler("climaxrank", climaxrank_command))
     app.add_handler(CommandHandler("climaxhistory", climaxhistory_command))
     
     # Public area commands
