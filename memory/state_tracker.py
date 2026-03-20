@@ -2,19 +2,21 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - STATE TRACKER
+MYLOVE ULTIMATE VERSI 2 - STATE TRACKER (VERSI HUMAN+)
 =============================================================================
-Melacak semua state dinamis yang berubah selama interaksi
+Melacak semua state dinamis dengan detail SUPER MANUSIA:
 - Lokasi, pakaian, posisi tubuh
 - Mood, gairah, status intim
-- Aktivitas saat ini
-- Semua perubahan tercatat dan bisa dilacak
-- Activity stack untuk aktivitas beruntun
+- Aktivitas saat ini (dengan stack)
+- Fisik detail (energi, lapar, haus, suhu)
+- Semua perubahan tercatat dengan timestamp
+- Multi-layer awareness
 =============================================================================
 """
 
 import time
 import logging
+import math
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from enum import Enum
@@ -32,15 +34,17 @@ class StateType(str, Enum):
     ACTIVITY = "activity"
     INTIMACY = "intimacy"
     PRIVACY = "privacy"
+    PHYSICAL = "physical"  # ENERGI, LAPAR, HAUS, SUHU
 
 
 class StateTracker:
     """
-    Melacak semua state dinamis dan perubahannya
+    Melacak semua state dinamis dengan kemampuan SUPER MANUSIA
     - Menyimpan history perubahan
-    - Bisa melihat trend (misal: mood sering berubah)
+    - Multi-layer awareness
     - Validasi perubahan yang masuk akal
-    - Activity stack untuk aktivitas beruntun
+    - Activity stack untuk multi-aktivitas
+    - Physical tracking (energi, lapar, haus, suhu)
     """
     
     def __init__(self, user_id: int, session_id: str):
@@ -52,14 +56,15 @@ class StateTracker:
         self.user_id = user_id
         self.session_id = session_id
         
-        # State saat ini
+        # ===== STATE SAAT INI (LENGKAP) =====
         self.current = {
             # ===== LOKASI =====
             'location': {
                 'name': None,
                 'category': None,
                 'privacy_level': 1.0,
-                'last_change': 0
+                'last_change': 0,
+                'visited_before': [],  # Riwayat kunjungan
             },
             
             # ===== PAKAIAN =====
@@ -67,30 +72,35 @@ class StateTracker:
                 'name': None,
                 'category': None,
                 'last_change': 0,
-                'change_reason': None
+                'change_reason': None,
+                'worn_before': [],  # Riwayat pakaian
             },
             
             # ===== POSISI TUBUH =====
             'position': {
                 'name': None,
                 'description': None,
-                'last_change': 0
+                'last_change': 0,
+                'positions_today': [],  # Posisi yang pernah dilakukan
             },
             
-            # ===== MOOD =====
+            # ===== MOOD (MULTI-LAYER) =====
             'mood': {
                 'primary': 'netral',
                 'secondary': None,
+                'tertiary': None,  # Lapisan ketiga untuk mood kompleks
                 'intensity': 0.5,
-                'last_change': 0
+                'last_change': 0,
+                'history_today': [],
             },
             
-            # ===== GAIrah =====
+            # ===== GAIRAH =====
             'arousal': {
                 'level': 0,  # 0-10
                 'last_change': 0,
                 'peak_level': 0,
-                'climax_count': 0
+                'climax_count': 0,
+                'arousal_today': [],
             },
             
             # ===== INTIMASI =====
@@ -100,33 +110,79 @@ class StateTracker:
                 'duration': 0,
                 'last_activity': None,
                 'positions_used': [],
-                'climax_count': 0
+                'climax_count': 0,
+                'sessions_today': 0,
             },
             
-            # ===== AKTIVITAS (BARU - LEBIH DETAIL) =====
+            # ===== AKTIVITAS (DETAIL) =====
             'activity': {
                 'name': None,
                 'details': {},
                 'start_time': None,
                 'last_update': None,
                 'progress': None,
-                'status': 'idle',  # idle, active, paused
-                'history': []
+                'status': 'idle',  # idle, active, paused, interrupted
+                'interruptions': [],  # Aktivitas yang menginterupsi
             },
             
-            # ===== ACTIVITY STACK (BARU) =====
-            'activity_stack': [],  # Stack untuk aktivitas beruntun
+            # ===== ACTIVITY STACK (UNTUK MULTI-AKTIVITAS) =====
+            'activity_stack': [],  # Stack aktivitas beruntun
+            'paused_activities': [],  # Aktivitas yang di-pause
+            
+            # ===== FISIK (DETAIL) =====
+            'physical': {
+                'energy': {
+                    'level': 80,  # 0-100
+                    'feeling': 'energetic',
+                    'last_change': time.time(),
+                    'daily_peak': 80,
+                    'daily_low': 80,
+                },
+                'hunger': {
+                    'level': 30,  # 0-100
+                    'feeling': 'normal',
+                    'last_change': time.time(),
+                    'last_meal': None,
+                },
+                'thirst': {
+                    'level': 30,  # 0-100
+                    'feeling': 'normal',
+                    'last_change': time.time(),
+                    'last_drink': None,
+                },
+                'temperature': {
+                    'level': 25,  # Celsius
+                    'feeling': 'normal',
+                    'last_change': time.time(),
+                },
+                'comfort': {
+                    'level': 80,  # 0-100
+                    'feeling': 'comfortable',
+                    'last_change': time.time(),
+                },
+            },
             
             # ===== INTERAKSI =====
             'interaction': {
                 'last_user_message': None,
                 'last_bot_response': None,
                 'total_messages': 0,
-                'last_active': time.time()
-            }
+                'messages_today': 0,
+                'last_active': time.time(),
+                'daily_active_periods': [],  # Periode aktif hari ini
+            },
+            
+            # ===== AWARENESS =====
+            'awareness': {
+                'time_of_day': None,
+                'day_of_week': None,
+                'weather': None,  # Bisa diisi nanti
+                'location_crowdedness': 0.5,  # 0 sepi, 1 ramai
+                'background_noise': 0.3,  # 0 sunyi, 1 bising
+            },
         }
         
-        # History perubahan (untuk tracking)
+        # ===== HISTORY PERUBAHAN (LENGKAP) =====
         self.history = {
             'location': [],
             'clothing': [],
@@ -134,84 +190,113 @@ class StateTracker:
             'mood': [],
             'arousal': [],
             'activity': [],
-            'intimacy': []
+            'intimacy': [],
+            'physical': [],
         }
         
-        # Rule validasi perubahan
+        # ===== STATISTIK HARIAN =====
+        self.daily_stats = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'mood_distribution': {},
+            'arousal_peaks': 0,
+            'activity_count': 0,
+            'location_changes': 0,
+            'clothing_changes': 0,
+        }
+        
+        # ===== RULE VALIDASI =====
         self.validation_rules = self._init_validation_rules()
         
-        logger.info(f"✅ StateTracker initialized for user {user_id}, session {session_id}")
+        logger.info(f"✅ StateTracker HUMAN+ initialized for user {user_id}")
     
     def _init_validation_rules(self) -> Dict:
-        """Inisialisasi rule validasi"""
+        """Inisialisasi rule validasi (super lengkap)"""
         return {
             'location': {
                 'plausible_transitions': {
                     'ruang tamu': ['kamar', 'dapur', 'teras', 'kamar mandi', 'taman'],
                     'kamar': ['kamar mandi', 'ruang tamu', 'balkon'],
-                    'kamar mandi': ['kamar', 'ruang tamu'],
-                    'dapur': ['ruang tamu', 'kamar mandi'],
+                    'kamar mandi': ['kamar', 'ruang tamu', 'dapur'],
+                    'dapur': ['ruang tamu', 'kamar mandi', 'teras'],
                     'teras': ['ruang tamu', 'taman'],
-                    'taman': ['teras', 'ruang tamu'],
-                    'pantai': ['mobil', 'kafe', 'rumah'],
-                    'mall': ['parkiran', 'mobil', 'kafe'],
-                    'mobil': ['pantai', 'mall', 'rumah', 'parkiran'],
-                    'kafe': ['mall', 'pantai', 'jalan'],
-                    'kantor': ['ruang tamu', 'mobil'],
+                    'balkon': ['kamar', 'ruang tamu'],
+                    'taman': ['teras', 'ruang tamu', 'jalan'],
+                    'pantai': ['mobil', 'kafe', 'rumah', 'jalan'],
+                    'mall': ['parkiran', 'mobil', 'kafe', 'jalan'],
+                    'kafe': ['mall', 'pantai', 'jalan', 'mobil'],
+                    'kantor': ['ruang tamu', 'mobil', 'jalan'],
+                    'mobil': ['pantai', 'mall', 'rumah', 'parkiran', 'kafe'],
                 },
-                'min_time_between_change': 60,  # Minimal 1 menit antar pindah
-                'require_transition': True
+                'min_time_between_change': 60,  # Minimal 1 menit
+                'require_transition': True,
+                'max_changes_per_day': 20,
             },
             'clothing': {
                 'require_reason': True,
-                'valid_reasons': ['mandi', 'gerah', 'dingin', 'ganti baju', 'habis mandi', 'mau tidur', 'bangun tidur', 'buka baju', 'lepas baju'],
-                'min_time_between_change': 300  # Minimal 5 menit antar ganti baju
+                'valid_reasons': ['mandi', 'gerah', 'dingin', 'ganti baju', 'habis mandi', 
+                                 'mau tidur', 'bangun tidur', 'buka baju', 'lepas baju',
+                                 'olahraga', 'hujan', 'panas'],
+                'min_time_between_change': 300,  # Minimal 5 menit
+                'max_changes_per_day': 10,
             },
             'position': {
-                'min_time_between_change': 10,  # 10 detik minimal
-                'max_changes_per_hour': 20
+                'min_time_between_change': 10,
+                'max_changes_per_hour': 20,
+                'max_changes_per_day': 100,
             },
             'activity': {
                 'min_duration': 60,  # Minimal 1 menit per aktivitas
                 'max_pause_duration': 1800,  # Max pause 30 menit
+                'max_interruptions': 5,  # Max interupsi per aktivitas
                 'valid_transitions': {
-                    'masak': ['makan', 'bersih-bersih'],
-                    'makan': ['masak', 'santai'],
-                    'tidur': ['bangun', 'mimpi'],
-                    'mandi': ['ganti baju', 'santai'],
-                    'kerja': ['istirahat', 'makan'],
-                }
+                    'masak': ['makan', 'bersih-bersih', 'santai'],
+                    'makan': ['masak', 'santai', 'cuci piring'],
+                    'tidur': ['bangun', 'mimpi', 'insomnia'],
+                    'mandi': ['ganti baju', 'santai', 'keramas'],
+                    'kerja': ['istirahat', 'makan', 'meeting'],
+                    'baca': ['santai', 'tidur', 'nulis'],
+                },
             },
             'arousal': {
-                'max_increase_per_minute': 5,  # Maksimal naik 5 per menit
+                'max_increase_per_minute': 5,
                 'max_decrease_per_minute': 3,
-                'climax_cooldown': 300  # 5 menit cooldown setelah climax
-            }
+                'climax_cooldown': 300,  # 5 menit cooldown
+                'max_climax_per_day': 5,
+            },
+            'physical': {
+                'energy_decay_per_hour': 5,  # Turun 5% per jam
+                'hunger_increase_per_hour': 3,  # Naik 3% per jam
+                'thirst_increase_per_hour': 2,  # Naik 2% per jam
+                'min_energy_for_activity': 20,  # Minimal energi untuk aktivitas berat
+            },
         }
     
     # =========================================================================
-    # ACTIVITY MANAGEMENT (BARU)
+    # ACTIVITY MANAGEMENT (MULTI-LAYER)
     # =========================================================================
     
     def start_activity(self, activity: str, details: Optional[Dict] = None):
         """
-        Mulai aktivitas baru
-        
-        Args:
-            activity: Nama aktivitas (masak, tidur, mandi, dll)
-            details: Detail aktivitas
+        Mulai aktivitas baru (push ke stack)
         """
         now = time.time()
         
-        # Simpan aktivitas sebelumnya ke history
+        # Simpan aktivitas sebelumnya ke stack
         if self.current['activity']['name']:
-            self.current['activity']['history'].append({
+            self.current['activity_stack'].append({
                 'name': self.current['activity']['name'],
-                'details': self.current['activity']['details'],
+                'details': self.current['activity']['details'].copy(),
                 'start_time': self.current['activity']['start_time'],
-                'end_time': now,
-                'duration': now - (self.current['activity']['start_time'] or now),
-                'status': 'completed'
+                'progress': self.current['activity']['progress'],
+                'interrupted_at': now,
+                'reason': 'new_activity'
+            })
+            
+            # Catat interupsi
+            self.current['activity']['interruptions'].append({
+                'time': now,
+                'by': activity,
+                'previous_activity': self.current['activity']['name']
             })
         
         # Set aktivitas baru
@@ -223,33 +308,137 @@ class StateTracker:
             'last_update': now,
             'progress': None,
             'status': 'active',
-            'history': self.current['activity']['history']
+            'interruptions': []
         }
         
-        # Catat history perubahan
+        # Catat history
         self.history['activity'].append({
             'timestamp': now,
             'from': old_activity,
             'to': activity,
-            'details': details
+            'details': details,
+            'type': 'start'
         })
+        
+        # Update daily stats
+        self.daily_stats['activity_count'] += 1
         
         logger.info(f"📌 Activity started: {activity}")
     
-    def update_activity(self, activity: str, details: Optional[Dict] = None):
+    def pause_activity(self, reason: str = "pause"):
         """
-        Update aktivitas (untuk backward compatibility)
-        Arahkan ke start_activity
+        Pause aktivitas saat ini
         """
-        self.start_activity(activity, details)
+        if self.current['activity']['name'] and self.current['activity']['status'] == 'active':
+            self.current['activity']['status'] = 'paused'
+            self.current['activity']['last_update'] = time.time()
+            self.current['activity']['pause_reason'] = reason
+            
+            self.current['paused_activities'].append({
+                'name': self.current['activity']['name'],
+                'details': self.current['activity']['details'].copy(),
+                'start_time': self.current['activity']['start_time'],
+                'progress': self.current['activity']['progress'],
+                'paused_at': time.time(),
+                'reason': reason
+            })
+            
+            self.history['activity'].append({
+                'timestamp': time.time(),
+                'from': self.current['activity']['name'],
+                'to': None,
+                'reason': reason,
+                'type': 'pause'
+            })
+            
+            logger.info(f"⏸️ Activity paused: {self.current['activity']['name']}")
+    
+    def resume_activity(self) -> bool:
+        """
+        Resume aktivitas terakhir yang di-pause
+        """
+        if self.current['paused_activities']:
+            last = self.current['paused_activities'].pop()
+            
+            # Hitung durasi pause
+            pause_duration = time.time() - last['paused_at']
+            
+            # Update status
+            last['status'] = 'active'
+            last['last_update'] = time.time()
+            last['resumed_at'] = time.time()
+            last['pause_duration'] = pause_duration
+            del last['paused_at']
+            
+            self.current['activity'] = last
+            
+            self.history['activity'].append({
+                'timestamp': time.time(),
+                'from': None,
+                'to': last['name'],
+                'type': 'resume',
+                'pause_duration': pause_duration
+            })
+            
+            logger.info(f"▶️ Activity resumed: {last['name']} (paused {pause_duration:.0f}s)")
+            return True
+        
+        elif self.current['activity_stack']:
+            # Kembali ke aktivitas sebelumnya di stack
+            last = self.current['activity_stack'].pop()
+            last['status'] = 'active'
+            last['last_update'] = time.time()
+            last['resumed_at'] = time.time()
+            
+            self.current['activity'] = last
+            
+            self.history['activity'].append({
+                'timestamp': time.time(),
+                'from': None,
+                'to': last['name'],
+                'type': 'return_to_stack'
+            })
+            
+            logger.info(f"↩️ Returned to activity: {last['name']}")
+            return True
+        
+        return False
+    
+    def end_activity(self, completed: bool = True):
+        """
+        Akhiri aktivitas saat ini
+        """
+        if self.current['activity']['name']:
+            activity = self.current['activity']['name']
+            duration = time.time() - (self.current['activity']['start_time'] or time.time())
+            
+            # Catat ke history
+            self.history['activity'].append({
+                'timestamp': time.time(),
+                'from': activity,
+                'to': None,
+                'duration': duration,
+                'completed': completed,
+                'type': 'end'
+            })
+            
+            # Reset current activity
+            self.current['activity'] = {
+                'name': None,
+                'details': {},
+                'start_time': None,
+                'last_update': None,
+                'progress': None,
+                'status': 'idle',
+                'interruptions': []
+            }
+            
+            status = "selesai" if completed else "dibatalkan"
+            logger.info(f"🏁 Activity ended: {activity} ({status})")
     
     def update_activity_progress(self, progress: str, details: Optional[Dict] = None):
         """
         Update progress aktivitas
-        
-        Args:
-            progress: Progress (misal: '75% matang')
-            details: Detail tambahan
         """
         if self.current['activity']['name']:
             self.current['activity']['progress'] = progress
@@ -260,118 +449,137 @@ class StateTracker:
             
             logger.debug(f"📊 Activity progress: {progress}")
     
-    def pause_activity(self):
-        """Pause aktivitas saat ini"""
-        if self.current['activity']['name'] and self.current['activity']['status'] == 'active':
-            self.current['activity']['status'] = 'paused'
-            self.current['activity']['last_update'] = time.time()
-            
-            # Push ke stack
-            self.current['activity_stack'].append({
-                'name': self.current['activity']['name'],
-                'details': self.current['activity']['details'].copy(),
-                'start_time': self.current['activity']['start_time'],
-                'progress': self.current['activity']['progress'],
-                'paused_at': time.time()
-            })
-            
-            logger.info(f"⏸️ Activity paused: {self.current['activity']['name']}")
-    
-    def resume_activity(self) -> bool:
-        """Resume aktivitas terakhir dari stack"""
-        if self.current['activity_stack']:
-            last = self.current['activity_stack'].pop()
-            
-            # Hitung durasi pause
-            pause_duration = time.time() - last['paused_at']
-            
-            # Set aktivitas kembali
-            self.current['activity'] = {
-                'name': last['name'],
-                'details': last['details'],
-                'start_time': last['start_time'],
-                'last_update': time.time(),
-                'progress': last['progress'],
-                'status': 'active',
-                'history': self.current['activity']['history']
-            }
-            
-            logger.info(f"▶️ Activity resumed: {last['name']} (paused for {pause_duration:.0f}s)")
-            return True
-        
-        return False
-    
-    def end_activity(self, completed: bool = True):
-        """
-        Akhiri aktivitas saat ini
-        
-        Args:
-            completed: True jika selesai, False jika dibatalkan
-        """
-        if self.current['activity']['name']:
-            activity = self.current['activity']['name']
-            duration = time.time() - (self.current['activity']['start_time'] or time.time())
-            
-            # Catat ke history
-            self.current['activity']['history'].append({
-                'name': activity,
-                'details': self.current['activity']['details'].copy(),
-                'start_time': self.current['activity']['start_time'],
-                'end_time': time.time(),
-                'duration': duration,
-                'completed': completed
-            })
-            
-            # Reset current activity
-            old_activity = self.current['activity']['name']
-            self.current['activity'] = {
-                'name': None,
-                'details': {},
-                'start_time': None,
-                'last_update': None,
-                'progress': None,
-                'status': 'idle',
-                'history': self.current['activity']['history']
-            }
-            
-            # Catat history
-            self.history['activity'].append({
-                'timestamp': time.time(),
-                'from': old_activity,
-                'to': None,
-                'completed': completed,
-                'duration': duration
-            })
-            
-            status = "selesai" if completed else "dibatalkan"
-            logger.info(f"🏁 Activity ended: {activity} ({status})")
-    
     def get_current_activity(self) -> Optional[Dict]:
-        """Dapatkan aktivitas saat ini"""
+        """
+        Dapatkan aktivitas saat ini dengan durasi
+        """
         if self.current['activity']['name']:
-            return {
-                'name': self.current['activity']['name'],
-                'details': self.current['activity']['details'].copy(),
-                'duration': time.time() - (self.current['activity']['start_time'] or time.time()),
-                'progress': self.current['activity']['progress'],
-                'status': self.current['activity']['status']
-            }
+            activity = self.current['activity'].copy()
+            activity['duration'] = time.time() - (activity['start_time'] or time.time())
+            return activity
         return None
     
-    def get_activity_history(self, limit: int = 10) -> List[Dict]:
-        """Dapatkan history aktivitas"""
-        return self.current['activity']['history'][-limit:]
+    # =========================================================================
+    # PHYSICAL TRACKING (DETAIL)
+    # =========================================================================
+    
+    def update_physical(self, category: str, delta: int, reason: str = ""):
+        """
+        Update kondisi fisik
+        
+        Args:
+            category: 'energy', 'hunger', 'thirst', 'temperature', 'comfort'
+            delta: Perubahan nilai
+            reason: Alasan perubahan
+        """
+        if category not in self.current['physical']:
+            return
+        
+        phys = self.current['physical'][category]
+        old_level = phys['level']
+        
+        # Apply delta dengan batasan
+        if category in ['energy', 'hunger', 'thirst', 'comfort']:
+            new_level = max(0, min(100, old_level + delta))
+        else:  # temperature
+            new_level = old_level + delta
+        
+        phys['level'] = new_level
+        phys['last_change'] = time.time()
+        
+        # Update feeling
+        self._update_physical_feeling(category)
+        
+        # Update peak/low untuk energy
+        if category == 'energy':
+            if new_level > phys.get('daily_peak', 0):
+                phys['daily_peak'] = new_level
+            if new_level < phys.get('daily_low', 100):
+                phys['daily_low'] = new_level
+        
+        # Catat history
+        self.history['physical'].append({
+            'timestamp': time.time(),
+            'category': category,
+            'from': old_level,
+            'to': new_level,
+            'delta': delta,
+            'reason': reason
+        })
+        
+        logger.debug(f"📊 Physical {category}: {old_level} → {new_level}")
+    
+    def _update_physical_feeling(self, category: str):
+        """Update feeling berdasarkan level"""
+        phys = self.current['physical'][category]
+        level = phys['level']
+        
+        if category == 'energy':
+            if level > 70:
+                phys['feeling'] = 'energetic'
+            elif level > 40:
+                phys['feeling'] = 'normal'
+            elif level > 20:
+                phys['feeling'] = 'tired'
+            else:
+                phys['feeling'] = 'exhausted'
+        
+        elif category == 'hunger':
+            if level > 70:
+                phys['feeling'] = 'very_hungry'
+            elif level > 40:
+                phys['feeling'] = 'hungry'
+            else:
+                phys['feeling'] = 'normal'
+        
+        elif category == 'thirst':
+            if level > 70:
+                phys['feeling'] = 'very_thirsty'
+            elif level > 40:
+                phys['feeling'] = 'thirsty'
+            else:
+                phys['feeling'] = 'normal'
+        
+        elif category == 'temperature':
+            if level < 20:
+                phys['feeling'] = 'cold'
+            elif level > 30:
+                phys['feeling'] = 'hot'
+            else:
+                phys['feeling'] = 'normal'
+        
+        elif category == 'comfort':
+            if level > 70:
+                phys['feeling'] = 'comfortable'
+            else:
+                phys['feeling'] = 'uncomfortable'
+    
+    def natural_decay(self, hours: float):
+        """
+        Natural decay fisik berdasarkan waktu berlalu
+        
+        Args:
+            hours: Jam yang telah berlalu
+        """
+        # Energy turun
+        decay = hours * self.validation_rules['physical']['energy_decay_per_hour']
+        self.update_physical('energy', -decay, 'natural_decay')
+        
+        # Hunger naik
+        increase = hours * self.validation_rules['physical']['hunger_increase_per_hour']
+        self.update_physical('hunger', increase, 'natural_decay')
+        
+        # Thirst naik
+        increase = hours * self.validation_rules['physical']['thirst_increase_per_hour']
+        self.update_physical('thirst', increase, 'natural_decay')
     
     # =========================================================================
     # LOCATION TRACKING
     # =========================================================================
     
-    def update_location(self, name: str, category: str = "unknown") -> Tuple[bool, str]:
+    def update_location(self, name: str, category: str = "private") -> Tuple[bool, str]:
         """
         Update lokasi saat ini
-        
-        Returns:
-            (success, message)
         """
         old_name = self.current['location']['name']
         
@@ -384,10 +592,11 @@ class StateTracker:
         self.current['location'] = {
             'name': name,
             'category': category,
-            'last_change': time.time()
+            'last_change': time.time(),
+            'visited_before': self.current['location'].get('visited_before', []) + [name]
         }
         
-        # Set privacy level based on category
+        # Update privacy level
         if category == 'intimate':
             self.current['location']['privacy_level'] = 0.9
         elif category == 'public':
@@ -403,6 +612,9 @@ class StateTracker:
             'category': category
         })
         
+        # Update daily stats
+        self.daily_stats['location_changes'] += 1
+        
         logger.debug(f"📍 Location updated: {old_name} → {name}")
         return True, f"Pindah ke {name}"
     
@@ -413,21 +625,29 @@ class StateTracker:
         
         rules = self.validation_rules['location']
         
-        # Cek waktu minimal antar perubahan
+        # Cek waktu minimal
         last_change = self.current['location']['last_change']
         if time.time() - last_change < rules['min_time_between_change']:
-            return False, f"Masih di {old}, tunggu bentar ya baru bisa pindah."
+            return False, f"Masih di {old}, tunggu bentar"
         
-        # Cek transisi yang masuk akal
+        # Cek batas harian
+        if self.daily_stats['location_changes'] >= rules['max_changes_per_day']:
+            return False, "Hari ini sudah terlalu banyak pindah tempat"
+        
+        # Cek transisi
         if rules['require_transition']:
             old_lower = old.lower()
             new_lower = new.lower()
             
+            allowed = False
             for key, values in rules['plausible_transitions'].items():
                 if key in old_lower:
-                    if not any(v in new_lower for v in values):
-                        return False, f"Gak bisa langsung dari {old} ke {new}."
-                    break
+                    if any(v in new_lower for v in values):
+                        allowed = True
+                        break
+            
+            if not allowed:
+                return False, f"Gak bisa langsung dari {old} ke {new}"
         
         return True, "OK"
     
@@ -436,12 +656,7 @@ class StateTracker:
     # =========================================================================
     
     def update_clothing(self, name: str, reason: str = "ganti baju") -> Tuple[bool, str]:
-        """
-        Update pakaian saat ini
-        
-        Returns:
-            (success, message)
-        """
+        """Update pakaian"""
         old_name = self.current['clothing']['name']
         
         # Validasi
@@ -453,7 +668,8 @@ class StateTracker:
         self.current['clothing'] = {
             'name': name,
             'last_change': time.time(),
-            'change_reason': reason
+            'change_reason': reason,
+            'worn_before': self.current['clothing'].get('worn_before', []) + [name]
         }
         
         # Catat history
@@ -464,7 +680,10 @@ class StateTracker:
             'reason': reason
         })
         
-        logger.debug(f"👗 Clothing updated: {old_name} → {name} ({reason})")
+        # Update daily stats
+        self.daily_stats['clothing_changes'] += 1
+        
+        logger.debug(f"👗 Clothing updated: {old_name} → {name}")
         return True, f"Ganti {name}"
     
     def _validate_clothing_change(self, old: Optional[str], reason: str) -> Tuple[bool, str]:
@@ -475,14 +694,17 @@ class StateTracker:
         rules = self.validation_rules['clothing']
         
         # Cek alasan
-        if rules['require_reason']:
-            if not reason or not any(r in reason.lower() for r in rules['valid_reasons']):
-                return False, "Ganti baju harus ada alasannya dong. Mandi? Gerah?"
+        if not reason or not any(r in reason.lower() for r in rules['valid_reasons']):
+            return False, "Ganti baju harus ada alasannya"
         
         # Cek waktu minimal
         last_change = self.current['clothing']['last_change']
         if time.time() - last_change < rules['min_time_between_change']:
-            return False, "Baru aja ganti baju, kok ganti lagi?"
+            return False, "Baru aja ganti baju"
+        
+        # Cek batas harian
+        if self.daily_stats['clothing_changes'] >= rules['max_changes_per_day']:
+            return False, "Hari ini sudah terlalu sering ganti baju"
         
         return True, "OK"
     
@@ -503,7 +725,8 @@ class StateTracker:
         self.current['position'] = {
             'name': name,
             'description': description,
-            'last_change': time.time()
+            'last_change': time.time(),
+            'positions_today': self.current['position'].get('positions_today', []) + [name]
         }
         
         # Catat history
@@ -519,10 +742,9 @@ class StateTracker:
         """Validasi perubahan posisi"""
         rules = self.validation_rules['position']
         
-        # Cek waktu minimal
         last_change = self.current['position']['last_change']
         if time.time() - last_change < rules['min_time_between_change']:
-            return False, "Kebanyakan gerak, santai dulu."
+            return False, "Kebanyakan gerak, santai dulu"
         
         # Cek frekuensi per jam
         last_hour = time.time() - 3600
@@ -530,51 +752,50 @@ class StateTracker:
                             if h['timestamp'] > last_hour]
         
         if len(changes_last_hour) > rules['max_changes_per_hour']:
-            return False, "Kamu kok gelisah banget? Sering banget ganti posisi."
+            return False, "Sering banget ganti posisi"
         
         return True, "OK"
     
     # =========================================================================
-    # MOOD TRACKING
+    # MOOD TRACKING (MULTI-LAYER)
     # =========================================================================
     
-    def update_mood(self, primary: str, secondary: Optional[str] = None, 
-                     intensity: float = 0.5, reason: str = "") -> None:
-        """Update mood saat ini"""
-        old_mood = self.current['mood']['primary']
+    def update_mood(self, primary: str, secondary: Optional[str] = None,
+                    tertiary: Optional[str] = None, intensity: float = 0.5,
+                    reason: str = ""):
+        """Update mood (bisa multi-layer)"""
+        old_primary = self.current['mood']['primary']
         
         self.current['mood'] = {
             'primary': primary,
             'secondary': secondary,
+            'tertiary': tertiary,
             'intensity': intensity,
-            'last_change': time.time()
+            'last_change': time.time(),
+            'history_today': self.current['mood'].get('history_today', []) + [primary]
         }
         
         self.history['mood'].append({
             'timestamp': time.time(),
-            'from': old_mood,
+            'from': old_primary,
             'to': primary,
+            'secondary': secondary,
             'intensity': intensity,
             'reason': reason
         })
         
-        logger.debug(f"🎭 Mood changed: {old_mood} → {primary}")
+        # Update daily stats
+        self.daily_stats['mood_distribution'][primary] = \
+            self.daily_stats['mood_distribution'].get(primary, 0) + 1
+        
+        logger.debug(f"🎭 Mood changed: {old_primary} → {primary}")
     
     # =========================================================================
     # AROUSAL TRACKING
     # =========================================================================
     
     def update_arousal(self, delta: int, reason: str = "") -> Tuple[bool, str]:
-        """
-        Update level gairah (0-10)
-        
-        Args:
-            delta: Perubahan (-10 sd +10)
-            reason: Alasan perubahan
-            
-        Returns:
-            (success, message)
-        """
+        """Update level gairah"""
         old_level = self.current['arousal']['level']
         new_level = max(0, min(10, old_level + delta))
         
@@ -590,11 +811,12 @@ class StateTracker:
         if new_level > self.current['arousal']['peak_level']:
             self.current['arousal']['peak_level'] = new_level
         
-        # Cek climax (naik drastis lalu turun)
+        # Catat climax
         if delta >= 3 and old_level >= 7:
             self.current['arousal']['climax_count'] += 1
             self.current['intimacy']['climax_count'] += 1
-            self.current['intimacy']['is_active'] = False
+            self.daily_stats['arousal_peaks'] += 1
+            
             self.history['intimacy'].append({
                 'timestamp': time.time(),
                 'type': 'climax',
@@ -602,11 +824,18 @@ class StateTracker:
                 'intensity': new_level
             })
         
-        # Auto-set intimacy status
+        # Update intimacy status
         if new_level >= 7 and not self.current['intimacy']['is_active']:
             self.start_intimacy()
         elif new_level < 7 and self.current['intimacy']['is_active']:
             self.end_intimacy()
+        
+        # Catat history
+        self.current['arousal']['arousal_today'].append({
+            'time': time.time(),
+            'level': new_level,
+            'delta': delta
+        })
         
         self.history['arousal'].append({
             'timestamp': time.time(),
@@ -631,38 +860,30 @@ class StateTracker:
                     break
             
             if last_climax and time.time() - last_climax < rules['climax_cooldown']:
-                return False, "Selesai climax, butuh istirahat dulu..."
+                return False, "Selesai climax, butuh istirahat dulu"
         
-        # Cek kecepatan naik
-        if delta > 0:
-            last_change = self.current['arousal']['last_change']
-            if last_change:
-                time_diff = time.time() - last_change
-                rate = delta / (time_diff / 60) if time_diff > 0 else delta
-                
-                if rate > rules['max_increase_per_minute']:
-                    return False, "Kok cepet banget? Santai dulu..."
+        # Cek batas harian climax
+        if delta >= 3 and old >= 7:
+            if self.daily_stats['arousal_peaks'] >= rules['max_climax_per_day']:
+                return False, "Hari ini sudah terlalu banyak climax"
         
         return True, "OK"
     
-    # =========================================================================
-    # INTIMACY TRACKING
-    # =========================================================================
-    
-    def start_intimacy(self) -> None:
+    def start_intimacy(self):
         """Mulai sesi intim"""
         if not self.current['intimacy']['is_active']:
             self.current['intimacy']['is_active'] = True
             self.current['intimacy']['start_time'] = time.time()
+            self.current['intimacy']['sessions_today'] += 1
             
             self.history['intimacy'].append({
                 'timestamp': time.time(),
                 'type': 'start'
             })
             
-            logger.debug("💕 Intimacy started")
+            logger.info("💕 Intimacy started")
     
-    def end_intimacy(self) -> None:
+    def end_intimacy(self):
         """Akhiri sesi intim"""
         if self.current['intimacy']['is_active']:
             duration = time.time() - self.current['intimacy']['start_time']
@@ -676,7 +897,7 @@ class StateTracker:
                 'duration': duration
             })
             
-            logger.debug(f"💕 Intimacy ended (duration: {duration:.0f}s)")
+            logger.info(f"💕 Intimacy ended ({duration:.0f}s)")
     
     def add_intimacy_position(self, position: str):
         """Tambah posisi yang digunakan saat intim"""
@@ -684,25 +905,18 @@ class StateTracker:
             self.current['intimacy']['positions_used'].append(position)
     
     # =========================================================================
-    # ACTIVITY TRACKING (OLD - UNTUK BACKWARD COMPATIBILITY)
-    # =========================================================================
-    
-    def update_activity_old(self, name: str) -> None:
-        """Update aktivitas saat ini (OLD METHOD)"""
-        # Method ini dipanggil oleh kode lama
-        # Arahkan ke start_activity
-        self.start_activity(name)
-    
-    # =========================================================================
     # INTERACTION TRACKING
     # =========================================================================
     
-    def register_interaction(self, user_message: str, bot_response: str) -> None:
+    def register_interaction(self, user_message: str, bot_response: str):
         """Catat interaksi"""
+        now = time.time()
+        
         self.current['interaction']['last_user_message'] = user_message
         self.current['interaction']['last_bot_response'] = bot_response
         self.current['interaction']['total_messages'] += 1
-        self.current['interaction']['last_active'] = time.time()
+        self.current['interaction']['messages_today'] += 1
+        self.current['interaction']['last_active'] = now
     
     # =========================================================================
     # GETTERS
@@ -710,6 +924,11 @@ class StateTracker:
     
     def get_current_state(self) -> Dict:
         """Dapatkan semua state saat ini"""
+        # Update awareness
+        now = datetime.now()
+        self.current['awareness']['time_of_day'] = self._get_time_of_day()
+        self.current['awareness']['day_of_week'] = now.strftime('%A')
+        
         return {
             'location': self.current['location']['name'],
             'location_category': self.current['location']['category'],
@@ -718,54 +937,63 @@ class StateTracker:
             'position': self.current['position']['name'],
             'position_desc': self.current['position']['description'],
             'mood': self.current['mood']['primary'],
+            'mood_secondary': self.current['mood']['secondary'],
+            'mood_tertiary': self.current['mood']['tertiary'],
             'mood_intensity': self.current['mood']['intensity'],
             'arousal': self.current['arousal']['level'],
             'is_intimate': self.current['intimacy']['is_active'],
             'activity': self.current['activity']['name'],
             'activity_details': self.current['activity']['details'],
             'activity_status': self.current['activity']['status'],
+            'energy': self.current['physical']['energy']['feeling'],
+            'hunger': self.current['physical']['hunger']['feeling'],
+            'thirst': self.current['physical']['thirst']['feeling'],
+            'temperature': self.current['physical']['temperature']['feeling'],
+            'comfort': self.current['physical']['comfort']['feeling'],
             'total_messages': self.current['interaction']['total_messages'],
             'idle_seconds': time.time() - self.current['interaction']['last_active']
         }
     
+    def _get_time_of_day(self) -> str:
+        """Dapatkan waktu dalam string"""
+        hour = datetime.now().hour
+        if 5 <= hour < 11:
+            return 'pagi'
+        elif 11 <= hour < 15:
+            return 'siang'
+        elif 15 <= hour < 18:
+            return 'sore'
+        else:
+            return 'malam'
+    
     def get_state_for_prompt(self) -> str:
         """Format state untuk prompt AI"""
         state = self.get_current_state()
-        activity = self.get_current_activity()
         
         parts = []
         
+        # Lokasi
         if state['location']:
             parts.append(f"di {state['location']}")
         
+        # Pakaian
         if state['clothing']:
-            parts.append(f"pake {state['clothing']}")
+            parts.append(f"pakai {state['clothing']}")
         
+        # Posisi
         if state['position']:
             parts.append(f"lagi {state['position_desc'] or state['position']}")
         
-        if activity:
-            duration = activity.get('duration', 0)
-            if duration < 60:
-                duration_str = "baru mulai"
-            else:
-                duration_str = f"{int(duration/60)} menit"
-            
-            parts.append(f"sedang {activity['name']} ({duration_str})")
-            
-            if activity['details']:
-                for key, value in activity['details'].items():
-                    parts.append(f"{key}: {value}")
+        # Aktivitas
+        if state['activity']:
+            parts.append(f"sedang {state['activity']}")
         
-        if state['is_intimate']:
-            parts.append("lagi intim")
-        elif state['arousal'] >= 7:
-            parts.append("horny")
+        # Mood
+        parts.append(f"mood {state['mood']}")
         
-        if state['privacy_level'] > 0.7:
-            parts.append("sepi")
-        elif state['privacy_level'] < 0.4:
-            parts.append("rame")
+        # Fisik
+        if state['energy'] != 'energetic':
+            parts.append(f"energi {state['energy']}")
         
         return "lagi " + ", ".join(parts) if parts else "santai"
     
@@ -779,40 +1007,31 @@ class StateTracker:
             f"📍 Lokasi: {self.current['location']['name'] or '?'}",
             f"👕 Pakaian: {self.current['clothing']['name'] or '?'}",
             f"🧍 Posisi: {self.current['position']['description'] or self.current['position']['name'] or '?'}",
-            f"🎭 Mood: {self.current['mood']['primary']} ({self.current['mood']['intensity']:.0%})",
+            f"🎭 Mood: {self.current['mood']['primary']}",
             f"🔥 Gairah: {self.current['arousal']['level']}/10",
             f"💕 Intim: {'Ya' if self.current['intimacy']['is_active'] else 'Tidak'}",
             f"🎯 Aktivitas: {activity_text}",
+            f"🔋 Energi: {self.current['physical']['energy']['feeling']}",
+            f"🍽️ Lapar: {self.current['physical']['hunger']['feeling']}",
+            f"💧 Haus: {self.current['physical']['thirst']['feeling']}",
             f"💬 Total chat: {self.current['interaction']['total_messages']}"
         ]
         
         return "\n".join(lines)
-    
-    # =========================================================================
-    # HISTORY
-    # =========================================================================
-    
-    def get_history(self, state_type: StateType, limit: int = 10) -> List[Dict]:
-        """Dapatkan history perubahan untuk state tertentu"""
-        if state_type.value in self.history:
-            return self.history[state_type.value][-limit:]
-        return []
     
     def get_timeline(self, limit: int = 20) -> List[Dict]:
         """Dapatkan timeline semua perubahan"""
         timeline = []
         
         for state_type, events in self.history.items():
-            for event in events:
+            for event in events[-limit:]:
                 timeline.append({
                     'time': event['timestamp'],
                     'type': state_type,
                     'data': event
                 })
         
-        # Sort by time
         timeline.sort(key=lambda x: x['time'], reverse=True)
-        
         return timeline[:limit]
     
     def format_timeline(self, limit: int = 10) -> str:
@@ -842,16 +1061,28 @@ class StateTracker:
                 if data.get('to'):
                     lines.append(f"• [{time_str}] Aktivitas: {data['from']} → {data['to']}")
                 else:
-                    lines.append(f"• [{time_str}] {data['from']} selesai ({data.get('duration', 0):.0f}s)")
+                    lines.append(f"• [{time_str}] {data['from']} {data.get('type', '')}")
             elif t['type'] == 'intimacy':
                 if data['type'] == 'start':
                     lines.append(f"• [{time_str}] 🔥 Mulai intim")
                 elif data['type'] == 'end':
                     lines.append(f"• [{time_str}] 💤 Selesai intim ({data.get('duration', 0):.0f}s)")
                 elif data['type'] == 'climax':
-                    lines.append(f"• [{time_str}] 💦 Climax! (intensitas: {data.get('intensity', 0)})")
+                    lines.append(f"• [{time_str}] 💦 Climax!")
         
         return "\n".join(lines)
+    
+    def reset_daily_stats(self):
+        """Reset statistik harian"""
+        self.daily_stats = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'mood_distribution': {},
+            'arousal_peaks': 0,
+            'activity_count': 0,
+            'location_changes': 0,
+            'clothing_changes': 0,
+        }
+        logger.info("📅 Daily stats reset")
 
 
 __all__ = ['StateTracker', 'StateType']
