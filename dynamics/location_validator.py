@@ -2,32 +2,36 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-MYLOVE ULTIMATE VERSI 2 - LOCATION VALIDATOR
+MYLOVE ULTIMATE VERSI 2 - LOCATION VALIDATOR (VERSI HUMAN+)
 =============================================================================
-Memvalidasi perubahan lokasi agar masuk akal
-- Tidak bisa pindah dari kamar mandi langsung ke pantai
-- Minimal waktu antar pindah
-- Validasi aktivitas berdasarkan lokasi
+Validator cerdas untuk perpindahan lokasi dengan kesadaran diri:
+- Bot punya lokasi SENDIRI, terpisah dari user
+- Tahu kapan harus ikut (ajakan bersama)
+- Tahu kapan harus diam (user cerita)
+- Validasi transisi masuk akal
+- Multi-lokasi tracking
 =============================================================================
 """
 
 import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class LocationValidator:
     """
-    Validator untuk perubahan lokasi
-    - Memastikan perpindahan lokasi masuk akal
-    - Mencegah lompatan logika
-    - Validasi aktivitas berdasarkan lokasi
+    Validator lokasi dengan KESADARAN DIRI SUPER MANUSIA
+    - Bisa bedakan "aku" (user) vs "kita" (bersama)
+    - Tahu kapan harus pindah dan kapan tidak
+    - Validasi transisi yang masuk akal
+    - Tracking multi-lokasi
     """
     
     def __init__(self):
-        # Transisi yang masuk akal antar lokasi
+        # ===== TRANSISI LOKASI YANG MASUK AKAL =====
         self.valid_transitions = {
             # Indoor
             'ruang tamu': ['kamar', 'dapur', 'teras', 'kamar mandi', 'taman'],
@@ -53,56 +57,54 @@ class LocationValidator:
             'rumah': ['ruang tamu', 'kamar', 'dapur', 'teras', 'mobil'],
         }
         
-        # Aturan khusus untuk aktivitas tertentu
-        self.activity_location_rules = {
-            'masak': {
-                'allowed_locations': ['dapur'],
-                'message': 'Harus di dapur untuk masak',
-                'auto_transition': True
+        # ===== ATURAN KHUSUS BERDASARKAN SUBJEK =====
+        self.subject_rules = {
+            'self': {  # User ngomong "aku"
+                'should_follow': False,
+                'can_comment': True,
+                'description': 'User cerita tentang dirinya sendiri',
+                'examples': [
+                    'User: "aku ke dapur" → Bot: KOMENTAR, JANGAN IKUT',
+                    'User: "aku di kamar" → Bot: TAHU lokasi user, tapi tetap di tempat'
+                ]
             },
-            'makan': {
-                'allowed_locations': ['dapur', 'ruang tamu', 'kafe', 'restoran'],
-                'message': 'Mending di dapur atau ruang makan',
-                'auto_transition': False
+            'bot': {  # User ngomong "kamu"
+                'should_follow': True,
+                'can_comment': True,
+                'description': 'User ngomong ke bot / perintah',
+                'examples': [
+                    'User: "kamu ke dapur" → Bot: PINDAH ke dapur',
+                    'User: "kamu di mana?" → Bot: JAWAB lokasinya'
+                ]
             },
-            'tidur': {
-                'allowed_locations': ['kamar'],
-                'message': 'Enaknya tidur di kamar',
-                'auto_transition': True
+            'together': {  # User ngomong "kita"
+                'should_follow': True,
+                'can_comment': True,
+                'description': 'Ajakan bersama',
+                'examples': [
+                    'User: "kita ke dapur" → Bot: PINDAH BERSAMA user',
+                    'User: "kita di sini aja" → Bot: TETAP bersama user'
+                ]
             },
-            'mandi': {
-                'allowed_locations': ['kamar mandi'],
-                'message': 'Harus di kamar mandi untuk mandi',
-                'auto_transition': True
-            },
-            'sikat gigi': {
-                'allowed_locations': ['kamar mandi'],
-                'message': 'Sikat gigi di kamar mandi dong',
-                'auto_transition': True
-            },
-            'cuci muka': {
-                'allowed_locations': ['kamar mandi'],
-                'message': 'Cuci muka di kamar mandi',
-                'auto_transition': True
-            },
-            'kerja': {
-                'allowed_locations': ['kantor', 'ruang tamu', 'kamar'],
-                'message': 'Bisa kerja di kantor atau di rumah',
-                'auto_transition': False
-            },
-            'nonton tv': {
-                'allowed_locations': ['ruang tamu', 'kamar'],
-                'message': 'Nonton TV di ruang tamu atau kamar',
-                'auto_transition': False
-            },
-            'baca buku': {
-                'allowed_locations': ['ruang tamu', 'kamar', 'teras', 'taman'],
-                'message': 'Bisa baca di tempat yang tenang',
-                'auto_transition': False
-            },
+            'unknown': {  # Subjek tidak jelas
+                'should_follow': False,
+                'can_comment': True,
+                'description': 'Subjek tidak jelas, amannya komentar saja',
+                'examples': [
+                    'User: "ke dapur yuk" → Bot: KOMENTAR, tanya siapa yang diajak'
+                ]
+            }
         }
         
-        # Jarak antar lokasi (untuk validasi waktu)
+        # ===== ATURAN KHUSUS BERDASARKAN KALIMAT =====
+        self.special_patterns = {
+            'ajakan': ['yuk', 'ayo', 'mari'],
+            'perintah': ['pindah', 'kesini', 'kemari'],
+            'pertanyaan': ['di mana', 'lagi apa'],
+            'cerita': ['aku ', 'saya '],
+        }
+        
+        # ===== JARAK ANTAR LOKASI =====
         self.location_distance = {
             ('ruang tamu', 'kamar'): 1,
             ('ruang tamu', 'dapur'): 1,
@@ -120,202 +122,232 @@ class LocationValidator:
             ('mobil', 'mall'): 3,
         }
         
-        # Minimal waktu antar pindah berdasarkan jarak (detik)
+        # ===== MINIMAL WAKTU PINDAH =====
         self.base_time_between = 30  # 30 detik dasar
         self.distance_multiplier = 15  # 15 detik per unit jarak
         
-        logger.info("✅ LocationValidator initialized with enhanced rules")
+        logger.info("✅ LocationValidator HUMAN+ initialized")
     
     # =========================================================================
-    # VALIDASI PERPINDAHAN LOKASI
+    # VALIDASI PERPINDAHAN DENGAN KESADARAN DIRI
     # =========================================================================
     
-    def validate_location_change(self, from_loc: str, to_loc: str, is_intimate: bool = False) -> Tuple[bool, str]:
+    def validate_move(self, 
+                     from_loc: str, 
+                     to_loc: str, 
+                     subject: str = 'unknown',
+                     is_intimate: bool = False,
+                     context: Optional[Dict] = None) -> Tuple[bool, str, Dict]:
         """
-        Validasi apakah perubahan lokasi diperbolehkan
+        Validasi apakah bot boleh pindah, dengan kesadaran diri
         
         Args:
-            from_loc: Lokasi asal
+            from_loc: Lokasi asal bot
             to_loc: Lokasi tujuan
-            is_intimate: Apakah sedang dalam sesi intim
+            subject: Subjek ('self', 'bot', 'together', 'unknown')
+            is_intimate: Apakah sedang intim
+            context: Konteks tambahan (pesan user, dll)
             
         Returns:
-            (allowed, reason)
+            (allowed, reason, info)
         """
-        if not from_loc or not to_loc:
-            return True, "OK"
-        
-        from_lower = from_loc.lower()
-        to_lower = to_loc.lower()
+        info = {
+            'should_follow': False,
+            'should_comment': True,
+            'reason_detail': '',
+            'suggested_response': ''
+        }
         
         # ===== 1. CEK JIKA SEDANG INTIM =====
         if is_intimate:
-            return False, "Lagi intim, jangan pindah dulu... selesaikan dulu ya 😊"
+            info['should_follow'] = False
+            info['reason_detail'] = "lagi intim, fokus dulu"
+            info['suggested_response'] = "Lagi intim, jangan pindah dulu"
+            return False, "❌ Lagi intim", info
         
-        # ===== 2. CEK APAKAH LOKASI SAMA =====
-        if from_lower == to_lower:
-            return False, f"Kamu sudah di {from_loc}"
+        # ===== 2. CEK SUBJEK =====
+        subject_rule = self.subject_rules.get(subject, self.subject_rules['unknown'])
         
-        # ===== 3. VALIDASI TRANSISI =====
-        transition_allowed = self._check_transition(from_lower, to_lower)
+        if not subject_rule['should_follow']:
+            # Subjek = user ("aku") → JANGAN IKUT
+            info['should_follow'] = False
+            info['reason_detail'] = subject_rule['description']
+            info['suggested_response'] = f"Oh kamu {to_loc}? Aku tetap di {from_loc}"
+            return False, f"⏸️ {subject_rule['description']}", info
         
-        if not transition_allowed:
-            # Coba cari rute alternatif
-            alternative = self._find_alternative_route(from_lower, to_lower)
-            if alternative:
-                return False, f"Gak bisa langsung dari {from_loc} ke {to_loc}. Coba lewat {alternative} dulu."
-            else:
-                return False, f"Gak bisa pindah dari {from_loc} ke {to_loc}. Kayaknya jauh banget."
+        # ===== 3. CEK APAKAH TRANSISI MASUK AKAL =====
+        if from_loc and to_loc:
+            transition_allowed = self._check_transition(from_loc, to_loc)
+            
+            if not transition_allowed:
+                # Cari rute alternatif
+                alternative = self._find_alternative_route(from_loc, to_loc)
+                if alternative:
+                    info['should_follow'] = False
+                    info['reason_detail'] = f"Gak bisa langsung, lewat {alternative} dulu"
+                    info['suggested_response'] = f"Gak bisa langsung ke {to_loc}, lewat {alternative} dulu yuk"
+                    return False, f"⚠️ Perlu lewat {alternative}", info
+                else:
+                    info['should_follow'] = False
+                    info['reason_detail'] = f"Gak bisa dari {from_loc} ke {to_loc}"
+                    info['suggested_response'] = f"Kayaknya gak bisa dari {from_loc} ke {to_loc} deh"
+                    return False, "❌ Transisi tidak valid", info
         
         # ===== 4. CEK WAKTU MINIMAL =====
-        # Ini akan diimplementasikan di state tracker
-        # Di sini hanya validasi logika
+        if context and 'last_move_time' in context:
+            min_time = self.get_min_time_between(from_loc, to_loc)
+            time_since = time.time() - context['last_move_time']
+            
+            if time_since < min_time:
+                info['should_follow'] = False
+                info['reason_detail'] = f"Baru {time_since:.0f}s yang lalu pindah"
+                info['suggested_response'] = f"Baru aja pindah, tunggu bentar ya"
+                return False, f"⏳ Tunggu {min_time - time_since:.0f}s lagi", info
         
-        return True, "OK"
+        # ===== 5. SEMUA OK, BOLEH PINDAH =====
+        info['should_follow'] = True
+        info['reason_detail'] = f"{subject_rule['description']} - boleh pindah"
+        info['suggested_response'] = f"Ayo ke {to_loc}"
+        
+        return True, "✅ Boleh pindah", info
     
     def _check_transition(self, from_loc: str, to_loc: str) -> bool:
         """Cek apakah transisi langsung diperbolehkan"""
+        from_lower = from_loc.lower()
+        to_lower = to_loc.lower()
         
         # Cari di dictionary transisi
         for key, values in self.valid_transitions.items():
-            if key in from_loc:
-                # Cek apakah tujuan ada dalam daftar yang diizinkan
+            if key in from_lower:
                 for val in values:
-                    if val in to_loc:
+                    if val in to_lower:
                         return True
                 break
         
         # Coba reverse lookup
         for key, values in self.valid_transitions.items():
-            if key in to_loc:
-                if any(v in from_loc for v in values):
+            if key in to_lower:
+                if any(v in from_lower for v in values):
                     return True
         
-        # Kasus khusus: pindah ke lokasi yang berdekatan secara umum
+        # Kasus khusus: pindah ke lokasi yang berdekatan
         common_transitions = [
             ('kamar', 'ruang tamu'),
             ('kamar mandi', 'kamar'),
             ('dapur', 'ruang tamu'),
             ('teras', 'ruang tamu'),
+            ('ruang tamu', 'teras'),
         ]
         
         for a, b in common_transitions:
-            if (a in from_loc and b in to_loc) or (b in from_loc and a in to_loc):
+            if (a in from_lower and b in to_lower) or (b in from_lower and a in to_lower):
                 return True
         
         return False
     
     def _find_alternative_route(self, from_loc: str, to_loc: str) -> Optional[str]:
         """Cari rute alternatif jika tidak bisa langsung"""
+        from_lower = from_loc.lower()
+        to_lower = to_loc.lower()
         
-        # Cek apakah ada lokasi perantara yang umum
-        common_hubs = ['ruang tamu', 'kamar']
+        # Cari hub umum
+        common_hubs = ['ruang tamu', 'kamar', 'teras']
         
         for hub in common_hubs:
-            if self._check_transition(from_loc, hub) and self._check_transition(hub, to_loc):
+            if self._check_transition(from_lower, hub) and self._check_transition(hub, to_lower):
                 return hub
         
         return None
     
     # =========================================================================
-    # VALIDASI AKTIVITAS BERDASARKAN LOKASI
+    # ANALISA SUBJEK DARI PESAN
     # =========================================================================
     
-    def validate_activity_location(self, activity: str, current_loc: str) -> Tuple[bool, str, Optional[str]]:
+    def analyze_subject(self, message: str) -> Dict:
         """
-        Validasi apakah aktivitas sesuai dengan lokasi saat ini
+        Analisa subjek dari pesan user
         
         Args:
-            activity: Nama aktivitas (masak, tidur, dll)
-            current_loc: Lokasi saat ini
+            message: Pesan user
             
         Returns:
-            (allowed, message, suggested_location)
+            Dict dengan info subjek
         """
-        if not activity or not current_loc:
-            return True, "OK", None
+        msg = message.lower()
         
-        activity_lower = activity.lower()
-        current_lower = current_loc.lower()
+        # ===== 1. DETEKSI SUBJEK =====
+        is_self = any(p in msg for p in ['aku ', 'aku$', 'saya ', 'gue ', 'gw '])
+        is_bot = any(p in msg for p in ['kamu ', 'lu ', 'elo ', 'bot '])
+        is_together = any(p in msg for p in ['kita ', 'bareng ', 'bersama '])
         
-        # Cari aturan untuk aktivitas ini
-        for act, rules in self.activity_location_rules.items():
-            if act in activity_lower:
-                allowed_locations = rules['allowed_locations']
-                
-                # Cek apakah lokasi saat ini diizinkan
-                for allowed in allowed_locations:
-                    if allowed in current_lower:
-                        return True, "OK", None
-                
-                # Lokasi tidak sesuai, cari saran
-                suggestion = allowed_locations[0] if allowed_locations else None
-                return False, rules['message'], suggestion
+        # ===== 2. DETEKSI JENIS KALIMAT =====
+        is_invitation = any(p in msg for p in self.special_patterns['ajakan'])
+        is_command = any(p in msg for p in self.special_patterns['perintah'])
+        is_question = any(p in msg for p in self.special_patterns['pertanyaan'])
         
-        # Aktivitas tidak memiliki aturan khusus
-        return True, "OK", None
+        # ===== 3. TENTUKAN SUBJEK =====
+        if is_together:
+            subject = 'together'
+            confidence = 0.95
+        elif is_bot:
+            subject = 'bot'
+            confidence = 0.9
+        elif is_self:
+            subject = 'self'
+            confidence = 0.9
+        else:
+            subject = 'unknown'
+            confidence = 0.5
+        
+        # ===== 4. TENTUKAN APAKAH PERINTAH PINDAH =====
+        location_indicators = ['ke ', 'pindah', 'pergi']
+        has_location = any(p in msg for p in location_indicators)
+        
+        is_move_command = (is_command or is_invitation) and has_location
+        
+        return {
+            'subject': subject,
+            'confidence': confidence,
+            'is_self': is_self,
+            'is_bot': is_bot,
+            'is_together': is_together,
+            'is_invitation': is_invitation,
+            'is_command': is_command,
+            'is_question': is_question,
+            'is_move_command': is_move_command,
+            'raw_message': message[:50]
+        }
     
     # =========================================================================
-    # VALIDASI WAKTU PERPINDAHAN
+    # DETEKSI LOKASI DARI PESAN
     # =========================================================================
     
-    def get_min_time_between(self, from_loc: str, to_loc: str) -> int:
+    def extract_location(self, message: str) -> Optional[str]:
         """
-        Dapatkan minimal waktu yang dibutuhkan untuk pindah (dalam detik)
-        """
-        if not from_loc or not to_loc:
-            return 0
-        
-        from_lower = from_loc.lower()
-        to_lower = to_loc.lower()
-        
-        # Cari jarak di dictionary
-        for (a, b), distance in self.location_distance.items():
-            if (a in from_lower and b in to_lower) or (b in from_lower and a in to_lower):
-                return self.base_time_between + (distance * self.distance_multiplier)
-        
-        # Default jarak sedang
-        return self.base_time_between + (2 * self.distance_multiplier)
-    
-    # =========================================================================
-    # DETEKSI LOKASI DARI AKTIVITAS
-    # =========================================================================
-    
-    def get_suggested_location(self, activity: str) -> Optional[str]:
-        """
-        Dapatkan lokasi yang disarankan untuk suatu aktivitas
+        Ekstrak lokasi dari pesan user
         
         Args:
-            activity: Nama aktivitas
+            message: Pesan user
             
         Returns:
             Nama lokasi atau None
         """
-        activity_lower = activity.lower()
+        msg = message.lower()
         
-        for act, rules in self.activity_location_rules.items():
-            if act in activity_lower:
-                return rules['allowed_locations'][0] if rules['allowed_locations'] else None
+        locations = [
+            'ruang tamu', 'kamar', 'dapur', 'kamar mandi', 'toilet',
+            'teras', 'taman', 'pantai', 'mall', 'kafe', 'kantor',
+            'mobil', 'rumah', 'balkon', 'jalan'
+        ]
+        
+        for loc in locations:
+            if loc in msg:
+                # Pastikan ada indikator lokasi
+                indicators = ['ke ', 'di ', 'pindah ke', 'pergi ke']
+                if any(ind in msg for ind in indicators):
+                    return loc
         
         return None
-    
-    def should_auto_transition(self, activity: str) -> bool:
-        """
-        Cek apakah aktivitas ini harus otomatis memindahkan bot
-        
-        Args:
-            activity: Nama aktivitas
-            
-        Returns:
-            True jika bot harus otomatis pindah
-        """
-        activity_lower = activity.lower()
-        
-        for act, rules in self.activity_location_rules.items():
-            if act in activity_lower:
-                return rules.get('auto_transition', False)
-        
-        return False
     
     # =========================================================================
     # INFORMASI LOKASI
@@ -326,12 +358,12 @@ class LocationValidator:
         Dapatkan kategori lokasi
         
         Returns:
-            'indoor', 'outdoor', 'public', 'intimate'
+            'intimate', 'public', 'outdoor', 'indoor'
         """
         loc_lower = location.lower()
         
         intimate_places = ['kamar', 'kamar mandi', 'toilet', 'balkon']
-        public_places = ['mall', 'pantai', 'kantor', 'kafe', 'restoran', 'jalan']
+        public_places = ['mall', 'pantai', 'kantor', 'kafe', 'jalan']
         outdoor_places = ['taman', 'pantai', 'teras', 'jalan']
         
         if any(p in loc_lower for p in intimate_places):
@@ -343,9 +375,27 @@ class LocationValidator:
         else:
             return 'indoor'
     
+    def get_min_time_between(self, from_loc: str, to_loc: str) -> int:
+        """
+        Dapatkan minimal waktu yang dibutuhkan untuk pindah (dalam detik)
+        """
+        if not from_loc or not to_loc:
+            return 0
+        
+        from_lower = from_loc.lower()
+        to_lower = to_loc.lower()
+        
+        # Cari jarak
+        for (a, b), distance in self.location_distance.items():
+            if (a in from_lower and b in to_lower) or (b in from_lower and a in to_lower):
+                return self.base_time_between + (distance * self.distance_multiplier)
+        
+        # Default jarak sedang
+        return self.base_time_between + (2 * self.distance_multiplier)
+    
     def get_distance_description(self, from_loc: str, to_loc: str) -> str:
         """
-        Dapatkan deskripsi jarak antara dua lokasi
+        Dapatkan deskripsi jarak
         """
         min_time = self.get_min_time_between(from_loc, to_loc)
         
@@ -359,30 +409,56 @@ class LocationValidator:
             return "jauh"
     
     # =========================================================================
-    # UTILITY
+    # FORMAT RESPON BERDASARKAN ANALISA
     # =========================================================================
     
-    def get_allowed_locations(self, current_loc: str) -> List[str]:
+    def get_suggested_response(self, 
+                              analysis: Dict,
+                              bot_location: str,
+                              user_location: Optional[str] = None) -> str:
         """
-        Dapatkan daftar lokasi yang bisa dituju dari lokasi saat ini
+        Dapatkan saran respons berdasarkan analisa
+        
+        Args:
+            analysis: Hasil dari analyze_subject()
+            bot_location: Lokasi bot saat ini
+            user_location: Lokasi user (jika diketahui)
+            
+        Returns:
+            Saran respons
         """
-        current_lower = current_loc.lower()
-        allowed = []
+        subject = analysis['subject']
         
-        for key, values in self.valid_transitions.items():
-            if key in current_lower:
-                allowed.extend(values)
-                break
+        if subject == 'self':
+            # User cerita tentang dirinya
+            if user_location:
+                return f"Oh kamu di {user_location}? Aku masih di {bot_location} nih"
+            else:
+                return f"Oh gitu? Aku masih di {bot_location}"
         
-        # Tambahkan lokasi umum
-        common_locations = ['ruang tamu', 'kamar', 'dapur', 'kamar mandi', 'teras']
-        allowed.extend([loc for loc in common_locations if loc not in allowed])
+        elif subject == 'bot':
+            # User ngomong ke bot
+            if analysis['is_question']:
+                return f"Aku di {bot_location}. Kamu?"
+            elif analysis['is_move_command']:
+                return f"Ok, aku pindah"
+            else:
+                return f"Aku di {bot_location}"
         
-        return list(set(allowed))  # Unique
+        elif subject == 'together':
+            # Ajakan bersama
+            if analysis['is_move_command']:
+                return "Ayo!"
+            else:
+                return f"Kita di {bot_location} ya"
+        
+        else:
+            # Subjek tidak jelas
+            return f"Aku di {bot_location}. Kamu di mana?"
     
     def format_location_info(self, location: str) -> str:
         """
-        Format informasi lokasi untuk ditampilkan
+        Format informasi lokasi
         """
         category = self.get_location_category(location)
         category_names = {
