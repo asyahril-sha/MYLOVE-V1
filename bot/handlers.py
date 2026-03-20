@@ -1171,6 +1171,264 @@ async def get_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error getting user: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
+# ===== FUNGSI FORCE_RESET_COMMAND =====
+async def force_reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Force reset session user (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    # Cek apakah ada argumen (user_id yang di-reset)
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "❌ **Gunakan:** `/force_reset [user_id]`\n\n"
+            "Contoh: `/force_reset 123456789`"
+        )
+        return
+    
+    target_user_id = args[0]
+    
+    try:
+        # Hapus session dari memory
+        from bot.handlers import active_engines, user_sessions
+        
+        # Cari session untuk user tersebut
+        sessions_to_remove = []
+        for session_id, engine in list(active_engines.items()):
+            if hasattr(engine, 'user_id') and str(engine.user_id) == str(target_user_id):
+                sessions_to_remove.append(session_id)
+        
+        # Hapus dari active_engines
+        for session_id in sessions_to_remove:
+            if session_id in active_engines:
+                del active_engines[session_id]
+        
+        # Hapus dari user_sessions
+        if int(target_user_id) in user_sessions:
+            del user_sessions[int(target_user_id)]
+        
+        # Update database (optional)
+        import sqlite3
+        from pathlib import Path
+        
+        db_path = Path("database/gadis_v81.db")
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Update sessions jadi ended
+            cursor.execute("""
+                UPDATE sessions 
+                SET status = 'ended', ended_at = datetime('now')
+                WHERE user_id = ? AND status IN ('active', 'paused')
+            """, (target_user_id,))
+            
+            conn.commit()
+            conn.close()
+        
+        await update.message.reply_text(
+            f"✅ **Force reset berhasil**\n\n"
+            f"User `{target_user_id}` telah di-reset.\n"
+            f"Sessions dihapus: {len(sessions_to_remove)}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error force reset: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+# ===== FUNGSI BACKUP_DB_COMMAND =====
+async def backup_db_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Backup database (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    try:
+        import shutil
+        from pathlib import Path
+        from datetime import datetime
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        # Buat folder backup jika belum ada
+        backup_dir = Path("backups")
+        backup_dir.mkdir(exist_ok=True)
+        
+        # Nama file backup dengan timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = backup_dir / f"gadis_v81_backup_{timestamp}.db"
+        
+        # Copy database
+        shutil.copy2(db_path, backup_path)
+        
+        # Hitung ukuran backup
+        size_bytes = backup_path.stat().st_size
+        size_mb = size_bytes / (1024 * 1024)
+        
+        await update.message.reply_text(
+            f"✅ **Backup database berhasil**\n\n"
+            f"📁 **Lokasi:** `{backup_path}`\n"
+            f"📊 **Ukuran:** {size_mb:.2f} MB\n"
+            f"⏱️ **Waktu:** {timestamp}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error backup db: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+# ===== FUNGSI VACUUM_COMMAND =====
+async def vacuum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Vacuum database (optimasi) (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    try:
+        import sqlite3
+        from pathlib import Path
+        
+        db_path = Path("database/gadis_v81.db")
+        
+        if not db_path.exists():
+            await update.message.reply_text("❌ Database tidak ditemukan")
+            return
+        
+        # Ukuran sebelum vacuum
+        size_before = db_path.stat().st_size
+        size_before_mb = size_before / (1024 * 1024)
+        
+        # Vacuum database
+        conn = sqlite3.connect(db_path)
+        conn.execute("VACUUM")
+        conn.close()
+        
+        # Ukuran setelah vacuum
+        size_after = db_path.stat().st_size
+        size_after_mb = size_after / (1024 * 1024)
+        
+        # Pengurangan ukuran
+        saved = size_before - size_after
+        saved_mb = saved / (1024 * 1024)
+        saved_percent = (saved / size_before * 100) if size_before > 0 else 0
+        
+        await update.message.reply_text(
+            f"✅ **Vacuum database berhasil**\n\n"
+            f"📊 **Ukuran sebelum:** {size_before_mb:.2f} MB\n"
+            f"📊 **Ukuran setelah:** {size_after_mb:.2f} MB\n"
+            f"💾 **Hemat:** {saved_mb:.2f} MB ({saved_percent:.1f}%)"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error vacuum db: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+# ===== FUNGSI MEMORY_STATS_COMMAND =====
+async def memory_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lihat statistik memory (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    try:
+        import psutil
+        import os
+        
+        process = psutil.Process(os.getpid())
+        
+        # Memory info
+        memory_info = process.memory_info()
+        memory_rss = memory_info.rss / (1024 * 1024)  # MB
+        memory_vms = memory_info.vms / (1024 * 1024)  # MB
+        
+        # CPU info
+        cpu_percent = process.cpu_percent(interval=0.1)
+        
+        # Threads
+        threads = process.num_threads()
+        
+        # Connections
+        connections = len(process.connections())
+        
+        # Active engines
+        from bot.handlers import active_engines, user_sessions
+        
+        text = (
+            f"🧠 **STATISTIK MEMORY**\n\n"
+            f"📊 **RSS Memory:** {memory_rss:.2f} MB\n"
+            f"📊 **VMS Memory:** {memory_vms:.2f} MB\n"
+            f"⚡ **CPU Usage:** {cpu_percent:.1f}%\n"
+            f"🧵 **Threads:** {threads}\n"
+            f"🔌 **Connections:** {connections}\n\n"
+            f"🤖 **Active Engines:** {len(active_engines)}\n"
+            f"👤 **User Sessions:** {len(user_sessions)}"
+        )
+        
+        await update.message.reply_text(text)
+        
+    except ImportError:
+        # Fallback jika psutil tidak tersedia
+        from bot.handlers import active_engines, user_sessions
+        await update.message.reply_text(
+            f"🧠 **STATISTIK MEMORY (SEDERHANA)**\n\n"
+            f"🤖 **Active Engines:** {len(active_engines)}\n"
+            f"👤 **User Sessions:** {len(user_sessions)}\n\n"
+            f"⚠️ Install psutil untuk statistik lengkap"
+        )
+    except Exception as e:
+        logger.error(f"Error memory stats: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+# ===== FUNGSI RELOAD_COMMAND =====
+async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reload konfigurasi (khusus admin)"""
+    user_id = update.effective_user.id
+    
+    # Cek apakah user adalah admin
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Command hanya untuk admin")
+        return
+    
+    try:
+        # Reload settings
+        import importlib
+        import config.settings
+        importlib.reload(config.settings)
+        
+        # Update settings
+        from config import settings as new_settings
+        global settings
+        settings = new_settings
+        
+        await update.message.reply_text(
+            f"✅ **Reload berhasil**\n\n"
+            f"Settings telah dimuat ulang."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error reload: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+        
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Info debug"""
     user_id = update.effective_user.id
@@ -1327,8 +1585,12 @@ __all__ = [
     'db_stats_command',
     'list_users_command',
     'get_user_command',
-    'debug_command',
+    'force_reset_command',
     'backup_db_command',
+    'vacuum_command',
+    'memory_stats_command', 
+    'reload_command',
+    'debug_command',
     
     # Dummy commands
     'dominant_command',
