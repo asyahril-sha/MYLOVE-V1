@@ -513,14 +513,14 @@ async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Tidak ada session aktif.")
         return
     
+    # Reset conversation memory (PANGGIL SEBELUM DIHAPUS)
+    if session_id in active_engines:
+        await active_engines[session_id].reset_conversation()
+    
     # Hapus dari active engines
     if session_id in active_engines:
         await active_engines[session_id].end_session()
         del active_engines[session_id]
-
-    # Reset conversation memory
-    if session_id in active_engines:
-        await active_engines[session_id].reset_conversation()
     
     context.user_data.clear()
     
