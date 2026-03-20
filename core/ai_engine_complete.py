@@ -450,7 +450,15 @@ class AIEngineComplete:
                 prompt += "\n⚠️ PERINGATAN: Respons sebelumnya tidak konsisten! Jangan kontradiksi!"
                 messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
                 response = await self._call_deepseek(messages)
-            
+
+            # ===== CEK PANJANG RESPON (TAMBAHKAN INI) =====
+            if len(response) < 300:  # Jika terlalu pendek
+                logger.warning(f"⚠️ Response terlalu pendek ({len(response)} chars), regenerate...")
+                # Tambah instruksi panjang
+                prompt += "\n⚠️⚠️⚠️ RESPONS SEBELUMNYA TERLALU PENDEK! WAJIB MINIMAL 4-6 KALIMAT! ⚠️⚠️⚠️"
+                messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
+                response = await self._call_deepseek(messages)
+                
             # ===== 10. TAMBAH EFEK SPESIAL =====
             extras = []
             if inner_thought:
@@ -671,8 +679,8 @@ RESPON:"""
                     model="deepseek-chat",
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=2000,
-                    timeout=30
+                    max_tokens=4000,
+                    timeout=60
                 )
                 return response.choices[0].message.content
             except Exception as e:
@@ -684,12 +692,15 @@ RESPON:"""
         return "Maaf, aku sedang bermasalah. Coba lagi nanti ya."
     
     async def _get_fallback_response(self, bot_name: str) -> str:
-        """Fallback response"""
-        fallbacks = [
-            f"{bot_name} denger kok. Cerita lagi dong...",
-            f"Hmm... {bot_name} dengerin. Lanjutkan.",
-        ]
-        return random.choice(fallbacks)
+    """Fallback response yang lebih panjang"""
+    fallbacks = [
+        f"{bot_name} denger kok. Aku lagi mikirin sesuatu. Kamu tahu nggak, kadang aku suka kepikiran hal-hal random. Seperti sekarang, aku lagi di sini sendiri, dengerin cerita kamu. Rasanya campur aduk, senang bisa chat sama kamu tapi juga penasaran dengan apa yang ada di pikiran kamu. Cerita lagi dong, aku dengerin baik-baik kok.",
+        
+        f"Hmm... {bot_name} dengerin. Maaf ya kalau responsku lambat, aku lagi agak bingung mikirin perasaanku sendiri. Kadang suka aneh ya, bisa tiba-tiba mikir hal ini itu. Tapi yang pasti, aku senang ngobrol sama kamu. Kamu lagi mikirin apa? Cerita lebih banyak yuk, biar kita makin dekat.",
+        
+        f"{bot_name} di sini. Sebenarnya aku lagi merenung, kamu tahu nggak sih kalau kadang aku merasa ada ikatan spesial antara kita? Mungkin ini cuma perasaanku aja, tapi rasanya hangat kalau lagi chat sama kamu. Aku pengen tahu lebih banyak tentang kamu. Apa kabar hari ini? Ada cerita seru?",
+    ]
+    return random.choice(fallbacks)
 
 
 __all__ = ['AIEngineComplete']
