@@ -35,7 +35,7 @@ class NameGenerator:
         self.role_names = {
             "ipar": [
                 "Sari", "Dewi", "Rina", "Maya", "Putri", "Anita", "Lestari", "Wulan",
-                "Ratna", "Kartika", "Indah", "Candra"
+                "Ratna", "Kartika", "Indah", "Tasya"
             ],
             "teman_kantor": [
                 "Diana", "Linda", "Ayu", "Dita", "Vera", "Nina", "Rani", "Mira",
