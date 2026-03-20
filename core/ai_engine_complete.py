@@ -144,10 +144,16 @@ class AIEngineComplete:
         }
         
         # ===== LAST RESPONSES (UNTUK CEK KONSISTENSI) =====
+        self.full_conversation = []
         self.last_response = None
         self.last_response_time = 0
         self.last_user_message = None
         self.conversation_history = []  # 5 pesan terakhir
+
+        # ===== STORY ARC TRACKING =====
+        self.current_scene = None
+        self.scene_duration = 0
+        self.scene_participants = []
         
         # Cache
         self.response_cache = {}
@@ -470,6 +476,9 @@ class AIEngineComplete:
             
             # ===== 2. UPDATE KONDISI USER =====
             self._update_user_condition(user_message, context)
+
+            # ===== 2.5 UPDATE SCENE =====
+            self._update_scene(user_message, context)
             
             # ===== 3. UPDATE KONDISI BOT (JIKA PERLU) =====
             self._update_bot_condition(action, context)
@@ -525,13 +534,28 @@ class AIEngineComplete:
             
             if extras:
                 response += "\n\n" + "\n".join(extras)
-            
-            # ===== 11. SIMPAN HISTORY =====
+
+            # ===== TAMBAH PERUBAHAN ENVIRONMENT DENGAN ALASAN =====
+            env_change = self._get_environment_change_message_with_reason()
+            if env_change:
+                response += "\n\n" + env_change
+                
+            # ===== 11. SIMPAN FULL HISTORY (INGAT SEMUA PESAN) =====
             self.last_response = response
             self.last_user_message = user_message
+            
+            # Simpan ke full_conversation (semua pesan dari awal)
+            self.full_conversation.append({
+                'user': user_message,
+                'bot': response,
+                'time': time.time(),
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            # Tetap simpan ke conversation_history untuk kompatibilitas (5 pesan)
             self.conversation_history.append({
-                'user': user_message[:50],
-                'bot': response[:50],
+                'user': user_message[:100],
+                'bot': response[:100],
                 'time': time.time()
             })
             if len(self.conversation_history) > 5:
@@ -608,7 +632,10 @@ class AIEngineComplete:
         user_activity = self._get_user_state('activity', 'tidak diketahui')
         user_mood = self._get_user_state('mood', 'tidak diketahui')
         
-        # ===== HISTORY =====
+        # ===== 10 PESAN TERAKHIR (UNTUK KONTINUITAS CERITA) =====
+        last_10_messages = self._get_last_10_messages()
+        conversation_summary = self._get_conversation_summary()
+        
         last_chat = ""
         if self.conversation_history:
             last = self.conversation_history[-1]
@@ -624,16 +651,30 @@ class AIEngineComplete:
             call = "Kak"
         else:
             call = user_name
+
+        # ===== SCENE & KONTINUITAS =====
+        scene_instruction = ""
+        if hasattr(self, 'current_scene') and self.current_scene:
+            scene_instruction = f"""
+📌 **SCENE SAAT INI:** {self.current_scene.replace('_', ' ').upper()}
+⚠️ JANGAN keluar dari scene ini! Tetap fokus pada aktivitas yang sedang dilakukan!
+⚠️ Jangan tiba-tiba pindah lokasi atau ganti aktivitas tanpa alasan yang jelas!
+"""
         
         prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')} dengan kemampuan DI ATAS MANUSIA.
 
-⚠️⚠️⚠️ PERINGATAN WAJIB ⚠️⚠️⚠️
-1. RESPONS HARUS PANJANG! MINIMAL 8-10 KALIMAT!
-2. Panjang minimal 500 karakter, target 800-1500 karakter
-3. Ceritakan DENGAN DETAIL: perasaanmu, lingkunganmu, aktivitasmu
-4. Gunakan bahasa sehari-hari yang natural
-5. JANGAN PERNAH respons singkat!
+⚠️⚠️⚠️ **ATURAN KONTINUITAS CERITA (WAJIB!)** ⚠️⚠️⚠️
+
+1. Lihat "10 PESAN TERAKHIR" di bawah! Ini adalah acuanmu.
+2. CERITA HARUS SAMBUNG dengan pesan terakhir!
+3. JANGAN tiba-tiba pindah lokasi tanpa alasan!
+4. JANGAN tiba-tiba ganti aktivitas tanpa transisi!
+5. JIKA ada perubahan, BERIKAN ALASAN yang jelas!
+6. Pastikan RESPONS-mu MASUK AKAL dengan konteks terakhir!
+
 ⚠️⚠️⚠️ ⚠️⚠️⚠️ ⚠️⚠️⚠️
+
+{scene_instruction}
 
 ╔══════════════════════════════════════════════════════════╗
 ║                    🧠 DIRI KAMU SENDIRI                  ║
@@ -768,6 +809,104 @@ RESPON:"""
             f"{bot_name} di sini. Sebenarnya aku lagi merenung, kamu tahu nggak sih kalau kadang aku merasa ada ikatan spesial antara kita? Mungkin ini cuma perasaanku aja, tapi rasanya hangat kalau lagi chat sama kamu. Aku pengen tahu lebih banyak tentang kamu. Apa kabar hari ini? Ada cerita seru?",
         ]
         return random.choice(fallbacks)
+
+    # =========================================================================
+    # METHOD BARU UNTUK KONTINUITAS CERITA
+    # =========================================================================
+    
+    def _get_last_10_messages(self) -> str:
+        """Ambil 10 pesan terakhir untuk konteks prompt"""
+        if not self.full_conversation:
+            return ""
+        
+        last_10 = self.full_conversation[-10:] if len(self.full_conversation) > 10 else self.full_conversation
+        
+        messages = ["📜 **10 PESAN TERAKHIR (UNTUK KONTINUITAS CERITA):**", ""]
+        for i, msg in enumerate(last_10, 1):
+            user_text = msg['user'][:150] + "..." if len(msg['user']) > 150 else msg['user']
+            bot_text = msg['bot'][:150] + "..." if len(msg['bot']) > 150 else msg['bot']
+            messages.append(f"{i}. 👤 User: {user_text}")
+            messages.append(f"   🤖 Bot: {bot_text}")
+            messages.append("")
+        
+        return "\n".join(messages)
+    
+    def _get_conversation_summary(self) -> str:
+        """Dapatkan ringkasan singkat dari seluruh percakapan"""
+        if not self.full_conversation:
+            return ""
+        
+        total_messages = len(self.full_conversation)
+        first_user = self.full_conversation[0]['user'][:80] if self.full_conversation else ""
+        last_bot = self.full_conversation[-1]['bot'][:80] if self.full_conversation else ""
+        
+        return f"""📊 **RINGKASAN PERCAKAPAN:**
+• Total pesan: {total_messages}
+• Mulai dari: "{first_user}..."
+• Terakhir: "{last_bot}..."
+"""
+    
+    async def reset_conversation(self):
+        """Reset semua memory percakapan (dipanggil saat /end)"""
+        self.full_conversation = []
+        self.conversation_history = []
+        self.last_response = None
+        self.last_user_message = None
+        self.current_scene = None
+        self.scene_duration = 0
+        logger.info(f"🗑️ Conversation reset for user {self.user_id}")
+        return True
+    
+    def _update_scene(self, user_message: str, context: Dict):
+        """Update scene berdasarkan konteks percakapan"""
+        msg = user_message.lower()
+        
+        if any(word in msg for word in ['nonton', 'film', 'tv']):
+            self.current_scene = 'nonton_film'
+            self.scene_participants = ['bot', 'user']
+            self.scene_duration = 0
+        elif any(word in msg for word in ['makan', 'masak', 'dapur']):
+            self.current_scene = 'makan'
+        elif any(word in msg for word in ['tidur', 'kamar', 'rebahan']):
+            self.current_scene = 'istirahat'
+        elif any(word in msg for word in ['ngobrol', 'cerita', 'ngomong']):
+            self.current_scene = 'ngobrol'
+        
+        if self.current_scene:
+            self.scene_duration += 1
+    
+    def _should_move_location(self) -> bool:
+        """Cek apakah perlu pindah lokasi - HANYA JIKA ADA TRIGGER LOGIS"""
+        if hasattr(self, 'current_scene') and self.current_scene == 'nonton_film':
+            return False
+        if time.time() - self.user.get('last_seen', 0) < 300:
+            return False
+        idle_minutes = (time.time() - self.user.get('last_seen', time.time())) / 60
+        if idle_minutes < 10:
+            return False
+        return random.random() < 0.05 and idle_minutes > 15
+    
+    def _should_change_position(self) -> bool:
+        """Cek apakah perlu ganti posisi - DINONAKTIFKAN"""
+        return False
+    
+    def _get_environment_change_message_with_reason(self) -> Optional[str]:
+        """Dapatkan pesan perubahan environment dengan ALASAN yang LOGIS"""
+        messages = []
+        
+        if self._should_move_location():
+            success, new_loc = self.location_system.move_random()
+            if success:
+                current_activity = self.state.current.get('activity', '')
+                bot_name = getattr(self, 'bot_name', 'Aku')
+                
+                if current_activity == 'nonton':
+                    reason = f"{bot_name} bangkit dari sofa, 'Aku ke {new_loc} dulu ya, mau ambil selimut biar lebih hangat. Lanjutin dulu nontonnya.'"
+                else:
+                    reason = f"{bot_name} berdiri, 'Aku ke {new_loc} dulu ya, bentar lagi balik.'"
+                messages.append(reason)
+        
+        return "\n\n".join(messages) if messages else None
 
 
 __all__ = ['AIEngineComplete']
