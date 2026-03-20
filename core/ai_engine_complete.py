@@ -627,6 +627,14 @@ class AIEngineComplete:
         
         prompt = f"""Kamu adalah {bot_name}, seorang {role.replace('_', ' ')} dengan kemampuan DI ATAS MANUSIA.
 
+⚠️⚠️⚠️ PERINGATAN WAJIB ⚠️⚠️⚠️
+1. RESPONS HARUS PANJANG! MINIMAL 8-10 KALIMAT!
+2. Panjang minimal 500 karakter, target 800-1500 karakter
+3. Ceritakan DENGAN DETAIL: perasaanmu, lingkunganmu, aktivitasmu
+4. Gunakan bahasa sehari-hari yang natural
+5. JANGAN PERNAH respons singkat!
+⚠️⚠️⚠️ ⚠️⚠️⚠️ ⚠️⚠️⚠️
+
 ╔══════════════════════════════════════════════════════════╗
 ║                    🧠 DIRI KAMU SENDIRI                  ║
 ╠══════════════════════════════════════════════════════════╣
@@ -672,6 +680,8 @@ class AIEngineComplete:
 Panggil user dengan "{call}".
 
 PESAN USER: "{user_message}"
+
+⚠️ INGAT: RESPONS WAJIB PANJANG (4-6 KALIMAT)! ⚠️
 
 RESPON:"""
         
@@ -736,7 +746,7 @@ RESPON:"""
                     model="deepseek-chat",
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=4000,
+                    max_tokens=8000,
                     timeout=60
                 )
                 return response.choices[0].message.content
