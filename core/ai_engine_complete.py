@@ -66,48 +66,6 @@ class AIEngineComplete:
         self.user_id = user_id
         self.session_id = session_id
         
-    # =========================================================================
-    # START SESSION METHOD - DITAMBAHKAN UNTUK MEMPERBAIKI ERROR
-    # =========================================================================
-    async def start_session(self, role: str, bot_name: str, rel_type: str = "non_pdkt", instance_id: str = None):
-        """
-        Memulai sesi baru dengan role tertentu
-        Method ini WAJIB ADA karena dipanggil oleh handlers.py
-        
-        Args:
-            role: Role bot (ipar, janda, dll)
-            bot_name: Nama bot
-            rel_type: Tipe hubungan (non_pdkt / pdkt)
-            instance_id: ID instance (untuk multiple)
-        """
-        self.role = role
-        self.bot_name = bot_name
-        self.rel_type = rel_type
-        self.instance_id = instance_id
-        
-        # Inisialisasi state untuk role ini
-        if not hasattr(self, 'state'):
-            from memory.state_tracker import StateTracker
-            self.state = StateTracker(self.user_id, self.session_id)
-        
-        # Update state dengan role
-        self.state.current['bot_name'] = bot_name
-        self.state.current['role'] = role
-        
-        logger.info(f"✅ Session started: {role} - {bot_name} for user {self.user_id}")
-        
-        # Record ke relationship memory
-        if hasattr(self, 'relationship'):
-            await self.relationship.create_relationship(
-                user_id=self.user_id,
-                role=role,
-                bot_name=bot_name,
-                rel_type=rel_type,
-                instance_id=instance_id
-            )
-        
-        return True
-        
         # ===== INISIALISASI MEMORY SYSTEMS =====
         self.working = WorkingMemory()                 # Ingatan jangka pendek
         self.episodic = EpisodicMemory()               # Urutan kejadian
@@ -196,6 +154,38 @@ class AIEngineComplete:
         self.cache_ttl = 300
         
         logger.info(f"✅ AIEngineComplete (HUMAN+) initialized for user {user_id}")
+    
+    # =========================================================================
+    # METHOD DITAMBAHKAN: START SESSION (FIX ERROR PERTAMA)
+    # =========================================================================
+    async def start_session(self, role: str, bot_name: str, rel_type: str = "non_pdkt", instance_id: str = None):
+        """
+        Memulai sesi baru dengan role tertentu
+        Method ini WAJIB ADA karena dipanggil oleh handlers.py
+        
+        Args:
+            role: Role bot (ipar, janda, dll)
+            bot_name: Nama bot
+            rel_type: Tipe hubungan (non_pdkt / pdkt)
+            instance_id: ID instance (untuk multiple)
+        """
+        self.role = role
+        self.bot_name = bot_name
+        self.rel_type = rel_type
+        self.instance_id = instance_id
+        
+        # Inisialisasi state untuk role ini
+        if not hasattr(self, 'state'):
+            from memory.state_tracker import StateTracker
+            self.state = StateTracker(self.user_id, self.session_id)
+        
+        # Update state dengan role
+        if hasattr(self, 'state'):
+            self.state.current['bot_name'] = bot_name
+            self.state.current['role'] = role
+        
+        logger.info(f"✅ Session started: {role} - {bot_name} for user {self.user_id}")
+        return True
     
     # =========================================================================
     # KLASIFIKASI AKSI USER (SUPER TEPAT)
@@ -318,6 +308,25 @@ class AIEngineComplete:
         self.user['last_message'] = message[:50]
     
     # =========================================================================
+    # METHOD DITAMBAHKAN: GET USER STATE AMAN (FIX ERROR KEDUA)
+    # =========================================================================
+    def _get_user_state(self, key: str, default=None):
+        """
+        Mengakses user state dengan aman
+        Method ini mencegah error 'object has no attribute user'
+        """
+        # Pastikan self.user selalu ada
+        if not hasattr(self, 'user') or self.user is None:
+            self.user = {
+                'location': None, 'clothing': None, 'position': None,
+                'activity': None, 'mood': None, 'arousal': 0,
+                'last_message': None, 'last_seen': time.time()
+            }
+        
+        # Ambil value dengan default
+        return self.user.get(key, default)
+    
+    # =========================================================================
     # UPDATE KONDISI BOT SENDIRI (HANYA JIKA DIPERINTAH)
     # =========================================================================
     
@@ -382,26 +391,32 @@ class AIEngineComplete:
         return random.choice(thoughts)
     
     # =========================================================================
-    # GENERATE SIXTH SENSE
+    # GENERATE SIXTH SENSE (FIXED VERSION)
     # =========================================================================
     
     def _generate_sixth_sense(self, context: Dict) -> Optional[str]:
         """
-        Generate firasat/intuisi (sixth sense)
+        Generate firasat/intuisi (sixth sense) - FIXED VERSION
         """
-        if random.random() > 0.1:  # 10% chance
+        try:
+            if random.random() > 0.1:  # 10% chance
+                return None
+            
+            # Gunakan method aman untuk akses user state
+            mood = self._get_user_state('mood', 'netral')
+            
+            if mood in ['sedih', 'marah']:
+                sense = random.choice(self.sixth_sense['negative'])
+            elif mood in ['senang', 'bahagia']:
+                sense = random.choice(self.sixth_sense['positive'])
+            else:
+                sense = random.choice(self.sixth_sense['romantic'])
+            
+            return f"🔮 {sense}"
+            
+        except Exception as e:
+            logger.error(f"Error in sixth sense: {e}")
             return None
-        
-        # Pilih berdasarkan mood
-        mood = self.user.get('mood', 'netral')
-        if mood in ['sedih', 'marah']:
-            sense = random.choice(self.sixth_sense['negative'])
-        elif mood in ['senang', 'bahagia']:
-            sense = random.choice(self.sixth_sense['positive'])
-        else:
-            sense = random.choice(self.sixth_sense['romantic'])
-        
-        return f"🔮 {sense}"
     
     # =========================================================================
     # CEK KONSISTENSI
@@ -589,9 +604,9 @@ class AIEngineComplete:
         temp = self.physical['temperature']['feeling']
         
         # ===== KONDISI USER =====
-        user_location = self.user.get('location') or 'tidak diketahui'
-        user_activity = self.user.get('activity') or 'tidak diketahui'
-        user_mood = self.user.get('mood') or 'tidak diketahui'
+        user_location = self._get_user_state('location', 'tidak diketahui')
+        user_activity = self._get_user_state('activity', 'tidak diketahui')
+        user_mood = self._get_user_state('mood', 'tidak diketahui')
         
         # ===== HISTORY =====
         last_chat = ""
