@@ -87,7 +87,7 @@ class NameGenerator:
             "Ratna": "permata",
             "Kartika": "bintang",
             "Indah": "cantik",
-            "Candra": "bulan",
+            "Tasya": "bulan",
             
             # Teman Kantor
             "Diana": "dewi bulan",
