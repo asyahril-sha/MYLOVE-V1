@@ -890,20 +890,19 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
         
         logger.info(f"User {user.id} selected role: {role_key} dengan nama {bot_name}")
         
-        await query.edit_message_text(response, parse_mode=None)
+        # FIX: Gunakan parse_mode=None untuk menghindari error Markdown
+        try:
+            await query.edit_message_text(response, parse_mode='Markdown')
+        except Exception as e:
+            # Jika error Markdown, kirim tanpa format
+            logger.warning(f"Markdown error, sending without formatting: {e}")
+            await query.edit_message_text(response, parse_mode=None)
+        
         return ConversationHandler.END
         
     except Exception as e:
         logger.error(f"Error in role_callback: {e}")
-        traceback.print_exc()
-        try:
-            await query.edit_message_text(
-                "❌ **Maaf, terjadi kesalahan teknis.**\n\n"
-                "Silakan coba /start lagi ya. "
-                "Kami sudah mencatat error ini dan akan segera diperbaiki."
-            )
-        except:
-            pass
+        await query.edit_message_text("❌ Terjadi kesalahan. Silakan coba lagi.")
         return ConversationHandler.END
 
 
