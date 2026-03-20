@@ -1415,10 +1415,16 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import config.settings
         importlib.reload(config.settings)
         
-        # Update settings
+        # Update settings - CARA BENAR
         from config import settings as new_settings
-        global settings
-        settings = new_settings
+        
+        # Update module settings secara global
+        import sys
+        sys.modules['config.settings'] = new_settings
+        
+        # Update variabel local
+        global_vars = globals()
+        global_vars['settings'] = new_settings
         
         await update.message.reply_text(
             f"✅ **Reload berhasil**\n\n"
