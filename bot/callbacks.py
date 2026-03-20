@@ -72,7 +72,7 @@ async def show_main_menu(query, text: str = "💕 **Pilih role yang kamu inginka
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=None)
     return Constants.SELECTING_ROLE
 
 
