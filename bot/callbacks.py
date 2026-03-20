@@ -853,7 +853,10 @@ async def role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, role
             print(f"Error generating session ID: {e}")
             session_id = generate_session_id_fallback(bot_name, role_key, user_id)
         context.user_data['current_session'] = session_id
-        
+
+        # <=== TAMBAHKAN INI UNTUK DEBUG ===>
+        logger.info(f"✅ SESSION SAVED: {session_id}")
+        logger.info(f"📦 USER DATA KEYS: {list(context.user_data.keys())}")
         # ===== 9. PILIH PEMBUKA =====
         opening = random.choice(role_info['pembuka'])
         
