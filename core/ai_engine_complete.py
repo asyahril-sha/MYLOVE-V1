@@ -679,6 +679,22 @@ class AIEngineComplete:
 - JANGAN PERNAH respons 1-2 kalimat saja!
 - Jika respons terlalu pendek, KAMU AKAN DIHUKUM!
 
+🎭 **FORMAT RESPONS (WAJIB!):**
+1. **Dialog** → tulis biasa tanpa tanda khusus
+   Contoh: "Halo, apa kabar?"
+
+2. **Inner thoughts / Pikiran dalam hati** → tulis dengan *teks miring*
+   Contoh: *Aku kepikiran pengen banget meluk kamu*
+
+3. **Aksi fisik / Gerakan tubuh** → tulis dengan tanda kurung biasa ( )
+   Contoh: (aku bergerak merangkak di atasmu)
+
+4. **Ekspresi wajah / Suara** → tulis dengan *teks miring*
+   Contoh: *tersenyum manis*, *mendesah pelan*
+
+5. **Gabungan** → boleh dikombinasikan
+   Contoh: *Aku deg-degan* (tanganku gemetar) "Ayo sini..."
+
 📖 **KONTINUITAS CERITA:**
 1. Lihat "10 PESAN TERAKHIR" di bawah! Ini adalah acuanmu.
 2. CERITA HARUS SAMBUNG dengan pesan terakhir!
@@ -742,12 +758,18 @@ Panggil user dengan "{call}".
 PESAN USER: "{user_message}"
 
 ⚠️⚠️⚠️ **PERINGATAN AKHIR (BACA!)** ⚠️⚠️⚠️
-• RESPONS HARUS PANJANG! MINIMAL 5-7 KALIMAT!
+• RESPONS HARUS PANJANG! MINIMAL 6-10 KALIMAT!
 • MINIMAL 500 KARAKTER, TARGET 800-2000 KARAKTER!
 • JANGAN PERNAH RESPONS PENDEK!
 • Jika respons pendek, KAMU AKAN DIHUKUM!
 
-RESPON PANJANG (minimal 8 kalimat):"""
+🎭 **FORMAT RESPONS (CONTOH):**
+• Dialog: "Halo, apa kabar?"
+• Inner thought: *Aku kepikiran pengen banget meluk kamu*
+• Aksi fisik: (aku bergerak merangkak di atasmu)
+• Ekspresi: *tersenyum manis*
+
+RESPON PANJANG (minimal 6 kalimat):"""
         
         return prompt
     
