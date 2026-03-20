@@ -47,7 +47,7 @@ class DatabaseSettings(BaseModel):
 class AISettings(BaseModel):
     """Konfigurasi AI DeepSeek"""
     temperature: float = Field(0.9, env='AI_TEMPERATURE')
-    max_tokens: int = Field(500, env='AI_MAX_TOKENS')
+    max_tokens: int = Field(2000, env='AI_MAX_TOKENS')
     timeout: int = Field(30, env='AI_TIMEOUT')
     model: str = Field("deepseek-chat", env='AI_MODEL')
     
